@@ -1,0 +1,50 @@
+name: Build Android App
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          
+      - name: Install Cordova
+        run: npm install -g cordova
+        
+      - name: Create Android Wrapper
+        run: |
+          cordova create myapp com.ibrahim.kelimesavasi KelimeSavasi
+          cd myapp
+          cordova platform add android --save
+          rm -rf www/*
+          cp -r ../* www/ || true
+          rm -rf www/myapp
+          
+      # BURAYI DEĞİŞTİRDİK: Doğrudan normal APK (debug) üretiyoruz, böylece dosya kesin oluşacak
+      - name: Build APK and AAB
+        run: |
+          cd myapp
+          cordova build android --debug
+          cordova build android --release -- --appBundle
+          
+      # NOKTA ATIŞI: Doğrudan üretilen tekil .apk dosyasını hedef gösterdik
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Telefonunuza-Kurmalik-APK
+          path: myapp/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          
+      - name: Upload AAB (Google Play için)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Google-Play-Icin-AAB
+          path: myapp/platforms/android/app/build/outputs/bundle/release/app-release.aab
