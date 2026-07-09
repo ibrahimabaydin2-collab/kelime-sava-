@@ -35,14 +35,16 @@ jobs:
           cordova build android --release
           cordova build android --release -- --appBundle
           
+      # GARANTİ ADIM: APK dosyasını bulup çıkartmak için yolu güncelledik
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Telefonunuza-Kurmalik-APK
-          path: myapp/platforms/android/app/build/outputs/apk/release/
+          path: myapp/platforms/android/app/build/outputs/apk/
           
       - name: Upload AAB (Google Play için)
         uses: actions/upload-artifact@v4
         with:
           name: Google-Play-Icin-AAB
-          path: myapp/platforms/android/app/build/outputs/bundle/release/
+          path: myapp/platforms/android/app/build/outputs/bundle/
+        
