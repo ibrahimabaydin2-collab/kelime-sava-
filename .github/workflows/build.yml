@@ -5,16 +5,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           
-      - name: Install Dependencies
-        run: npm install
-        
-      - name: Build Web Project
-        run: npm run build
-        
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          
       - name: Install Cordova
         run: npm install -g cordova
         
@@ -24,7 +26,8 @@ jobs:
           cd myapp
           cordova platform add android --save
           rm -rf www/*
-          cp -r ../dist/* www/
+          cp -r ../* www/ || true
+          rm -rf www/myapp
           
       - name: Build APK and AAB
         run: |
@@ -43,7 +46,3 @@ jobs:
         with:
           name: Google-Play-Icin-AAB
           path: myapp/platforms/android/app/build/outputs/bundle/release/
-
-
-          
-          
