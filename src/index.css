@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@keyframes flicker {
+  0%, 100% { transform: scale(1) rotate(-2deg); filter: brightness(1); }
+  20% { transform: scale(1.1) rotate(3deg); filter: brightness(1.2); }
+  40% { transform: scale(0.95) rotate(-1deg); filter: brightness(0.9); }
+  60% { transform: scale(1.05) rotate(2deg); filter: brightness(1.1); }
+  80% { transform: scale(1) rotate(0deg); filter: brightness(1.05); }
+}
+
+@keyframes floatUp {
+  0% { transform: translateY(10px) scale(0.5); opacity: 0; }
+  30% { opacity: 0.9; }
+  100% { transform: translateY(-70px) scale(1.2); opacity: 0; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.4)); }
+  50% { filter: drop-shadow(0 0 20px rgba(239, 68, 68, 0.8)); }
+}
+
+@keyframes rotateSlow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-flicker {
+  animation: flicker 0.15s infinite ease-in-out alternate;
+}
+
+.animate-float-up-slow {
+  animation: floatUp 2s infinite ease-out;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s infinite ease-in-out;
+}
+
+.animate-rotate-slow {
+  animation: rotateSlow 12s infinite linear;
+}
