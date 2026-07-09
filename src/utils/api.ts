@@ -3,36 +3,48 @@ const DEPLOYED_APP_URL = "https://ais-pre-vzpmai7eoao3e226nj2zhy-132556631899.eu
 export function getBaseUrl(): string {
   // Check if process.env.APP_URL is injected during build
   const envUrl = typeof process !== 'undefined' && process.env && process.env.APP_URL ? process.env.APP_URL : '';
+  const fallbackUrl = envUrl || DEPLOYED_APP_URL;
+  const cleanFallback = fallbackUrl.endsWith('/') ? fallbackUrl.slice(0, -1) : fallbackUrl;
   
-  // If we're in a regular browser environment running on the Cloud Run domain, we can use relative paths
   if (typeof window !== 'undefined') {
     const { protocol, hostname, port } = window.location;
+    const ua = navigator.userAgent || '';
+    
+    // Detect mobile device/emulator and WebView environment indicators
+    const isAndroid = /android/i.test(ua);
+    const isIOS = /iphone|ipad|ipod/i.test(ua);
+    
+    // Webview detection (includes common wrapper strings, e.g. "wv", "WebView", or custom Android interface)
+    const isWebView = ua.includes('wv') || 
+                      ua.includes('WebView') || 
+                      (isAndroid && !ua.includes('Chrome')) ||
+                      (isIOS && !ua.includes('Safari')) ||
+                      (window as any).Android || 
+                      ((window as any).webkit && (window as any).webkit.messageHandlers);
+    
+    // If we are in a hybrid / mobile container (local files, capacitor protocol, native ionic, or localhost with a mobile agent)
+    const isHybrid = protocol === 'file:' || 
+                     protocol.startsWith('capacitor') || 
+                     protocol.startsWith('ionic') || 
+                     isWebView ||
+                     ((hostname === 'localhost' || hostname === '127.0.0.1') && (isAndroid || isIOS));
+                     
+    if (isHybrid) {
+      return cleanFallback;
+    }
     
     // Regular web browser (on actual domain or dev server)
     if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
       return ''; // Relative path works fine
     }
     
-    // Localhost with port (e.g., browser dev environment)
+    // Localhost with port (desktop browser development environment)
     if ((hostname === 'localhost' || hostname === '127.0.0.1') && port) {
       return ''; // Relative path works fine
     }
-    
-    // If it's an APK / Hybrid (file protocol, capacitor, ionic, or localhost without port)
-    const isHybrid = protocol === 'file:' || 
-                     protocol.startsWith('capacitor') || 
-                     protocol.startsWith('ionic') || 
-                     (hostname === 'localhost' && !port) ||
-                     (typeof navigator !== 'undefined' && /android|iphone|ipad/i.test(navigator.userAgent));
-                     
-    if (isHybrid) {
-      // Return the env-injected URL, or fall back to the deployed URL
-      const cleanUrl = envUrl || DEPLOYED_APP_URL;
-      return cleanUrl.endsWith('/') ? cleanUrl.slice(0, -1) : cleanUrl;
-    }
   }
   
-  return envUrl || DEPLOYED_APP_URL;
+  return cleanFallback;
 }
 
 export function getApiUrl(endpoint: string): string {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Award, CheckCircle, BarChart2, Share2, Sparkles, Copy, Check } from 'lucide-react';
 import { UserProfile, Badge, DailyMission } from '../types';
+import { getBaseUrl } from '../utils/api.js';
 
 interface StatsModalProps {
   profile: UserProfile;
@@ -29,6 +30,8 @@ export default function StatsModal({
   const completedMissionsCount = profile.missions.filter(m => m.completed).length;
 
   const handleShare = () => {
+    const baseUrl = getBaseUrl();
+    const shareLink = baseUrl ? baseUrl : (window.location.origin || window.location.href);
     const shareText = `🧩 Kelime Savaşı Türkçe Kelime Oyunu! 
 
 🏆 Günlük Skor: ${profile.dailyScore} Puan
@@ -36,7 +39,7 @@ export default function StatsModal({
 🔥 En İyi Seri: ${stats.maxStreak} Gün
 🎖️ Kazanılan Rozet: ${unlockedBadgesCount}/${profile.badges.length}
 
-Sen de bana meydan oku! 🚀 ${window.location.href}`;
+Sen de bana meydan oku! 🚀 ${shareLink}`;
 
     navigator.clipboard.writeText(shareText);
     setCopied(true);

@@ -33,9 +33,12 @@ export default function Header({
     <header className="w-full border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 transition-colors duration-200">
       <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="bg-emerald-500 text-white p-2 rounded-lg font-bold text-lg tracking-wider animate-pulse shadow-md shadow-emerald-500/20">
-            KS
-          </div>
+          <img 
+            src="/logo.svg" 
+            alt="Kelime Savaşı Logo" 
+            className="w-10 h-10 rounded-xl shadow-md shadow-emerald-500/25 transition duration-300 hover:scale-105"
+            referrerPolicy="no-referrer"
+          />
           <div>
             <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white font-sans flex items-center gap-2">
               Kelime Savaşı

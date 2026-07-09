@@ -5,6 +5,7 @@ import {
   Copy, Check, Flame, Zap, Target, Edit2, User, Award, CheckCircle2, TrendingUp
 } from 'lucide-react';
 import { UserProfile, LobbyPlayer, Challenge } from '../types.js';
+import { getBaseUrl } from '../utils/api.js';
 
 interface WelcomeScreenProps {
   profile: UserProfile;
@@ -67,7 +68,9 @@ export default function WelcomeScreen({
   const AVATAR_PRESETS = ['⚔️', '🧠', '🐺', '🦁', '🧙‍♂️', '🦊', '👾', '🦄', '⚡', '👑', '🎯', '🚀', '🔥', '🐉', '🐼', '🛡️', '🏆', '🦉'];
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
+    const baseUrl = getBaseUrl();
+    const shareLink = baseUrl ? baseUrl : (window.location.origin || window.location.href);
+    navigator.clipboard.writeText(shareLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -97,6 +100,22 @@ export default function WelcomeScreen({
   return (
     <div className="w-full max-w-lg mx-auto space-y-5 px-4 py-2 animate-fade-in" id="welcome-screen-root">
       
+      {/* Brand Hero Header */}
+      <div className="flex flex-col items-center text-center py-3 space-y-1">
+        <img 
+          src="/logo.svg" 
+          alt="Kelime Savaşı Logo" 
+          className="w-24 h-24 rounded-3xl shadow-xl shadow-emerald-500/15 border-2 border-emerald-500/20 mb-2 transition duration-500 hover:rotate-6 active:scale-95"
+          referrerPolicy="no-referrer"
+        />
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
+          Kelime Savaşı
+        </h1>
+        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold tracking-widest uppercase">
+          TÜRKÇE KELİME BULMACA DÜELLOSU
+        </p>
+      </div>
+
       {/* Interactive Savaşçı Kartı (Warrior Profile Card) */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden text-white" id="warrior-profile-card">
         {/* Background ambient lighting effects */}
