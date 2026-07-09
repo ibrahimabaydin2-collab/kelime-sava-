@@ -1,0 +1,49 @@
+name: Build Android App
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          
+      - name: Install Dependencies
+        run: npm install
+        
+      - name: Build Web Project
+        run: npm run build
+        
+      - name: Install Cordova
+        run: npm install -g cordova
+        
+      - name: Create Android Wrapper
+        run: |
+          cordova create myapp com.ibrahim.kelimesavasi KelimeSavasi
+          cd myapp
+          cordova platform add android --save
+          rm -rf www/*
+          cp -r ../dist/* www/
+          
+      - name: Build APK and AAB
+        run: |
+          cd myapp
+          cordova build android --release
+          cordova build android --release -- --appBundle
+          
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Telefonunuza-Kurmalik-APK
+          path: myapp/platforms/android/app/build/outputs/apk/release/
+          
+      - name: Upload AAB (Google Play için)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Google-Play-Icin-AAB
+          path: myapp/platforms/android/app/build/outputs/bundle/release/
+
+
+          
+          
