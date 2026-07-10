@@ -1807,7 +1807,10 @@ export default function App() {
         <SettingsModal
           settings={settings}
           onChangeSettings={setSettings}
-          onClose={() => setShowSettingsModal(false)}
+          onClose={() => {
+            setShowSettingsModal(false);
+            handleManualReconnect();
+          }}
           darkMode={darkMode}
           onToggleDarkMode={() => setDarkMode(!darkMode)}
           onOpenStats={() => setShowStatsModal(true)}

@@ -1,6 +1,21 @@
 const DEPLOYED_APP_URL = "https://ais-pre-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app";
+const DEV_APP_URL = "https://ais-dev-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app";
 
 export function getBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    try {
+      const type = window.localStorage.getItem('kelimesavasi_server_type') || 'pre';
+      if (type === 'dev') {
+        return DEV_APP_URL;
+      } else if (type === 'custom') {
+        const customUrl = window.localStorage.getItem('kelimesavasi_custom_server_url');
+        if (customUrl) {
+          return customUrl.endsWith('/') ? customUrl.slice(0, -1) : customUrl;
+        }
+      }
+    } catch (e) {}
+  }
+
   // Check if process.env.APP_URL is injected during build
   const envUrl = typeof process !== 'undefined' && process.env && process.env.APP_URL ? process.env.APP_URL : '';
   const fallbackUrl = envUrl || DEPLOYED_APP_URL;
@@ -90,8 +105,27 @@ export function getApiUrl(endpoint: string): string {
 
 export function getWsUrl(): string {
   let wsUrl = '';
+
+  if (typeof window !== 'undefined') {
+    try {
+      const type = window.localStorage.getItem('kelimesavasi_server_type') || 'pre';
+      if (type === 'dev') {
+        const noProtocol = DEV_APP_URL.replace(/^https?:\/\//, '');
+        return `wss://${noProtocol}/ws`;
+      } else if (type === 'custom') {
+        const customUrl = window.localStorage.getItem('kelimesavasi_custom_server_url') || '';
+        if (customUrl) {
+          const cleanUrl = customUrl.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '');
+          const isSecure = customUrl.startsWith('https:') || customUrl.startsWith('wss:') || (!customUrl.includes('localhost') && !customUrl.includes('127.0.0.1') && !customUrl.includes('192.168.'));
+          const protocol = isSecure ? 'wss:' : 'ws:';
+          return `${protocol}//${cleanUrl}/ws`;
+        }
+      }
+    } catch (e) {}
+  }
+
   if (typeof window !== 'undefined' && window.location) {
-    const { hostname, host, protocol, port } = window.location;
+    const { hostname, host, protocol } = window.location;
     const ua = navigator.userAgent || '';
     const isAndroid = /android/i.test(ua);
     const isIOS = /iphone|ipad|ipod/i.test(ua);

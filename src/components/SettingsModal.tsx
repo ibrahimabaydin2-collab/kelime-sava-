@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2, Wifi, Server } from 'lucide-react';
 
 export interface AppSettings {
   boardTheme: 'classic' | 'ocean' | 'neon' | 'autumn' | 'pastel';
@@ -26,6 +26,19 @@ export default function SettingsModal({
   onToggleDarkMode,
   onOpenStats
 }: SettingsModalProps) {
+  const [serverType, setServerType] = useState<'pre' | 'dev' | 'custom'>(() => {
+    if (typeof window !== 'undefined') {
+      return (window.localStorage.getItem('kelimesavasi_server_type') as any) || 'pre';
+    }
+    return 'pre';
+  });
+
+  const [customUrl, setCustomUrl] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('kelimesavasi_custom_server_url') || '';
+    }
+    return '';
+  });
   
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     onChangeSettings({
@@ -223,6 +236,94 @@ export default function SettingsModal({
             </div>
           )}
 
+        </div>
+
+        {/* Section 4: Server Connection Settings */}
+        <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-2">
+            <Wifi size={14} className="text-emerald-500" />
+            Sunucu Bağlantı Ayarları (Mobil APK Bağlantısı)
+          </h4>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-normal">
+            Mobil APK veya dış ağlardan oyuna bağlandığınızda sunucu seçebilir, veya kendi yerel/özel IP adresinizi tanımlayabilirsiniz.
+          </p>
+          
+          <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setServerType('pre');
+                  localStorage.setItem('kelimesavasi_server_type', 'pre');
+                }}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  serverType === 'pre'
+                    ? 'bg-emerald-500 text-white shadow'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                Canlı (Pre)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setServerType('dev');
+                  localStorage.setItem('kelimesavasi_server_type', 'dev');
+                }}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  serverType === 'dev'
+                    ? 'bg-emerald-500 text-white shadow'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                Geliştirme
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setServerType('custom');
+                  localStorage.setItem('kelimesavasi_server_type', 'custom');
+                }}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  serverType === 'custom'
+                    ? 'bg-emerald-500 text-white shadow'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                Özel IP
+              </button>
+            </div>
+
+            {serverType === 'custom' && (
+              <div className="space-y-1.5 mt-1.5 animate-scale-up">
+                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Özel Sunucu Adresi (HTTP/HTTPS/WS)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={customUrl}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomUrl(val);
+                      localStorage.setItem('kelimesavasi_custom_server_url', val);
+                    }}
+                    placeholder="Örn: 192.168.1.100:3000"
+                    className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-1 select-all break-all bg-white dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
+              <span className="font-bold text-emerald-500 shrink-0">Aktif Hedef:</span>
+              <span className="truncate">
+                {serverType === 'pre' 
+                  ? 'https://ais-pre-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app' 
+                  : serverType === 'dev' 
+                  ? 'https://ais-dev-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app' 
+                  : customUrl || 'Lütfen özel adres girin'}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Footer info */}
