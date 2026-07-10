@@ -526,11 +526,11 @@ export default function App() {
 
       ws.onclose = () => {
         clearTimeout(connTimeout);
-        setIsOnline(false);
-        if (pingInterval) clearInterval(pingInterval);
         if (socketRef.current === ws) {
+          setIsOnline(false);
           socketRef.current = null;
         }
+        if (pingInterval) clearInterval(pingInterval);
         // Attempt reconnect after 3 seconds
         if (!isDisposed) {
           if (reconnectTimeout) clearTimeout(reconnectTimeout);
@@ -541,8 +541,10 @@ export default function App() {
       ws.onerror = (err) => {
         clearTimeout(connTimeout);
         console.error(`WebSocket connection error to URL: ${wsUrl}`, err);
-        showToast(`Sunucu bağlantı hatası (${wsUrl}). Çevrimdışı moda geçiliyor...`, 'error');
-        setIsOnline(false);
+        if (socketRef.current === ws) {
+          showToast(`Sunucu bağlantı hatası. Çevrimdışı moda geçiliyor...`, 'error');
+          setIsOnline(false);
+        }
         try {
           ws.close(); // Guarantees triggering onclose and scheduling reconnect
         } catch (e) {
@@ -553,7 +555,7 @@ export default function App() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+        if (!socketRef.current || (socketRef.current.readyState !== WebSocket.OPEN && socketRef.current.readyState !== WebSocket.CONNECTING)) {
           console.log('App returned to foreground. Reconnecting WebSocket...');
           if (socketRef.current) {
             try { socketRef.current.close(); } catch (e) {}
@@ -564,7 +566,7 @@ export default function App() {
     };
 
     const handleOnline = () => {
-      if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      if (!socketRef.current || (socketRef.current.readyState !== WebSocket.OPEN && socketRef.current.readyState !== WebSocket.CONNECTING)) {
         console.log('Network connection restored. Reconnecting WebSocket...');
         if (socketRef.current) {
           try { socketRef.current.close(); } catch (e) {}
@@ -1154,7 +1156,7 @@ export default function App() {
   return (
     <div className={`min-h-screen flex flex-col transition-all duration-300 ${getBgThemeClass()}`}>
       {/* Main Container */}
-      <main className="flex-1 flex flex-col items-center justify-center py-4 px-4 max-w-4xl w-full mx-auto relative">
+      <main className="flex-1 flex flex-col items-center justify-center py-2 sm:py-4 px-1.5 sm:px-4 max-w-5xl lg:max-w-6xl w-full mx-auto relative">
         {/* Toast Notification */}
         {toast && (
           <div className={`fixed top-20 z-50 left-1/2 transform -translate-x-1/2 px-4 py-2.5 rounded-xl border flex items-center gap-2.5 text-xs sm:text-sm font-semibold shadow-lg transition duration-200 animate-slide-in ${
@@ -1218,7 +1220,7 @@ export default function App() {
           <>
             {/* Back to entry screen header */}
             {!activeMatch && (
-              <div className="w-full max-w-2xl flex justify-between items-center mb-4">
+              <div className="w-full max-w-3xl lg:max-w-4xl flex justify-between items-center mb-3">
                 <button
                   onClick={() => {
                     if (gameStatus === 'playing' && attempts.length > 0 && !confirm('Mevcut oyundan çıkıp giriş ekranına dönmek istiyor musunuz?')) {
@@ -1310,7 +1312,7 @@ export default function App() {
 
         {/* Game State Control Panel (Length selector / Reset) */}
         {!activeMatch && (
-          <div className="w-full max-w-2xl flex justify-between items-center bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-3 shadow-sm mb-4">
+          <div className="w-full max-w-3xl lg:max-w-4xl flex justify-between items-center bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-3 shadow-sm mb-4">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Harf Sayısı:</span>
               <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg">
@@ -1350,7 +1352,7 @@ export default function App() {
         )}
 
         {/* Game Area Card */}
-        <div className="w-full max-w-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 sm:p-6 shadow-xl flex flex-col items-center justify-center transition-all duration-200">
+        <div className="w-full max-w-3xl lg:max-w-4xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 sm:p-6 shadow-xl flex flex-col items-center justify-center transition-all duration-200">
           {/* Top Timer & Attempts Tracker */}
           <div className="w-full flex justify-between items-center mb-4 px-2 border-b border-gray-100 dark:border-gray-800 pb-3">
             {gameStatus === 'playing' ? (
@@ -1556,7 +1558,7 @@ export default function App() {
 
           {/* Action Button Above Keyboard */}
           {gameStatus === 'playing' && (
-            <div className="w-full max-w-lg px-2 mt-4 mb-3">
+            <div className="w-full max-w-2xl lg:max-w-3xl px-2 mt-4 mb-3">
               <button
                 onClick={submitGuess}
                 disabled={currentAttempt.length !== wordLength || isValidating}

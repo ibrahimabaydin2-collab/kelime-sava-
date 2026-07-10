@@ -34,6 +34,7 @@ export function getBaseUrl(): string {
                       ((window as any).webkit && (window as any).webkit.messageHandlers);
     
     const isCapacitor = !!(window as any).Capacitor;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || !hostname;
     
     // In hybrid mobile environment (Capacitor / WebView / file protocol / mobile host layout)
     const isHybrid = protocol === 'file:' || 
@@ -41,7 +42,7 @@ export function getBaseUrl(): string {
                      protocol.startsWith('ionic') || 
                      isWebView ||
                      isCapacitor ||
-                     (isMobile && (hostname === 'localhost' || hostname === '127.0.0.1') && !port);
+                     (isMobile && isLocalhost);
                      
     if (isHybrid) {
       return cleanFallback;
@@ -90,8 +91,35 @@ export function getApiUrl(endpoint: string): string {
 export function getWsUrl(): string {
   let wsUrl = '';
   if (typeof window !== 'undefined' && window.location) {
-    const { hostname, host, protocol } = window.location;
-    if (hostname) {
+    const { hostname, host, protocol, port } = window.location;
+    const ua = navigator.userAgent || '';
+    const isAndroid = /android/i.test(ua);
+    const isIOS = /iphone|ipad|ipod/i.test(ua);
+    const isMobile = isAndroid || isIOS;
+    
+    const isWebView = ua.includes('wv') || 
+                      ua.includes('WebView') || 
+                      (isAndroid && !ua.includes('Chrome')) ||
+                      (isIOS && !ua.includes('Safari')) ||
+                      (window as any).Android || 
+                      ((window as any).webkit && (window as any).webkit.messageHandlers);
+    
+    const isCapacitor = !!(window as any).Capacitor;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || !hostname;
+    
+    const isHybrid = protocol === 'file:' || 
+                     protocol.startsWith('capacitor') || 
+                     protocol.startsWith('ionic') || 
+                     isWebView ||
+                     isCapacitor ||
+                     (isMobile && isLocalhost);
+
+    if (isHybrid) {
+      // For mobile hybrid applications/WebViews on Android/iOS, point to the live cloud backend!
+      const base = DEPLOYED_APP_URL;
+      const noProtocol = base.replace(/^https?:\/\//, '');
+      wsUrl = `wss://${noProtocol}/ws`;
+    } else if (hostname) {
       const isRemote = hostname !== 'localhost' && 
                        hostname !== '127.0.0.1' &&
                        !hostname.startsWith('192.168.') &&
@@ -102,7 +130,7 @@ export function getWsUrl(): string {
       }
     }
     
-    if (!wsUrl) {
+    if (!wsUrl && !isHybrid) {
       // Fallback relative protocol
       const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
       if (host) {

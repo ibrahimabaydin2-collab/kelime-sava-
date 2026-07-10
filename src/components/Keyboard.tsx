@@ -33,7 +33,7 @@ export default function Keyboard({
   const rows = keyboardLayout === 'F' ? fRows : qRows;
 
   const getKeyClass = (char: string) => {
-    const base = 'flex-1 h-10 sm:h-12 md:h-14 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors duration-200 cursor-pointer select-none';
+    const base = 'flex-1 h-[clamp(2.2rem,5.2vh,3.75rem)] rounded-lg text-xs sm:text-sm font-black flex items-center justify-center transition-colors duration-200 cursor-pointer select-none';
     const status = letterStatuses[char.toLocaleUpperCase('tr-TR')];
 
     if (char === 'ENTER' || char === 'SIL') {
@@ -76,10 +76,10 @@ export default function Keyboard({
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-1 sm:px-4 mt-2">
-      <div className="flex flex-col gap-1.5 sm:gap-2">
+    <div className="w-full max-w-3xl lg:max-w-4xl mx-auto px-0.5 sm:px-2 mt-2">
+      <div className="flex flex-col gap-[clamp(0.2rem,0.9vh,0.5rem)]">
         {rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex justify-center gap-1 sm:gap-1.5">
+          <div key={rowIndex} className="flex justify-center gap-[clamp(0.15rem,0.9vw,0.4rem)]">
             {row.map((char) => {
               const isAction = char === 'ENTER' || char === 'SIL';
               return (

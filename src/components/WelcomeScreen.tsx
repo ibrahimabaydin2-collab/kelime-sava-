@@ -70,6 +70,7 @@ export default function WelcomeScreen({
   const [showHowToPlay, setShowHowToPlay] = useState<boolean>(false);
   const [showMissions, setShowMissions] = useState<boolean>(false);
   const [showRulesModal, setShowRulesModal] = useState<boolean>(false);
+  const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
 
   // Profile Inline Editor State
@@ -367,31 +368,25 @@ export default function WelcomeScreen({
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => onChangeGameMode('timed')}
-                className={`py-1.5 px-2.5 rounded-xl text-xs font-bold transition duration-150 flex items-center justify-center gap-2 border text-left ${
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition duration-150 flex items-center justify-center gap-2 border text-left cursor-pointer ${
                   gameMode === 'timed'
                     ? 'bg-emerald-500 border-emerald-400 text-white shadow-md shadow-emerald-500/10'
                     : 'bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-400 border-transparent hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
               >
                 <span className="text-sm">⏱️</span>
-                <div className="flex flex-col">
-                  <span className={`text-xs font-black leading-tight ${gameMode === 'timed' ? 'text-white' : 'text-gray-700 dark:text-gray-200'}`}>Süreli Oyun</span>
-                  <span className={`text-[8px] font-bold font-mono tracking-tight leading-none mt-0.5 ${gameMode === 'timed' ? 'text-emerald-100' : 'text-gray-400'}`}>İLK HARF VERİLİR</span>
-                </div>
+                <span className={`text-xs font-black leading-tight ${gameMode === 'timed' ? 'text-white' : 'text-gray-700 dark:text-gray-200'}`}>Süreli Oyun</span>
               </button>
               <button
                 onClick={() => onChangeGameMode('untimed')}
-                className={`py-1.5 px-2.5 rounded-xl text-xs font-bold transition duration-150 flex items-center justify-center gap-2 border text-left ${
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition duration-150 flex items-center justify-center gap-2 border text-left cursor-pointer ${
                   gameMode === 'untimed'
                     ? 'bg-emerald-500 border-emerald-400 text-white shadow-md shadow-emerald-500/10'
                     : 'bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-400 border-transparent hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
               >
                 <span className="text-sm">♾️</span>
-                <div className="flex flex-col">
-                  <span className={`text-xs font-black leading-tight ${gameMode === 'untimed' ? 'text-white' : 'text-gray-700 dark:text-gray-200'}`}>Süresiz Oyun</span>
-                  <span className={`text-[8px] font-bold font-mono tracking-tight leading-none mt-0.5 ${gameMode === 'untimed' ? 'text-emerald-100' : 'text-gray-400'}`}>SÜRE SINIRI YOKTUR</span>
-                </div>
+                <span className={`text-xs font-black leading-tight ${gameMode === 'untimed' ? 'text-white' : 'text-gray-700 dark:text-gray-200'}`}>Süresiz Oyun</span>
               </button>
             </div>
           </div>
@@ -458,105 +453,56 @@ export default function WelcomeScreen({
             </p>
           </div>
         )}
-      </div>
 
-      {/* Social / Direct Challenges - Simple & Clean */}
-      {isOnline && (activeChallenges.length > 0 || otherPlayers.length > 0) && (
-        <div className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-2xl p-3.5 shadow-sm space-y-2.5">
-          <div className="flex justify-between items-center border-b border-gray-50 dark:border-gray-800 pb-2">
-            <h3 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 font-mono flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-              Aktif Oyuncular
-            </h3>
-            <span className="text-[9px] text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded font-bold font-mono">
-              {lobbyPlayers.length} Çevrimiçi
-            </span>
-          </div>
-
-          {/* Active Invitations Received */}
-          {activeChallenges.length > 0 && (
-            <div className="space-y-1.5 bg-amber-500/5 p-2 rounded-xl border border-dashed border-amber-500/20 animate-fade-in text-left">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                <Zap size={10} className="fill-amber-500/20 animate-pulse" />
-                Meydan Okuma Daveti!
+        {/* Direct Challenge Notification on Main Screen */}
+        {activeChallenges.length > 0 && (
+          <div className="bg-amber-500/10 border-2 border-dashed border-amber-500/30 p-3 rounded-xl space-y-2 animate-pulse text-left relative overflow-hidden mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 font-mono flex items-center gap-1">
+                <Zap size={11} className="text-amber-500 fill-current animate-bounce" />
+                DÜELLO DAVETİ VAR!
               </span>
-              <div className="space-y-1">
-                {activeChallenges.map((chal) => (
-                  <div key={chal.id} className="bg-white dark:bg-gray-900 border border-amber-100 dark:border-amber-900/50 p-2 rounded-lg flex items-center justify-between gap-1.5">
-                    <div className="text-left">
-                      <span className="font-bold text-[11px] text-gray-800 dark:text-white block leading-tight">{chal.challenger.name}</span>
-                      <span className="text-[9px] text-gray-400 block">{chal.wordLength} Harfli Maç</span>
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => onDeclineChallenge?.(chal.id)}
-                        className="px-2 py-0.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-600 dark:text-gray-300 text-[9px] font-bold rounded transition cursor-pointer"
-                      >
-                        Reddet
-                      </button>
-                      <button
-                        onClick={() => onAcceptChallenge?.(chal.id)}
-                        className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-bold rounded transition shadow-sm cursor-pointer"
-                      >
-                        Kabul Et
-                      </button>
-                    </div>
-                  </div>
-                ))}
+              <button 
+                onClick={() => setShowFriendsModal(true)}
+                className="text-[9px] font-bold text-amber-600 dark:text-amber-400 underline hover:text-amber-700 cursor-pointer"
+              >
+                Tümünü Gör
+              </button>
+            </div>
+            <div className="flex items-center justify-between bg-white dark:bg-gray-950 p-2.5 rounded-lg border border-amber-200/50 dark:border-amber-900/40">
+              <div className="text-left">
+                <span className="font-black text-xs text-gray-800 dark:text-gray-150 block leading-tight">
+                  {activeChallenges[0].challenger.name}
+                </span>
+                <span className="text-[9px] text-gray-400 block mt-0.5">
+                  {activeChallenges[0].wordLength} Harfli Maç Teklifi
+                </span>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <button
+                  onClick={() => onDeclineChallenge?.(activeChallenges[0].id)}
+                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-600 dark:text-gray-300 text-[9.5px] font-bold rounded transition cursor-pointer"
+                >
+                  Reddet
+                </button>
+                <button
+                  onClick={() => onAcceptChallenge?.(activeChallenges[0].id)}
+                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[9.5px] font-black rounded transition shadow-sm cursor-pointer"
+                >
+                  Savaşa Gir
+                </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
+      </div>
 
-          {/* Other players online list */}
-          {otherPlayers.length > 0 && (
-            <div className="space-y-1 max-h-28 overflow-y-auto pr-0.5">
-              {otherPlayers.map((player) => (
-                <div key={player.id} className="p-1.5 bg-gray-50/50 dark:bg-gray-950/25 rounded-xl border border-gray-100 dark:border-gray-850 flex items-center justify-between text-left">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center font-bold text-[10px] border border-white dark:border-gray-850 shrink-0">
-                      {player.avatarUrl ? (
-                        player.avatarUrl.length < 4 ? (
-                          <span className="text-xs select-none">{player.avatarUrl}</span>
-                        ) : (
-                          <img src={player.avatarUrl} alt="avatar" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
-                        )
-                      ) : (
-                        <span className="text-gray-500">{player.name.charAt(0).toUpperCase()}</span>
-                      )}
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-bold text-gray-800 dark:text-white block leading-none">{player.name}</span>
-                      <span className="text-[8px] text-gray-400 block font-mono mt-0.5">
-                        {player.status === 'playing' ? 'Oyunda' : player.status === 'challenging' ? 'Sırada' : 'Boşta'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    disabled={player.status !== 'idle'}
-                    onClick={() => onChallenge?.(player, wordLength)}
-                    className={`text-[9px] px-2 py-0.5 rounded font-bold transition duration-150 flex items-center gap-0.5 cursor-pointer ${
-                      player.status === 'idle'
-                        ? 'bg-gray-150 hover:bg-emerald-500 dark:bg-gray-800 dark:hover:bg-emerald-500 text-gray-700 dark:text-gray-300 hover:text-white'
-                        : 'bg-gray-100 dark:bg-gray-850 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    <Swords size={9} />
-                    <span>Savaş Aç</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Side-by-Side rectangular folder cards ("dosya misali yanyana") */}
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5" id="welcome-bottom-folders">
+      {/* Side-by-Side rectangular folder cards ("dosya misali yanyana" - 4 columns) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2.5" id="welcome-bottom-folders">
         {/* Card 1: Savaş Görevleri */}
         <button
           onClick={onOpenMissions}
-          className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-xl p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-850/40 transition duration-150 cursor-pointer text-left flex flex-col justify-between h-16 relative overflow-hidden shadow-xs hover:border-emerald-500 dark:hover:border-emerald-500/50 group"
+          className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-xl p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-850/40 transition duration-150 cursor-pointer text-left flex flex-col justify-between h-14 relative overflow-hidden shadow-xs hover:border-emerald-500 dark:hover:border-emerald-500/50 group"
         >
           <div className="absolute top-0 right-0 w-12 h-12 bg-amber-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-amber-500/10 transition" />
           <div className="flex items-center gap-1 text-[8.5px] font-extrabold font-mono uppercase tracking-wider text-amber-600 dark:text-amber-400 leading-none">
@@ -565,14 +511,13 @@ export default function WelcomeScreen({
           </div>
           <div>
             <span className="text-[10px] sm:text-[11px] font-black text-gray-850 dark:text-gray-100 block leading-tight">Savaş Görevleri</span>
-            <span className="text-[7.5px] sm:text-[8px] text-gray-400 dark:text-gray-500 block leading-none mt-0.5">Görevler & Ödüller</span>
           </div>
         </button>
 
         {/* Card 2: Nasıl Oynanır */}
         <button
           onClick={() => setShowRulesModal(true)}
-          className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-xl p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-850/40 transition duration-150 cursor-pointer text-left flex flex-col justify-between h-16 relative overflow-hidden shadow-xs hover:border-emerald-500 dark:hover:border-emerald-500/50 group"
+          className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-xl p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-850/40 transition duration-150 cursor-pointer text-left flex flex-col justify-between h-14 relative overflow-hidden shadow-xs hover:border-emerald-500 dark:hover:border-emerald-500/50 group"
         >
           <div className="absolute top-0 right-0 w-12 h-12 bg-emerald-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/10 transition" />
           <div className="flex items-center gap-1 text-[8.5px] font-extrabold font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400 leading-none">
@@ -581,14 +526,13 @@ export default function WelcomeScreen({
           </div>
           <div>
             <span className="text-[10px] sm:text-[11px] font-black text-gray-850 dark:text-gray-100 block leading-tight">Nasıl Oynanır?</span>
-            <span className="text-[7.5px] sm:text-[8px] text-gray-400 dark:text-gray-500 block leading-none mt-0.5">Kurallar & İpuçları</span>
           </div>
         </button>
 
         {/* Card 3: Oyun Ayarları */}
         <button
           onClick={onOpenSettings}
-          className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-xl p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-850/40 transition duration-150 cursor-pointer text-left flex flex-col justify-between h-16 relative overflow-hidden shadow-xs hover:border-emerald-500 dark:hover:border-emerald-500/50 group"
+          className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-xl p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-850/40 transition duration-150 cursor-pointer text-left flex flex-col justify-between h-14 relative overflow-hidden shadow-xs hover:border-emerald-500 dark:hover:border-emerald-500/50 group"
         >
           <div className="absolute top-0 right-0 w-12 h-12 bg-blue-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-blue-500/10 transition" />
           <div className="flex items-center gap-1 text-[8.5px] font-extrabold font-mono uppercase tracking-wider text-blue-600 dark:text-blue-400 leading-none">
@@ -597,7 +541,31 @@ export default function WelcomeScreen({
           </div>
           <div>
             <span className="text-[10px] sm:text-[11px] font-black text-gray-850 dark:text-gray-100 block leading-tight">Oyun Ayarları</span>
-            <span className="text-[7.5px] sm:text-[8px] text-gray-400 dark:text-gray-500 block leading-none mt-0.5">Görünüm & Ses</span>
+          </div>
+        </button>
+
+        {/* Card 4: Aktif Arkadaşlar */}
+        <button
+          onClick={() => setShowFriendsModal(true)}
+          className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-xl p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-850/40 transition duration-150 cursor-pointer text-left flex flex-col justify-between h-14 relative overflow-hidden shadow-xs hover:border-teal-500 dark:hover:border-teal-500/50 group"
+        >
+          <div className="absolute top-0 right-0 w-12 h-12 bg-teal-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-teal-500/10 transition" />
+          <div className="flex items-center gap-1 text-[8.5px] font-extrabold font-mono uppercase tracking-wider text-teal-600 dark:text-teal-400 leading-none">
+            <Users size={10} className="text-teal-500" />
+            <span className="flex items-center gap-1">
+              ARKADAŞLAR
+              {otherPlayers.length > 0 && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              )}
+            </span>
+          </div>
+          <div className="flex items-center justify-between w-full leading-none">
+            <span className="text-[10px] sm:text-[11px] font-black text-gray-850 dark:text-gray-100 block truncate leading-none">Aktif Arkadaşlar</span>
+            {otherPlayers.length > 0 && (
+              <span className="text-[8px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-extrabold px-1 rounded scale-90 sm:scale-100">
+                {otherPlayers.length}
+              </span>
+            )}
           </div>
         </button>
       </div>
@@ -625,21 +593,21 @@ export default function WelcomeScreen({
             </div>
 
             <div className="space-y-3 text-xs leading-relaxed text-gray-700 dark:text-gray-300 max-h-[50vh] overflow-y-auto pr-1">
-              <div className="bg-gray-50 dark:bg-gray-950/45 p-3 rounded-xl border border-gray-100 dark:border-gray-850">
+              <div className="bg-gray-50 dark:bg-gray-950/45 p-3 rounded-xl border border-gray-150 dark:border-gray-850">
                 <span className="font-bold text-gray-900 dark:text-white block mb-0.5">1. Harf Renkleri</span>
                 <p className="text-[11px] leading-normal text-gray-600 dark:text-gray-400">
                   Tahmin ettiğiniz kelimedeki doğru yerdeki harfler <span className="text-emerald-500 dark:text-emerald-400 font-bold">Yeşil</span>, yanlış yerdeki harfler ise <span className="text-amber-500 dark:text-amber-400 font-bold">Turuncu</span> renk alır. Gri harfler kelimede yoktur.
                 </p>
               </div>
 
-              <div className="bg-gray-50 dark:bg-gray-950/45 p-3 rounded-xl border border-gray-100 dark:border-gray-850">
+              <div className="bg-gray-50 dark:bg-gray-950/45 p-3 rounded-xl border border-gray-150 dark:border-gray-850">
                 <span className="font-bold text-gray-900 dark:text-white block mb-0.5">2. Canlı Eş Zamanlı Yarış</span>
                 <p className="text-[11px] leading-normal text-gray-600 dark:text-gray-400">
                   Rakibinizle aynı gizli kelimeyi çözmeye çalışırsınız. En az deneme ile en hızlı sürede çözen düellonun kazananı olur.
                 </p>
               </div>
 
-              <div className="bg-gray-50 dark:bg-gray-950/45 p-3 rounded-xl border border-gray-100 dark:border-gray-850">
+              <div className="bg-gray-50 dark:bg-gray-950/45 p-3 rounded-xl border border-gray-150 dark:border-gray-850">
                 <span className="font-bold text-gray-900 dark:text-white block mb-0.5">3. TDK Sözlük Doğrulaması</span>
                 <p className="text-[11px] leading-normal text-gray-600 dark:text-gray-400">
                   Girdiğiniz her tahminin TDK sözlüğünde yer alması gerekir. Çözülemeyen kelimelerin anlamlarını oyun bittiğinde görebilirsiniz.
@@ -661,6 +629,138 @@ export default function WelcomeScreen({
                 className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-md transition cursor-pointer"
               >
                 Anladım
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Friends Modal (Aktif Arkadaşlar) */}
+      {showFriendsModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-850 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-scale-up text-left">
+            <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-800 pb-3">
+              <div>
+                <h3 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-wide flex items-center gap-2">
+                  <Users size={18} className="text-teal-500" />
+                  Aktif Arkadaşlar
+                </h3>
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono font-bold uppercase mt-0.5">
+                  ÇEVRİMİÇİ OYUNCU LİSTESİ ({lobbyPlayers.length})
+                </p>
+              </div>
+              <button
+                onClick={() => setShowFriendsModal(false)}
+                className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-850 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Active Invitations/Challenges Received inside Friends list */}
+            {activeChallenges.length > 0 && (
+              <div className="space-y-1.5 bg-amber-500/5 p-3 rounded-xl border border-dashed border-amber-500/20 animate-fade-in text-left">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <Zap size={10} className="fill-amber-500/20 animate-pulse" />
+                  Meydan Okuma Daveti Var!
+                </span>
+                <div className="space-y-1">
+                  {activeChallenges.map((chal) => (
+                    <div key={chal.id} className="bg-white dark:bg-gray-900 border border-amber-100 dark:border-amber-900/50 p-2.5 rounded-lg flex items-center justify-between gap-1.5 shadow-xs">
+                      <div className="text-left">
+                        <span className="font-bold text-[11px] text-gray-800 dark:text-white block leading-tight">{chal.challenger.name}</span>
+                        <span className="text-[9px] text-gray-400 block">{chal.wordLength} Harfli Maç</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => onDeclineChallenge?.(chal.id)}
+                          className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-600 dark:text-gray-300 text-[10px] font-bold rounded-lg transition cursor-pointer"
+                        >
+                          Reddet
+                        </button>
+                        <button
+                          onClick={() => onAcceptChallenge?.(chal.id)}
+                          className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition shadow-sm cursor-pointer"
+                        >
+                          Kabul Et
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2 text-xs leading-relaxed text-gray-700 dark:text-gray-300 max-h-[45vh] overflow-y-auto pr-1">
+              {!isOnline ? (
+                <div className="text-center py-6 text-gray-400">
+                  <p className="text-xs font-bold font-mono">ÇEVRİMDIŞI MOD</p>
+                  <p className="text-[10px] mt-1 text-gray-400/85">Arkadaşlarını görebilmek ve savaş açabilmek için internet bağlantısı gerekir.</p>
+                </div>
+              ) : otherPlayers.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-xs font-black font-mono">LOBİ BOŞ 🏜️</p>
+                  <p className="text-[10px] mt-1 text-gray-400/85">Şu anda başka aktif arkadaşın yok. Aşağıdaki butondan davet linkini kopyalayıp arkadaşına gönderebilirsin!</p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {otherPlayers.map((player) => (
+                    <div key={player.id} className="p-2.5 bg-gray-50/50 dark:bg-gray-950/25 rounded-xl border border-gray-100 dark:border-gray-850 flex items-center justify-between text-left">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-xs border border-white dark:border-gray-800 shrink-0">
+                          {player.avatarUrl ? (
+                            player.avatarUrl.length < 4 ? (
+                              <span className="text-sm select-none">{player.avatarUrl}</span>
+                            ) : (
+                              <img src={player.avatarUrl} alt="avatar" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                            )
+                          ) : (
+                            <span className="text-gray-500">{player.name.charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-xs font-black text-gray-800 dark:text-white block leading-none">{player.name}</span>
+                          <span className="text-[8.5px] text-gray-400 block font-mono mt-0.5 uppercase tracking-wide">
+                            {player.status === 'playing' ? '🎮 Oyunda' : player.status === 'challenging' ? '⚔️ Sırada' : '🟢 Boşta'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        disabled={player.status !== 'idle'}
+                        onClick={() => {
+                          onChallenge?.(player, wordLength);
+                          setShowFriendsModal(false);
+                        }}
+                        className={`text-[9.5px] px-2.5 py-1 rounded-lg font-black uppercase transition duration-150 flex items-center gap-1 cursor-pointer ${
+                          player.status === 'idle'
+                            ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm'
+                            : 'bg-gray-100 dark:bg-gray-850 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        <Swords size={10} />
+                        <span>Meydan Oku</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
+              <button
+                onClick={handleCopyLink}
+                className="inline-flex items-center gap-1.5 bg-gray-50 dark:bg-gray-950 hover:bg-gray-100 dark:hover:bg-gray-850 text-gray-700 dark:text-gray-300 px-3 py-2 rounded-xl text-[10px] font-bold transition border border-gray-150 dark:border-gray-850 cursor-pointer"
+              >
+                {copied ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                <span>{copied ? 'Kopyalandı!' : 'Arkadaş Davet Et'}</span>
+              </button>
+
+              <button
+                onClick={() => setShowFriendsModal(false)}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-md transition cursor-pointer"
+              >
+                Kapat
               </button>
             </div>
           </div>

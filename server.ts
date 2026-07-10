@@ -203,51 +203,88 @@ const broadcastLobby = () => {
 const setupWebSocket = (server: any) => {
   const wss = new WebSocketServer({ noServer: true });
 
+  // Register a dummy listener to ensure server.listenerCount('upgrade') > 0.
+  // Node's HTTP server immediately destroys the socket on upgrade request if listenerCount is 0,
+  // before 'upgrade' event can be emitted and intercepted.
+  server.on('upgrade', () => {});
+
   wss.on('error', (err) => {
     console.error('[WS Server] error:', err);
+    try {
+      fs.appendFileSync(path.join(process.cwd(), 'ws_debug.log'), `[${new Date().toISOString()}] WSS ERROR: ${err.stack || err.message || err}\n`);
+    } catch (e) {}
   });
 
-  server.on('upgrade', (request: any, socket: any, head: any) => {
-    let pathname = '';
-    try {
-      pathname = new URL(request.url || '', 'http://localhost').pathname;
-    } catch (e) {
-      pathname = (request.url || '').split('?')[0];
-    }
+  const originalEmit = server.emit;
+  server.emit = function (event: string, ...args: any[]) {
+    if (event === 'upgrade') {
+      const request = args[0];
+      const socket = args[1];
+      const head = args[2];
 
-    // Log the upgrade request to a debug file
-    try {
-      const logMsg = `[${new Date().toISOString()}] Upgrade event: URL=${request.url}, Pathname=${pathname}, Headers=${JSON.stringify(request.headers)}\n`;
-      fs.appendFileSync(path.join(process.cwd(), 'ws_debug.log'), logMsg);
-    } catch (err) {
-      // ignore log write failure
-    }
-
-    if (pathname.startsWith('/ws')) {
-      console.log(`[WS Upgrade] Intercepted upgrade for game server. URL: ${request.url}, Pathname: ${pathname}`);
+      let pathname = '';
       try {
-        wss.handleUpgrade(request, socket, head, (ws) => {
-          wss.emit('connection', ws, request);
-        });
+        pathname = new URL(request.url || '', 'http://localhost').pathname;
+      } catch (e) {
+        pathname = (request.url || '').split('?')[0];
+      }
+
+      // Log the upgrade request to a debug file
+      try {
+        const logMsg = `[${new Date().toISOString()}] Upgrade event received: URL=${request.url}, Pathname=${pathname}, Headers=${JSON.stringify(request.headers)}\n`;
+        fs.appendFileSync(path.join(process.cwd(), 'ws_debug.log'), logMsg);
       } catch (err) {
-        console.error('[WS Upgrade] Failed to handle upgrade:', err);
+        // ignore log write failure
+      }
+
+      if (pathname.startsWith('/ws')) {
+        console.log(`[WS Intercept] Exclusively handling upgrade for game server. URL: ${request.url}, Pathname: ${pathname}`);
         try {
-          socket.destroy();
-        } catch (e) {}
+          fs.appendFileSync(path.join(process.cwd(), 'ws_debug.log'), `[${new Date().toISOString()}] Intercepted and starting handleUpgrade for ${request.url}\n`);
+          wss.handleUpgrade(request, socket, head, (ws) => {
+            try {
+              fs.appendFileSync(path.join(process.cwd(), 'ws_debug.log'), `[${new Date().toISOString()}] handleUpgrade callback executed, emitting connection\n`);
+            } catch (e) {}
+            wss.emit('connection', ws, request);
+          });
+        } catch (err: any) {
+          console.error('[WS Intercept] Failed to handle upgrade:', err);
+          try {
+            fs.appendFileSync(path.join(process.cwd(), 'ws_debug.log'), `[${new Date().toISOString()}] handleUpgrade FAILED: ${err.stack || err.message || err}\n`);
+          } catch (e) {}
+          try {
+            socket.destroy();
+          } catch (e) {}
+        }
+        return true; // Intercepted, do not propagate to Vite or other listeners
       }
     }
-  });
+    return originalEmit.call(this, event, ...args);
+  };
 
-  wss.on('connection', (ws: WebSocket) => {
+  wss.on('connection', (ws: WebSocket, request: any) => {
     let playerId = '';
+    try {
+      fs.appendFileSync(path.join(process.cwd(), 'ws_debug.log'), `[${new Date().toISOString()}] WSS on('connection') fired for URL: ${request?.url}\n`);
+    } catch (e) {}
 
     ws.on('message', (message: string) => {
       try {
         const data = JSON.parse(message);
+        try {
+          fs.appendFileSync(path.join(process.cwd(), 'ws_debug.log'), `[${new Date().toISOString()}] Received WS message: ${JSON.stringify(data)}\n`);
+        } catch (e) {}
         
         switch (data.type) {
           case 'join': {
             playerId = data.id;
+            const existingClient = clients.get(playerId);
+            if (existingClient && existingClient.ws !== ws) {
+              console.log(`[WS Server] Closing stale connection for player ${playerId}`);
+              try {
+                existingClient.ws.close(1000, 'Replaced by new connection');
+              } catch (e) {}
+            }
             clients.set(playerId, {
               ws,
               name: data.name,
@@ -658,32 +695,46 @@ const setupWebSocket = (server: any) => {
       }
     });
 
-    ws.on('close', () => {
-      if (playerId) {
-        clients.delete(playerId);
-        matchmakingQueue.delete(playerId);
-        console.log(`Player disconnected: ${playerId}`);
+    ws.on('error', (err) => {
+      try {
+        fs.appendFileSync(path.join(process.cwd(), 'ws_debug.log'), `[${new Date().toISOString()}] Socket ERROR for player ${playerId || 'unknown'}: ${err.message || err}\n`);
+      } catch (e) {}
+    });
 
-        // Handle active matches where this player was playing
-        for (const [matchId, match] of matches.entries()) {
-          if (match.status === 'playing' && match.players[playerId]) {
-            match.status = 'ended';
-            const opponentId = Object.keys(match.players).find(id => id !== playerId);
-            if (opponentId) {
-              const opponent = clients.get(opponentId);
-              if (opponent && opponent.ws.readyState === WebSocket.OPEN) {
-                opponent.ws.send(JSON.stringify({
-                  type: 'opponent_left',
-                  matchId
-                }));
+    ws.on('close', (code, reason) => {
+      try {
+        fs.appendFileSync(path.join(process.cwd(), 'ws_debug.log'), `[${new Date().toISOString()}] Socket CLOSED for player ${playerId || 'unknown'}. Code: ${code}, Reason: ${reason || 'none'}\n`);
+      } catch (e) {}
+      if (playerId) {
+        const currentClient = clients.get(playerId);
+        if (currentClient && currentClient.ws === ws) {
+          clients.delete(playerId);
+          matchmakingQueue.delete(playerId);
+          console.log(`Player disconnected: ${playerId}`);
+
+          // Handle active matches where this player was playing
+          for (const [matchId, match] of matches.entries()) {
+            if (match.status === 'playing' && match.players[playerId]) {
+              match.status = 'ended';
+              const opponentId = Object.keys(match.players).find(id => id !== playerId);
+              if (opponentId) {
+                const opponent = clients.get(opponentId);
+                if (opponent && opponent.ws.readyState === WebSocket.OPEN) {
+                  opponent.ws.send(JSON.stringify({
+                    type: 'opponent_left',
+                    matchId
+                  }));
+                }
+                const oppClient = clients.get(opponentId);
+                if (oppClient) oppClient.status = 'idle';
               }
-              const oppClient = clients.get(opponentId);
-              if (oppClient) oppClient.status = 'idle';
             }
           }
-        }
 
-        broadcastLobby();
+          broadcastLobby();
+        } else {
+          console.log(`[WS Server] Stale connection closed for player ${playerId}. Keeping current connection.`);
+        }
       }
     });
   });
