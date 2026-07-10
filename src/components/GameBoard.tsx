@@ -34,9 +34,21 @@ export default function GameBoard({
     });
   }
 
+  // Determine dynamic cell sizing based on word length to scale perfectly on mobile devices
+  const getCellSizeClass = () => {
+    if (wordLength >= 7) {
+      return 'w-[clamp(1.8rem,7.5vw,3.25rem)] h-[clamp(1.8rem,7.5vw,3.25rem)] sm:w-12 sm:h-12 md:w-14 md:h-14 text-base sm:text-xl md:text-2xl border-[2px] sm:border-[3px] rounded-lg sm:rounded-xl';
+    }
+    if (wordLength >= 6) {
+      return 'w-[clamp(2rem,8.2vw,3.5rem)] h-[clamp(2rem,8.2vw,3.5rem)] sm:w-13 sm:h-13 md:w-15 md:h-15 text-lg sm:text-2xl md:text-2xl border-[2.5px] sm:border-[3px] rounded-xl';
+    }
+    return 'w-[clamp(2.2rem,9.5vw,3.75rem)] h-[clamp(2.2rem,9.5vw,3.75rem)] sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl sm:text-2xl md:text-3xl border-[3px] rounded-xl';
+  };
+
   // Determine cell classes based on status
   const getCellClass = (char: string, index: number, isSubmitted: boolean, feedback?: 'green' | 'orange' | 'grey') => {
-    const base = 'w-11 h-11 sm:w-14 sm:h-14 md:w-16 md:h-16 border-[3px] flex items-center justify-center text-xl sm:text-2xl md:text-3xl font-bold rounded-xl uppercase transition-all duration-300 select-none';
+    const sizeClass = getCellSizeClass();
+    const base = `${sizeClass} flex items-center justify-center font-bold uppercase transition-all duration-300 select-none`;
     
     if (!isSubmitted) {
       if (char && char !== ' ') {

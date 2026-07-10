@@ -305,8 +305,12 @@ export default function App() {
   // Connect to real-time WebSocket on mount or profile change
   useEffect(() => {
     const wsUrl = getWsUrl();
+    let pingInterval: NodeJS.Timeout | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let isDisposed = false;
 
     const connectWS = () => {
+      if (isDisposed) return;
       console.log('Connecting to WebSocket at:', wsUrl);
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
@@ -320,6 +324,14 @@ export default function App() {
           name: profile.name,
           avatarUrl: profile.avatarUrl
         }));
+
+        // Heartbeat to keep connection alive on serverless platforms (Cloud Run)
+        if (pingInterval) clearInterval(pingInterval);
+        pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 15000);
       };
 
       ws.onmessage = (event) => {
@@ -471,20 +483,37 @@ export default function App() {
 
       ws.onclose = () => {
         setIsOnline(false);
-        // Attempt reconnect after 5 seconds
-        setTimeout(connectWS, 5000);
+        if (pingInterval) clearInterval(pingInterval);
+        if (socketRef.current === ws) {
+          socketRef.current = null;
+        }
+        // Attempt reconnect after 3 seconds
+        if (!isDisposed) {
+          if (reconnectTimeout) clearTimeout(reconnectTimeout);
+          reconnectTimeout = setTimeout(connectWS, 3000);
+        }
       };
 
-      ws.onerror = () => {
+      ws.onerror = (err) => {
+        console.error('WebSocket connection error:', err);
         setIsOnline(false);
+        try {
+          ws.close(); // Guarantees triggering onclose and scheduling reconnect
+        } catch (e) {
+          // ignore
+        }
       };
     };
 
     connectWS();
 
     return () => {
+      isDisposed = true;
+      if (pingInterval) clearInterval(pingInterval);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (socketRef.current) {
         socketRef.current.close();
+        socketRef.current = null;
       }
     };
   }, [profile.id, profile.name, profile.avatarUrl]);
@@ -1115,7 +1144,7 @@ export default function App() {
           <>
             {/* Back to entry screen header */}
             {!activeMatch && (
-              <div className="w-full max-w-md flex justify-between items-center mb-4">
+              <div className="w-full max-w-2xl flex justify-between items-center mb-4">
                 <button
                   onClick={() => {
                     if (gameStatus === 'playing' && attempts.length > 0 && !confirm('Mevcut oyundan çıkıp giriş ekranına dönmek istiyor musunuz?')) {
@@ -1207,7 +1236,7 @@ export default function App() {
 
         {/* Game State Control Panel (Length selector / Reset) */}
         {!activeMatch && (
-          <div className="w-full max-w-md flex justify-between items-center bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-3 shadow-sm mb-4">
+          <div className="w-full max-w-2xl flex justify-between items-center bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-3 shadow-sm mb-4">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Harf Sayısı:</span>
               <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg">
@@ -1247,7 +1276,7 @@ export default function App() {
         )}
 
         {/* Game Area Card */}
-        <div className="w-full max-w-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-6 shadow-xl flex flex-col items-center justify-center transition-all duration-200">
+        <div className="w-full max-w-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 sm:p-6 shadow-xl flex flex-col items-center justify-center transition-all duration-200">
           {/* Top Timer & Attempts Tracker */}
           <div className="w-full flex justify-between items-center mb-4 px-2 border-b border-gray-100 dark:border-gray-800 pb-3">
             {gameStatus === 'playing' ? (

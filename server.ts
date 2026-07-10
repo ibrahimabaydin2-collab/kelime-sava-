@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import http from 'http';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
@@ -13,6 +14,17 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// Custom CORS middleware to fully unblock Android WebViews, emulators, and local origins
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({
@@ -197,12 +209,10 @@ const setupWebSocket = (server: any) => {
     } catch (e) {
       pathname = (request.url || '').split('?')[0];
     }
-    if (pathname === '/ws') {
+    if (pathname === '/ws' || pathname === '/ws/') {
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
       });
-    } else {
-      socket.destroy();
     }
   });
 
@@ -224,6 +234,13 @@ const setupWebSocket = (server: any) => {
             });
             console.log(`Player connected: ${data.name} (${playerId})`);
             broadcastLobby();
+            break;
+          }
+
+          case 'ping': {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'pong' }));
+            }
             break;
           }
 
@@ -651,10 +668,18 @@ const setupWebSocket = (server: any) => {
 };
 
 async function startServer() {
+  const server = http.createServer(app);
+
+  // Setup WebSocket server before Vite so our upgrade handler gets priority
+  setupWebSocket(server);
+
   // Vite integration
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        hmr: { server }
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -666,11 +691,9 @@ async function startServer() {
     });
   }
 
-  const server = app.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
-
-  setupWebSocket(server);
 }
 
 startServer();

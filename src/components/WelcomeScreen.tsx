@@ -107,7 +107,7 @@ export default function WelcomeScreen({
     : 0;
 
   return (
-    <div className="w-full max-w-lg mx-auto space-y-5 px-4 py-2 animate-fade-in" id="welcome-screen-root">
+    <div className="w-full max-w-2xl mx-auto space-y-5 px-4 py-2 animate-fade-in" id="welcome-screen-root">
       
       {/* Brand Hero Header */}
       <div className="flex flex-col items-center text-center py-3 space-y-1">

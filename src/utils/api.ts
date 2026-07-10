@@ -9,9 +9,15 @@ export function getBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const { protocol, hostname, port } = window.location;
     
-    // If we are on the actual deployed Cloud Run environment
-    if (hostname.includes('.run.app')) {
-      return ''; // Relative path works perfectly and safely
+    // If we are on any remote web server (loaded via http/https and not local loopbacks)
+    const isRemoteWebServer = (protocol === 'http:' || protocol === 'https:') && 
+                              hostname !== 'localhost' && 
+                              hostname !== '127.0.0.1' &&
+                              !hostname.startsWith('192.168.') &&
+                              !hostname.startsWith('10.');
+                              
+    if (isRemoteWebServer) {
+      return ''; // Relative paths are 100% safe and correct on remote domains
     }
     
     const ua = navigator.userAgent || '';
@@ -35,7 +41,7 @@ export function getBaseUrl(): string {
                      protocol.startsWith('ionic') || 
                      isWebView ||
                      isCapacitor ||
-                     (isMobile && (hostname === 'localhost' || hostname === '127.0.0.1' || !port));
+                     (isMobile && (hostname === 'localhost' || hostname === '127.0.0.1') && !port);
                      
     if (isHybrid) {
       return cleanFallback;
