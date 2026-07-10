@@ -34,15 +34,13 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Android SDK Kurulumu
-        uses: android-actions/setup-android@v3
-
       - name: Capacitor Android Projesini Hazırla
         run: |
-          if [ ! -d "android" ]; then
+          if [ ! -d "android" ] || [ ! -d "android/app" ]; then
             npx cap add android
           fi
           npx cap sync android
+          chmod +x android/gradlew
 
       - name: Debug APK Derle (Telefon için)
         run: |
