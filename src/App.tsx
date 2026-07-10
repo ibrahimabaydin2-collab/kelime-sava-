@@ -264,12 +264,18 @@ export default function App() {
 
   // Real-time Multiplayer State
   const [isOnline, setIsOnline] = useState<boolean>(false);
+  const [reconnectCounter, setReconnectCounter] = useState<number>(0);
   const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
   const [activeChallenges, setActiveChallenges] = useState<Challenge[]>([]);
   const [activeMatch, setActiveMatch] = useState<RealtimeMatch | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleManualReconnect = () => {
+    showToast('Sunucuya yeniden bağlanılıyor...', 'info');
+    setReconnectCounter((prev) => prev + 1);
+  };
 
   // Apply dark mode to document element
   useEffect(() => {
@@ -302,221 +308,25 @@ export default function App() {
     }, 4000);
   };
 
-  // Connect to real-time WebSocket on mount or profile change
+  // Force HTTPS on remote servers for secure WebSockets
   useEffect(() => {
-    const wsUrl = getWsUrl();
-    let pingInterval: NodeJS.Timeout | null = null;
-    let reconnectTimeout: NodeJS.Timeout | null = null;
-    let isDisposed = false;
+    if (typeof window !== 'undefined' && 
+        window.location.protocol === 'http:' && 
+        window.location.hostname !== 'localhost' && 
+        window.location.hostname !== '127.0.0.1' &&
+        !window.location.hostname.startsWith('192.168.') &&
+        !window.location.hostname.startsWith('10.')) {
+      window.location.href = window.location.href.replace('http:', 'https:');
+    }
+  }, []);
 
-    const connectWS = () => {
-      if (isDisposed) return;
-      console.log('Connecting to WebSocket at:', wsUrl);
-      const ws = new WebSocket(wsUrl);
-      socketRef.current = ws;
-
-      ws.onopen = () => {
-        setIsOnline(true);
-        // Register client
-        ws.send(JSON.stringify({
-          type: 'join',
-          id: profile.id,
-          name: profile.name,
-          avatarUrl: profile.avatarUrl
-        }));
-
-        // Heartbeat to keep connection alive on serverless platforms (Cloud Run)
-        if (pingInterval) clearInterval(pingInterval);
-        pingInterval = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping' }));
-          }
-        }, 15000);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          
-          switch (data.type) {
-            case 'lobby_update':
-              setLobbyPlayers(data.players);
-              break;
-
-            case 'challenged':
-              // Avoid receiving multiple of the same challenge
-              setActiveChallenges((prev) => {
-                if (prev.some((c) => c.id === data.challenge.id)) return prev;
-                return [
-                  ...prev,
-                  {
-                    id: data.challenge.id,
-                    challenger: { id: data.challenge.challengerId, name: data.challenge.challengerName },
-                    challenged: { id: profile.id, name: profile.name },
-                    wordLength: data.challenge.wordLength,
-                    status: 'pending'
-                  }
-                ];
-              });
-              showToast(`${data.challenge.challengerName} sana meydan okudu!`, 'info');
-              break;
-
-            case 'challenge_declined':
-              showToast(`${data.challengedName} meydan okumanı reddetti.`, 'error');
-              break;
-
-            case 'match_start': {
-              const { matchId, targetWord: sharedWord, wordLength: len, opponentId, opponentName } = data;
-              showToast(`Maç Başladı! Rakip: ${opponentName}`, 'success');
-              
-              // Transition to match state
-              setWordLength(len);
-              setTargetWord(sharedWord);
-              setAttempts([]);
-              setCurrentAttempt('');
-              setGameStatus('playing');
-              setSecondsLeft(20);
-              setWordDefinition('');
-              setLetterStatuses({});
-              setShowLobbyModal(false);
-              setMatchmakingStatus('idle');
-              setHasEnteredGame(true);
-
-              // Set active match reference
-              setActiveMatch({
-                id: matchId,
-                wordLength: len,
-                targetWord: sharedWord,
-                players: {
-                  [profile.id]: {
-                    name: profile.name,
-                    attempts: [],
-                    currentAttempt: 0,
-                    completed: false,
-                    timeRemaining: 20,
-                    score: 0,
-                    won: false
-                  },
-                  [opponentId]: {
-                    name: opponentName,
-                    attempts: [],
-                    currentAttempt: 0,
-                    completed: false,
-                    timeRemaining: 20,
-                    score: 0,
-                    won: false
-                  }
-                },
-                status: 'playing'
-              });
-              break;
-            }
-
-            case 'match_update': {
-              const { playerUpdate } = data;
-              setActiveMatch((prev) => {
-                if (!prev) return null;
-                return {
-                  ...prev,
-                  players: {
-                    ...prev.players,
-                    [playerUpdate.id]: {
-                      ...prev.players[playerUpdate.id],
-                      attempts: playerUpdate.attempts,
-                      currentAttempt: playerUpdate.currentAttempt,
-                      completed: playerUpdate.completed,
-                      won: playerUpdate.won,
-                      score: playerUpdate.score,
-                      timeRemaining: playerUpdate.timeRemaining
-                    }
-                  }
-                };
-              });
-              break;
-            }
-
-            case 'opponent_left':
-              showToast('Rakip oyundan ayrıldı!', 'error');
-              setGameStatus('won'); // Automatically win if opponent flees
-              setActiveMatch(null);
-              break;
-
-            case 'match_end': {
-              const { winnerId, players: finalPlayers } = data;
-              setActiveMatch((prev) => {
-                if (!prev) return null;
-                return {
-                  ...prev,
-                  status: 'ended',
-                  winnerId
-                };
-              });
-
-              if (winnerId === profile.id) {
-                showToast('TEBRİKLER! Savaşı Kazandın!', 'success');
-                // Award Gladiator Badge
-                unlockBadge('gladiator');
-                updateDailyScore(200);
-              } else if (winnerId === 'draw') {
-                showToast('Maç berabere bitti!', 'info');
-                updateDailyScore(50);
-              } else {
-                showToast('Maçı rakibin kazandı. Daha hızlı olmalısın!', 'error');
-              }
-              break;
-            }
-
-            case 'matchmaking_status': {
-              setMatchmakingStatus(data.status);
-              if (data.status === 'queued') {
-                showToast('Eşleşme aranıyor... Lütfen bekleyin.', 'info');
-              } else if (data.status === 'idle') {
-                showToast('Eşleşme kuyruğundan çıkıldı.', 'info');
-              }
-              break;
-            }
-          }
-        } catch (e) {
-          console.error('Error handling websocket message:', e);
-        }
-      };
-
-      ws.onclose = () => {
-        setIsOnline(false);
-        if (pingInterval) clearInterval(pingInterval);
-        if (socketRef.current === ws) {
-          socketRef.current = null;
-        }
-        // Attempt reconnect after 3 seconds
-        if (!isDisposed) {
-          if (reconnectTimeout) clearTimeout(reconnectTimeout);
-          reconnectTimeout = setTimeout(connectWS, 3000);
-        }
-      };
-
-      ws.onerror = (err) => {
-        console.error('WebSocket connection error:', err);
-        setIsOnline(false);
-        try {
-          ws.close(); // Guarantees triggering onclose and scheduling reconnect
-        } catch (e) {
-          // ignore
-        }
-      };
-    };
-
-    connectWS();
-
-    return () => {
-      isDisposed = true;
-      if (pingInterval) clearInterval(pingInterval);
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      if (socketRef.current) {
-        socketRef.current.close();
-        socketRef.current = null;
-      }
-    };
-  }, [profile.id, profile.name, profile.avatarUrl]);
+  // Connect to real-time WebSocket on mount or profile change - DEACTIVATED to resolve WebSocket errors and support offline solo play
+  useEffect(() => {
+    setIsOnline(false);
+    setLobbyPlayers([]);
+    setActiveChallenges([]);
+    setMatchmakingStatus('idle');
+  }, []);
 
   // Synchronize game updates to WebSocket if in active match
   const syncMatchState = (
@@ -1133,6 +943,7 @@ export default function App() {
             onToggleDarkMode={() => setDarkMode(!darkMode)}
             matchmakingStatus={matchmakingStatus}
             isOnline={isOnline}
+            onReconnect={handleManualReconnect}
             lobbyPlayers={lobbyPlayers}
             activeChallenges={activeChallenges}
             onChallenge={handleChallengePlayer}

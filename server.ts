@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import http from 'http';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
@@ -202,6 +203,10 @@ const broadcastLobby = () => {
 const setupWebSocket = (server: any) => {
   const wss = new WebSocketServer({ noServer: true });
 
+  wss.on('error', (err) => {
+    console.error('[WS Server] error:', err);
+  });
+
   server.on('upgrade', (request: any, socket: any, head: any) => {
     let pathname = '';
     try {
@@ -209,10 +214,27 @@ const setupWebSocket = (server: any) => {
     } catch (e) {
       pathname = (request.url || '').split('?')[0];
     }
-    if (pathname === '/ws' || pathname === '/ws/') {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
-      });
+
+    // Log the upgrade request to a debug file
+    try {
+      const logMsg = `[${new Date().toISOString()}] Upgrade event: URL=${request.url}, Pathname=${pathname}, Headers=${JSON.stringify(request.headers)}\n`;
+      fs.appendFileSync(path.join(process.cwd(), 'ws_debug.log'), logMsg);
+    } catch (err) {
+      // ignore log write failure
+    }
+
+    if (pathname.startsWith('/ws')) {
+      console.log(`[WS Upgrade] Intercepted upgrade for game server. URL: ${request.url}, Pathname: ${pathname}`);
+      try {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          wss.emit('connection', ws, request);
+        });
+      } catch (err) {
+        console.error('[WS Upgrade] Failed to handle upgrade:', err);
+        try {
+          socket.destroy();
+        } catch (e) {}
+      }
     }
   });
 
@@ -675,10 +697,11 @@ async function startServer() {
 
   // Vite integration
   if (process.env.NODE_ENV !== 'production') {
+    const isHmrDisabled = process.env.DISABLE_HMR === 'true';
     const vite = await createViteServer({
       server: { 
         middlewareMode: true,
-        hmr: { server }
+        hmr: isHmrDisabled ? false : { server }
       },
       appType: 'spa',
     });

@@ -47,8 +47,11 @@ export function getBaseUrl(): string {
       return cleanFallback;
     }
     
-    // Regular desktop development with port
-    if ((hostname === 'localhost' || hostname === '127.0.0.1') && port) {
+    // Regular desktop or mobile development with port (e.g. localhost:3000, 192.168.1.x:3000)
+    if (port || hostname.startsWith('192.168.') || hostname.startsWith('10.')) {
+      if (window.location.origin && window.location.origin !== 'null') {
+        return window.location.origin;
+      }
       return ''; // Relative path works fine
     }
   }
@@ -63,11 +66,29 @@ export function getApiUrl(endpoint: string): string {
 }
 
 export function getWsUrl(): string {
+  if (typeof window !== 'undefined' && window.location) {
+    const { hostname, host, protocol } = window.location;
+    if (hostname) {
+      const isRemote = hostname !== 'localhost' && 
+                       hostname !== '127.0.0.1' &&
+                       !hostname.startsWith('192.168.') &&
+                       !hostname.startsWith('10.');
+      if (isRemote) {
+        // Remote servers (e.g. Cloud Run) ALWAYS require secure WebSockets (wss://)
+        return `wss://${host || hostname}/ws`;
+      }
+    }
+    
+    // Fallback relative protocol
+    const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+    if (host) {
+      return `${wsProtocol}//${host}/ws`;
+    }
+  }
+
   const base = getBaseUrl();
   if (!base) {
-    // Relative protocol
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${window.location.host}/ws`;
+    return `ws://localhost:3000/ws`;
   }
   
   // Convert http/https base to ws/wss
