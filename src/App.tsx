@@ -8,7 +8,6 @@ import {
   playVictorySound,
   playDefeatSound
 } from './utils/soundEffects.js';
-import Header from './components/Header.js';
 import GameBoard from './components/GameBoard.js';
 import Keyboard from './components/Keyboard.js';
 import Lobby from './components/Lobby.js';
@@ -1052,28 +1051,6 @@ export default function App() {
 
   return (
     <div className={`min-h-screen flex flex-col transition-all duration-300 ${getBgThemeClass()}`}>
-      {/* Header Bar */}
-      <Header
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        onOpenStats={() => setShowStatsModal(true)}
-        onOpenBadges={() => {
-          setShowStatsModal(true);
-        }}
-        onOpenMissions={() => setShowMissionsModal(true)}
-        onOpenLobby={() => setShowLobbyModal(true)}
-        onOpenSettings={() => setShowSettingsModal(true)}
-        playerName={profile.name}
-        avatarUrl={profile.avatarUrl}
-        onEditName={() => {
-          setNameInput(profile.name);
-          setAvatarInput(profile.avatarUrl);
-          setIsEditingName(true);
-        }}
-        dailyScore={profile.dailyScore}
-        isOnline={isOnline}
-      />
-
       {/* Main Container */}
       <main className="flex-1 flex flex-col items-center justify-center py-4 px-4 max-w-4xl w-full mx-auto relative">
         {/* Toast Notification */}
@@ -1122,6 +1099,9 @@ export default function App() {
             onOpenLobby={() => setShowLobbyModal(true)}
             onOpenSettings={() => setShowSettingsModal(true)}
             onOpenMissions={() => setShowMissionsModal(true)}
+            onOpenStats={() => setShowStatsModal(true)}
+            darkMode={darkMode}
+            onToggleDarkMode={() => setDarkMode(!darkMode)}
             matchmakingStatus={matchmakingStatus}
             isOnline={isOnline}
             lobbyPlayers={lobbyPlayers}

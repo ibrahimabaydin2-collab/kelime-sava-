@@ -191,7 +191,12 @@ const setupWebSocket = (server: any) => {
   const wss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', (request: any, socket: any, head: any) => {
-    const { pathname } = new URL(request.url, `http://${request.headers.host}`);
+    let pathname = '';
+    try {
+      pathname = new URL(request.url || '', 'http://localhost').pathname;
+    } catch (e) {
+      pathname = (request.url || '').split('?')[0];
+    }
     if (pathname === '/ws') {
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);

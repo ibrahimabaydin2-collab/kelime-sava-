@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { 
   Swords, Play, Globe, ShieldAlert, Sparkles, 
   Trophy, Users, HelpCircle, ChevronDown, ChevronUp, 
-  Copy, Check, Flame, Zap, Target, Edit2, User, Award, CheckCircle2, TrendingUp
+  Copy, Check, Flame, Zap, Target, Edit2, User, Award, CheckCircle2, TrendingUp,
+  Sun, Moon, Sliders, BarChart2
 } from 'lucide-react';
 import { UserProfile, LobbyPlayer, Challenge } from '../types.js';
 import { getBaseUrl } from '../utils/api.js';
@@ -24,6 +25,11 @@ interface WelcomeScreenProps {
   matchmakingStatus: 'idle' | 'queued';
   isOnline: boolean;
   onStartGroupRace?: () => void;
+  
+  // New Header integration props
+  onOpenStats?: () => void;
+  darkMode?: boolean;
+  onToggleDarkMode?: () => void;
   
   // Dynamic Integrated Dashboard Props
   lobbyPlayers?: LobbyPlayer[];
@@ -50,6 +56,9 @@ export default function WelcomeScreen({
   matchmakingStatus,
   isOnline,
   onStartGroupRace,
+  onOpenStats,
+  darkMode,
+  onToggleDarkMode,
   lobbyPlayers = [],
   activeChallenges = [],
   onChallenge,
@@ -114,6 +123,51 @@ export default function WelcomeScreen({
         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold tracking-widest uppercase">
           TÜRKÇE KELİME BULMACA DÜELLOSU
         </p>
+      </div>
+
+      {/* Minimalist Top Utility Bar */}
+      <div className="flex justify-between items-center bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-2xl px-4 py-2.5 shadow-xs" id="welcome-utility-bar">
+        {/* Connection status */}
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+          <span className="text-[10px] font-bold text-gray-550 dark:text-gray-400 font-mono tracking-wider">
+            BAĞLANTI: {isOnline ? 'AKTİF' : 'ÇEVRİMDIŞI'}
+          </span>
+        </div>
+        
+        {/* Utility Icon Buttons */}
+        <div className="flex items-center gap-1">
+          {/* Stats Button */}
+          {onOpenStats && (
+            <button
+              onClick={onOpenStats}
+              className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+              title="İstatistikler & Rozetler"
+            >
+              <BarChart2 size={16} />
+            </button>
+          )}
+          
+          {/* Settings Button */}
+          <button
+            onClick={onOpenSettings}
+            className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+            title="Ayarlar"
+          >
+            <Sliders size={16} />
+          </button>
+          
+          {/* Dark Mode Toggle */}
+          {onToggleDarkMode && (
+            <button
+              onClick={onToggleDarkMode}
+              className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+              title={darkMode ? 'Gündüz Modu' : 'Gece Modu'}
+            >
+              {darkMode ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} />}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Interactive Savaşçı Kartı (Warrior Profile Card) */}

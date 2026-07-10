@@ -8,11 +8,16 @@ export function getBaseUrl(): string {
   
   if (typeof window !== 'undefined') {
     const { protocol, hostname, port } = window.location;
-    const ua = navigator.userAgent || '';
     
-    // Detect mobile device/emulator and WebView environment indicators
+    // If we are on the actual deployed Cloud Run environment
+    if (hostname.includes('.run.app')) {
+      return ''; // Relative path works perfectly and safely
+    }
+    
+    const ua = navigator.userAgent || '';
     const isAndroid = /android/i.test(ua);
     const isIOS = /iphone|ipad|ipod/i.test(ua);
+    const isMobile = isAndroid || isIOS;
     
     // Webview detection (includes common wrapper strings, e.g. "wv", "WebView", or custom Android interface)
     const isWebView = ua.includes('wv') || 
@@ -24,24 +29,19 @@ export function getBaseUrl(): string {
     
     const isCapacitor = !!(window as any).Capacitor;
     
-    // If we are in a hybrid / mobile container (local files, capacitor protocol, native ionic, or localhost with a mobile agent)
+    // In hybrid mobile environment (Capacitor / WebView / file protocol / mobile host layout)
     const isHybrid = protocol === 'file:' || 
                      protocol.startsWith('capacitor') || 
                      protocol.startsWith('ionic') || 
                      isWebView ||
                      isCapacitor ||
-                     ((hostname === 'localhost' || hostname === '127.0.0.1') && (isAndroid || isIOS));
+                     (isMobile && (hostname === 'localhost' || hostname === '127.0.0.1' || !port));
                      
     if (isHybrid) {
       return cleanFallback;
     }
     
-    // Regular web browser (on actual domain or dev server)
-    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      return ''; // Relative path works fine
-    }
-    
-    // Localhost with port (desktop browser development environment)
+    // Regular desktop development with port
     if ((hostname === 'localhost' || hostname === '127.0.0.1') && port) {
       return ''; // Relative path works fine
     }
