@@ -103,7 +103,7 @@ export default function WelcomeScreen({
       {/* Brand Hero Header */}
       <div className="flex flex-col items-center text-center py-3 space-y-1">
         <img 
-          src="/logo.svg" 
+          src="./logo.svg" 
           alt="Kelime Savaşı Logo" 
           className="w-24 h-24 rounded-3xl shadow-xl shadow-emerald-500/15 border-2 border-emerald-500/20 mb-2 transition duration-500 hover:rotate-6 active:scale-95"
           referrerPolicy="no-referrer"

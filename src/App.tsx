@@ -140,18 +140,40 @@ const triggerVictoryCelebration = (soundEnabled: boolean) => {
   }, 350);
 };
 
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem(key);
+      }
+    } catch (e) {
+      console.warn('localStorage getItem blocked/unavailable:', e);
+    }
+    return null;
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
+      }
+    } catch (e) {
+      console.warn('localStorage setItem blocked/unavailable:', e);
+    }
+  }
+};
+
 export default function App() {
   // Theme & Menu State
   const [darkMode, setDarkMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem('darkMode');
+    const saved = safeLocalStorage.getItem('darkMode');
     if (saved !== null) return saved === 'true';
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
   // User Profile
   const [profile, setProfile] = useState<UserProfile>(() => {
-    let saved = localStorage.getItem('kelimesavasi_profile');
-    if (!saved) saved = localStorage.getItem('lingo_profile');
+    let saved = safeLocalStorage.getItem('kelimesavasi_profile');
+    if (!saved) saved = safeLocalStorage.getItem('lingo_profile');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -191,19 +213,19 @@ export default function App() {
 
   // Welcome Screen & Dictionary Mode State
   const [hasEnteredGame, setHasEnteredGame] = useState<boolean>(() => {
-    return localStorage.getItem('kelimesavasi_entered') === 'true';
+    return safeLocalStorage.getItem('kelimesavasi_entered') === 'true';
   });
   const [dictionaryMode, setDictionaryMode] = useState<'tdk_online' | 'no_validation'>(() => {
-    const saved = localStorage.getItem('kelimesavasi_dict_mode');
+    const saved = safeLocalStorage.getItem('kelimesavasi_dict_mode');
     return saved === 'no_validation' ? 'no_validation' : 'tdk_online';
   });
   const [gameMode, setGameMode] = useState<'timed' | 'untimed'>(() => {
-    const saved = localStorage.getItem('kelimesavasi_game_mode');
+    const saved = safeLocalStorage.getItem('kelimesavasi_game_mode');
     return saved === 'untimed' ? 'untimed' : 'timed';
   });
 
   useEffect(() => {
-    localStorage.setItem('kelimesavasi_game_mode', gameMode);
+    safeLocalStorage.setItem('kelimesavasi_game_mode', gameMode);
   }, [gameMode]);
 
   const [matchmakingStatus, setMatchmakingStatus] = useState<'idle' | 'queued'>('idle');
@@ -216,7 +238,7 @@ export default function App() {
   const [showLobbyModal, setShowLobbyModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('kelimesavasi_settings');
+    const saved = safeLocalStorage.getItem('kelimesavasi_settings');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -234,7 +256,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('kelimesavasi_settings', JSON.stringify(settings));
+    safeLocalStorage.setItem('kelimesavasi_settings', JSON.stringify(settings));
   }, [settings]);
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [nameInput, setNameInput] = useState<string>(profile.name);
@@ -257,20 +279,20 @@ export default function App() {
     } else {
       document.documentElement.classList.remove('dark');
     }
-    localStorage.setItem('darkMode', darkMode.toString());
+    safeLocalStorage.setItem('darkMode', darkMode.toString());
   }, [darkMode]);
 
   // Persist User Profile
   useEffect(() => {
-    localStorage.setItem('kelimesavasi_profile', JSON.stringify(profile));
+    safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(profile));
   }, [profile]);
 
   useEffect(() => {
-    localStorage.setItem('kelimesavasi_entered', hasEnteredGame.toString());
+    safeLocalStorage.setItem('kelimesavasi_entered', hasEnteredGame.toString());
   }, [hasEnteredGame]);
 
   useEffect(() => {
-    localStorage.setItem('kelimesavasi_dict_mode', dictionaryMode);
+    safeLocalStorage.setItem('kelimesavasi_dict_mode', dictionaryMode);
   }, [dictionaryMode]);
 
   // Toast Helper
@@ -571,11 +593,30 @@ export default function App() {
   }, [gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode]); // Resets interval on attempt submission or validation change or exit or gameMode change
 
   // Handle Game Loss
-  const handleGameLoss = (reason: string = 'Hakkınız Bitti') => {
+  const handleGameLoss = async (reason: string = 'Hakkınız Bitti') => {
     setGameStatus('lost');
     showToast(`Oyunu Kaybettiniz: ${reason}! Doğru Kelime: ${targetWord}`, 'error');
     playDefeatSound(settings.soundEnabled);
     
+    // Fetch definition for targetWord so the user can learn its meaning even on loss!
+    if (dictionaryMode !== 'no_validation' && targetWord) {
+      try {
+        const response = await fetch(getApiUrl('/api/validate-word'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word: targetWord, length: wordLength })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.definition) {
+            setWordDefinition(data.definition);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch target word definition on loss', e);
+      }
+    }
+
     // Increment gamesPlayed and reset streak
     setProfile((prev) => {
       const newStats = {
@@ -1400,6 +1441,18 @@ export default function App() {
                 <h4 className="text-lg font-bold text-gray-900 dark:text-white">Aradığınız kelime şuydu:</h4>
                 <strong className="text-2xl text-rose-500 tracking-wider font-extrabold block uppercase">{targetWord}</strong>
               </div>
+
+              {wordDefinition && (
+                <div className="p-4 bg-white/70 dark:bg-gray-950/40 rounded-2xl border border-rose-500/15 shadow-inner text-left animate-fade-in">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 font-mono block mb-1">
+                    TDK SÖZLÜK ANLAMI
+                  </span>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 italic font-sans leading-relaxed">
+                    "{wordDefinition}"
+                  </p>
+                </div>
+              )}
+
               <button
                 onClick={() => startNewGame(wordLength)}
                 className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-emerald-500/20 text-xs sm:text-sm active:scale-95 transition"

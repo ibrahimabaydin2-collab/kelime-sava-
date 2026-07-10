@@ -34,7 +34,7 @@ export default function Header({
       <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img 
-            src="/logo.svg" 
+            src="./logo.svg" 
             alt="Kelime Savaşı Logo" 
             className="w-10 h-10 rounded-xl shadow-md shadow-emerald-500/25 transition duration-300 hover:scale-105"
             referrerPolicy="no-referrer"

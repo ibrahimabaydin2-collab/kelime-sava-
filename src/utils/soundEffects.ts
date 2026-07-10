@@ -4,15 +4,24 @@ let audioCtx: AudioContext | null = null;
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   if (!audioCtx) {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (AudioContextClass) {
-      audioCtx = new AudioContextClass();
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+      }
+    } catch (e) {
+      console.warn('Web Audio API is not supported or was blocked:', e);
+      return null;
     }
   }
   
   // Resume context if suspended (e.g. due to user gesture policy)
   if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume();
+    try {
+      audioCtx.resume();
+    } catch (e) {
+      console.warn('Failed to resume AudioContext:', e);
+    }
   }
   
   return audioCtx;

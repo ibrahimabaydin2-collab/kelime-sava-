@@ -1,0 +1,68 @@
+name: Android APK & AAB Derleyici
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Android Derlemesi
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu Klonla (Checkout)
+        uses: actions/checkout@v4
+
+      - name: Node.js Kurulumu
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Bağımlılıkları Yükle (npm ci)
+        run: npm ci
+
+      - name: Web Uygulamasını Derle (React Build)
+        run: npm run build
+
+      - name: Java 17 Kurulumu (JDK)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Android SDK Kurulumu
+        uses: android-actions/setup-android@v3
+
+      - name: Capacitor Android Projesini Hazırla
+        run: |
+          npx cap sync
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: Debug APK Derle (Telefon için)
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Google Play için Release AAB Derle
+        run: |
+          cd android
+          ./gradlew bundleRelease
+
+      - name: APK Dosyasını Yükle (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KelimeSavasi-Mobil-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: AAB Dosyasını Yükle (Google Play Bundle)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KelimeSavasi-PlayStore-AAB
+          path: android/app/build/outputs/bundle/release/app-release.aab

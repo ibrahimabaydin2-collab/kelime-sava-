@@ -22,11 +22,14 @@ export function getBaseUrl(): string {
                       (window as any).Android || 
                       ((window as any).webkit && (window as any).webkit.messageHandlers);
     
+    const isCapacitor = !!(window as any).Capacitor;
+    
     // If we are in a hybrid / mobile container (local files, capacitor protocol, native ionic, or localhost with a mobile agent)
     const isHybrid = protocol === 'file:' || 
                      protocol.startsWith('capacitor') || 
                      protocol.startsWith('ionic') || 
                      isWebView ||
+                     isCapacitor ||
                      ((hostname === 'localhost' || hostname === '127.0.0.1') && (isAndroid || isIOS));
                      
     if (isHybrid) {
