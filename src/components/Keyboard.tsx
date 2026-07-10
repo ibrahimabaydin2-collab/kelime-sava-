@@ -33,7 +33,7 @@ export default function Keyboard({
   const rows = keyboardLayout === 'F' ? fRows : qRows;
 
   const getKeyClass = (char: string) => {
-    const base = 'flex-1 h-12 sm:h-14 md:h-16 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors duration-200 cursor-pointer select-none';
+    const base = 'flex-1 h-10 sm:h-12 md:h-14 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors duration-200 cursor-pointer select-none';
     const status = letterStatuses[char.toLocaleUpperCase('tr-TR')];
 
     if (char === 'ENTER' || char === 'SIL') {

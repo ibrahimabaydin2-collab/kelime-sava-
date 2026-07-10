@@ -62,10 +62,33 @@ export function getBaseUrl(): string {
 export function getApiUrl(endpoint: string): string {
   const base = getBaseUrl();
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return `${base}${cleanEndpoint}`;
+  let url = `${base}${cleanEndpoint}`;
+  
+  // Append ___aistudio_auth_token to bypass cookie blocking in iframes
+  if (typeof window !== 'undefined') {
+    let token = new URLSearchParams(window.location.search).get('___aistudio_auth_token');
+    if (token) {
+      try {
+        window.sessionStorage.setItem('aistudio_auth_token', token);
+      } catch (e) {}
+    } else {
+      try {
+        token = window.sessionStorage.getItem('aistudio_auth_token');
+      } catch (e) {}
+    }
+    
+    if (token) {
+      url = url.includes('?')
+        ? `${url}&___aistudio_auth_token=${encodeURIComponent(token)}`
+        : `${url}?___aistudio_auth_token=${encodeURIComponent(token)}`;
+    }
+  }
+  
+  return url;
 }
 
 export function getWsUrl(): string {
+  let wsUrl = '';
   if (typeof window !== 'undefined' && window.location) {
     const { hostname, host, protocol } = window.location;
     if (hostname) {
@@ -75,24 +98,50 @@ export function getWsUrl(): string {
                        !hostname.startsWith('10.');
       if (isRemote) {
         // Remote servers (e.g. Cloud Run) ALWAYS require secure WebSockets (wss://)
-        return `wss://${host || hostname}/ws`;
+        wsUrl = `wss://${host || hostname}/ws`;
       }
     }
     
-    // Fallback relative protocol
-    const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
-    if (host) {
-      return `${wsProtocol}//${host}/ws`;
+    if (!wsUrl) {
+      // Fallback relative protocol
+      const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+      if (host) {
+        wsUrl = `${wsProtocol}//${host}/ws`;
+      }
     }
   }
 
-  const base = getBaseUrl();
-  if (!base) {
-    return `ws://localhost:3000/ws`;
+  if (!wsUrl) {
+    const base = getBaseUrl();
+    if (!base) {
+      wsUrl = `ws://localhost:3000/ws`;
+    } else {
+      // Convert http/https base to ws/wss
+      const wsProtocol = base.startsWith('https:') ? 'wss:' : 'ws:';
+      const noProtocol = base.replace(/^https?:\/\//, '');
+      wsUrl = `${wsProtocol}//${noProtocol}/ws`;
+    }
   }
-  
-  // Convert http/https base to ws/wss
-  const wsProtocol = base.startsWith('https:') ? 'wss:' : 'ws:';
-  const noProtocol = base.replace(/^https?:\/\//, '');
-  return `${wsProtocol}//${noProtocol}/ws`;
+
+  // Append ___aistudio_auth_token if available to bypass cookie-blocking issues in iframes
+  if (typeof window !== 'undefined') {
+    let token = new URLSearchParams(window.location.search).get('___aistudio_auth_token');
+    if (token) {
+      try {
+        window.sessionStorage.setItem('aistudio_auth_token', token);
+      } catch (e) {}
+    } else {
+      try {
+        token = window.sessionStorage.getItem('aistudio_auth_token');
+      } catch (e) {}
+    }
+    
+    if (token) {
+      wsUrl = wsUrl.includes('?') 
+        ? `${wsUrl}&___aistudio_auth_token=${encodeURIComponent(token)}`
+        : `${wsUrl}?___aistudio_auth_token=${encodeURIComponent(token)}`;
+    }
+  }
+
+  return wsUrl;
 }

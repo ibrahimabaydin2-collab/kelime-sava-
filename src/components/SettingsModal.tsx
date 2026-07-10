@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone } from 'lucide-react';
+import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2 } from 'lucide-react';
 
 export interface AppSettings {
   boardTheme: 'classic' | 'ocean' | 'neon' | 'autumn' | 'pastel';
@@ -13,12 +13,18 @@ interface SettingsModalProps {
   settings: AppSettings;
   onChangeSettings: (newSettings: AppSettings) => void;
   onClose: () => void;
+  darkMode?: boolean;
+  onToggleDarkMode?: () => void;
+  onOpenStats?: () => void;
 }
 
 export default function SettingsModal({
   settings,
   onChangeSettings,
-  onClose
+  onClose,
+  darkMode,
+  onToggleDarkMode,
+  onOpenStats
 }: SettingsModalProps) {
   
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
@@ -167,7 +173,7 @@ export default function SettingsModal({
                 className={`flex-1 py-2.5 px-3 rounded-2xl border-2 text-xs font-bold transition flex items-center justify-center gap-2 ${
                   settings.soundEnabled
                     ? 'border-emerald-500 bg-emerald-50/10 dark:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400'
-                    : 'border-slate-100 dark:border-slate-800 text-slate-400'
+                    : 'border-slate-100 dark:border-slate-800 text-slate-400 hover:bg-slate-50'
                 }`}
               >
                 {settings.soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
@@ -175,6 +181,47 @@ export default function SettingsModal({
               </button>
             </div>
           </div>
+
+          {/* Dark Mode Toggle */}
+          {onToggleDarkMode !== undefined && (
+            <div className="space-y-2.5">
+              <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                {darkMode ? <Moon size={14} /> : <Sun size={14} />}
+                Görünüm Modu
+              </h4>
+              <button
+                onClick={onToggleDarkMode}
+                className={`w-full py-2.5 px-3 rounded-2xl border-2 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                  darkMode
+                    ? 'border-emerald-500 bg-emerald-50/10 dark:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400'
+                    : 'border-slate-100 dark:border-slate-800 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {darkMode ? <Moon size={14} className="text-amber-400" /> : <Sun size={14} className="text-amber-500" />}
+                <span>{darkMode ? 'Gece Modu' : 'Gündüz Modu'}</span>
+              </button>
+            </div>
+          )}
+
+          {/* Stats Button */}
+          {onOpenStats !== undefined && (
+            <div className="space-y-2.5">
+              <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <BarChart2 size={14} />
+                Oyuncu İstatistikleri
+              </h4>
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenStats();
+                }}
+                className="w-full py-2.5 px-3 rounded-2xl border-2 border-dashed border-emerald-500/30 hover:border-emerald-500 hover:bg-emerald-50/10 dark:hover:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <BarChart2 size={14} />
+                <span>İstatistikler & Rozetler</span>
+              </button>
+            </div>
+          )}
 
         </div>
 
