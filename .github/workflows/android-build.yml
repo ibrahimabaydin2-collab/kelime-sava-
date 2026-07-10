@@ -22,8 +22,8 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Bağımlılıkları Yükle (npm ci)
-        run: npm ci
+      - name: Bağımlılıkları Yükle (npm install)
+        run: npm install
 
       - name: Web Uygulamasını Derle (React Build)
         run: npm run build
@@ -39,7 +39,6 @@ jobs:
 
       - name: Capacitor Android Projesini Hazırla
         run: |
-          npx cap sync
           if [ ! -d "android" ]; then
             npx cap add android
           fi
