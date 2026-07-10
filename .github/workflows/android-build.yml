@@ -36,7 +36,16 @@ jobs:
 
       - name: Capacitor Android Projesini Hazırla
         run: |
-          if [ ! -d "android" ] || [ ! -d "android/app" ]; then
+          if [ -d "android" ]; then
+            if [ ! -f "android/gradlew" ]; then
+              echo "WARNING: 'android' folder exists but is incomplete (missing gradlew). Recreating..."
+              rm -rf android
+              npx cap add android
+            else
+              echo "Android folder is complete."
+            fi
+          else
+            echo "Android folder does not exist. Adding android platform..."
             npx cap add android
           fi
           npx cap sync android
