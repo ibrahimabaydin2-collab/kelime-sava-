@@ -28,11 +28,11 @@ jobs:
       - name: Web Uygulamasını Derle (React Build)
         run: npm run build
 
-      - name: Java 17 Kurulumu (JDK)
+      - name: Java 21 Kurulumu (JDK)
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       - name: Capacitor Android Projesini Hazırla
         run: |
