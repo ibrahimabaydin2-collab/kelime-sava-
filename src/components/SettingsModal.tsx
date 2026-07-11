@@ -26,6 +26,55 @@ export default function SettingsModal({
   onToggleDarkMode,
   onOpenStats
 }: SettingsModalProps) {
+  const activeToken = typeof window !== 'undefined'
+    ? (new URLSearchParams(window.location.search).get('___aistudio_auth_token') ||
+       window.localStorage.getItem('aistudio_auth_token') ||
+       window.sessionStorage.getItem('aistudio_auth_token') ||
+       '')
+    : '';
+
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const isDev = currentOrigin.includes('-dev-') || (typeof window !== 'undefined' && window.location.href.includes('-dev-'));
+  const currentServer = isDev ? 'dev' : 'pre';
+  
+  const connectUrl = `${currentOrigin}/connect?token=${encodeURIComponent(activeToken)}&server=${currentServer}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(connectUrl)}`;
+
+  const [tokenInput, setTokenInput] = useState(() => {
+    return typeof window !== 'undefined'
+      ? (window.localStorage.getItem('aistudio_auth_token') || activeToken)
+      : '';
+  });
+  const [isCopied, setIsCopied] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
+
+  const [serverType, setServerType] = useState(() => {
+    return typeof window !== 'undefined'
+      ? (window.localStorage.getItem('kelimesavasi_server_type') || 'pre')
+      : 'pre';
+  });
+
+  const [customServerUrl, setCustomServerUrl] = useState(() => {
+    return typeof window !== 'undefined'
+      ? (window.localStorage.getItem('kelimesavasi_custom_server_url') || '')
+      : '';
+  });
+
+  const handleSaveConnection = () => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('kelimesavasi_server_type', serverType);
+      window.localStorage.setItem('aistudio_auth_token', tokenInput);
+      window.sessionStorage.setItem('aistudio_auth_token', tokenInput);
+      if (serverType === 'custom') {
+        window.localStorage.setItem('kelimesavasi_custom_server_url', customServerUrl);
+      }
+      setSaveStatus('saved');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+    }
+  };
+
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     onChangeSettings({
       ...settings,
@@ -221,6 +270,139 @@ export default function SettingsModal({
               </button>
             </div>
           )}
+
+          {/* Section 4: Server Connection Settings */}
+          <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-2">
+              <Wifi size={14} className="text-emerald-500" />
+              Sunucu & Mobil Bağlantı Ayarları
+            </h4>
+            
+            {/* Automatic QR Code Connection */}
+            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 block">Yöntem 1: Hızlı QR Kod Bağlantısı</span>
+              {activeToken ? (
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm shrink-0 flex items-center justify-center">
+                    <img
+                      src={qrCodeUrl}
+                      alt="Bağlantı Karekodu"
+                      className="w-24 h-24 select-none"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div className="space-y-1.5 text-left flex-1">
+                    <h5 className="text-xs font-bold text-slate-700 dark:text-slate-300 font-sans">Telefon Kamerasıyla Taratın</h5>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal font-sans">
+                      Kameranızı bu karekoda tutun ve çıkan bağlantıya tıklayın. Uygulamanız otomatik olarak açılacak ve internete bağlanacaktır.
+                    </p>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(activeToken);
+                        setIsCopied(true);
+                        setTimeout(() => setIsCopied(false), 2000);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 transition"
+                    >
+                      {isCopied ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                      <span>{isCopied ? 'Anahtar Kopyalandı!' : 'Bağlantı Anahtarını Kopyala'}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full text-center py-2 text-slate-400 dark:text-slate-500 text-xs flex flex-col items-center gap-1.5">
+                  <Key size={18} className="text-amber-500 animate-pulse" />
+                  <span>Güvenlik belirteci bulunamadı. Lütfen oyunu bilgisayar tarayıcısından açın.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Manual Connection Settings */}
+            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 block">Yöntem 2: Manuel Bağlantı & Gelişmiş Ayarlar</span>
+              
+              {/* Server Type Selector */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                  <Server size={12} />
+                  Bağlanılacak Sunucu Türü
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-150 dark:border-slate-800">
+                  {[
+                    { id: 'pre', name: 'Canlı (Pre)' },
+                    { id: 'dev', name: 'Geliştirme' },
+                    { id: 'custom', name: 'Özel (IP/URL)' }
+                  ].map((srv) => (
+                    <button
+                      key={srv.id}
+                      type="button"
+                      onClick={() => setServerType(srv.id as any)}
+                      className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                        serverType === srv.id
+                          ? 'bg-emerald-500 text-white shadow-sm'
+                          : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                      }`}
+                    >
+                      {srv.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Server URL Input */}
+              {serverType === 'custom' && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Özel Sunucu Adresi (örn: http://192.168.1.50:3000)</label>
+                  <input
+                    type="text"
+                    value={customServerUrl}
+                    onChange={(e) => setCustomServerUrl(e.target.value)}
+                    placeholder="http://192.168.1.100:3000"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 dark:text-slate-100"
+                  />
+                </div>
+              )}
+
+              {/* Token Input */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                  <Key size={12} />
+                  Bağlantı Anahtarı (Token)
+                </label>
+                <input
+                  type="text"
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value)}
+                  placeholder="AI Studio Bağlantı Anahtarını Buraya Yapıştırın"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none font-mono text-slate-800 dark:text-slate-100"
+                />
+              </div>
+
+              {/* Save Connection Action */}
+              <button
+                type="button"
+                onClick={handleSaveConnection}
+                disabled={saveStatus === 'saved'}
+                className={`w-full py-2.5 rounded-xl text-xs font-black tracking-wide transition flex items-center justify-center gap-2 cursor-pointer ${
+                  saveStatus === 'saved'
+                    ? 'bg-emerald-600 text-white cursor-not-allowed'
+                    : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/10'
+                }`}
+              >
+                {saveStatus === 'saved' ? (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    Bağlantı Güncellendi! Yeniden Başlatılıyor...
+                  </>
+                ) : (
+                  <>
+                    <Wifi size={14} />
+                    Mobil Bağlantıyı Kaydet ve Uygula
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
 
         </div>
 

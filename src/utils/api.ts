@@ -7,6 +7,27 @@ export function getBaseUrl(): string {
   if (typeof window !== 'undefined') {
     try {
       const type = window.localStorage.getItem('kelimesavasi_server_type') || 'pre';
+      
+      // If we are on mobile device and NOT directly visiting the Cloud Run page in a browser, 
+      // we must force using the absolute remote cloud server URL instead of relative paths!
+      const ua = navigator.userAgent || '';
+      const isAndroid = /android/i.test(ua);
+      const isIOS = /iphone|ipad|ipod/i.test(ua);
+      const isMobile = isAndroid || isIOS;
+      const isCloudRun = window.location.hostname.includes('run.app');
+      
+      if (isMobile && !isCloudRun) {
+        if (type === 'dev') {
+          return DEV_APP_URL;
+        } else if (type === 'custom') {
+          const customUrl = window.localStorage.getItem('kelimesavasi_custom_server_url');
+          if (customUrl) {
+            return customUrl.endsWith('/') ? customUrl.slice(0, -1) : customUrl;
+          }
+        }
+        return DEPLOYED_APP_URL;
+      }
+
       if (type === 'dev') {
         return DEV_APP_URL;
       } else if (type === 'custom') {
@@ -26,14 +47,9 @@ export function getBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const { protocol, hostname, port } = window.location;
     
-    // If we are on any remote web server (loaded via http/https and not local loopbacks)
-    const isRemoteWebServer = (protocol === 'http:' || protocol === 'https:') && 
-                              hostname !== 'localhost' && 
-                              hostname !== '127.0.0.1' &&
-                              !hostname.startsWith('192.168.') &&
-                              !hostname.startsWith('10.');
-                              
-    if (isRemoteWebServer) {
+    // Check if we are visiting our live Cloud Run app directly in a browser
+    const isCloudRun = hostname.includes('run.app');
+    if (isCloudRun) {
       return ''; // Relative paths are 100% safe and correct on remote domains
     }
     
@@ -53,15 +69,19 @@ export function getBaseUrl(): string {
     const isCapacitor = !!(window as any).Capacitor;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || !hostname;
     
-    // In hybrid mobile environment (Capacitor / WebView / file protocol / mobile host layout)
+    // In hybrid mobile environment (Capacitor / WebView / file protocol / mobile host layout / or any mobile run not on run.app)
     const isHybrid = protocol === 'file:' || 
                      protocol.startsWith('capacitor') || 
                      protocol.startsWith('ionic') || 
                      isWebView ||
                      isCapacitor ||
-                     (isMobile && isLocalhost);
+                     (isMobile && !isCloudRun);
                      
     if (isHybrid) {
+      try {
+        const type = window.localStorage.getItem('kelimesavasi_server_type') || 'pre';
+        if (type === 'dev') return DEV_APP_URL;
+      } catch (e) {}
       return cleanFallback;
     }
     
@@ -127,6 +147,16 @@ export function getWsUrl(): string {
           const protocol = isSecure ? 'wss:' : 'ws:';
           return `${protocol}//${cleanUrl}/ws`;
         }
+      } else if (type === 'pre') {
+        const ua = navigator.userAgent || '';
+        const isAndroid = /android/i.test(ua);
+        const isIOS = /iphone|ipad|ipod/i.test(ua);
+        const isMobile = isAndroid || isIOS;
+        const isCloudRun = window.location.hostname.includes('run.app');
+        if (isMobile && !isCloudRun) {
+          const noProtocol = DEPLOYED_APP_URL.replace(/^https?:\/\//, '');
+          return `wss://${noProtocol}/ws`;
+        }
       }
     } catch (e) {}
   }
@@ -146,37 +176,32 @@ export function getWsUrl(): string {
                       ((window as any).webkit && (window as any).webkit.messageHandlers);
     
     const isCapacitor = !!(window as any).Capacitor;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || !hostname;
+    const isCloudRun = hostname.includes('run.app');
     
-    const isRemote = hostname && 
-                     hostname !== 'localhost' && 
-                     hostname !== '127.0.0.1' &&
-                     !hostname.startsWith('192.168.') &&
-                     !hostname.startsWith('10.');
-
-    const isHybrid = !isRemote && (
+    const isHybrid = !isCloudRun && (
                      protocol === 'file:' || 
                      protocol.startsWith('capacitor') || 
                      protocol.startsWith('ionic') || 
                      isWebView ||
                      isCapacitor ||
-                     (isMobile && isLocalhost)
+                     isMobile
     );
 
     if (isHybrid) {
       // For mobile hybrid applications/WebViews on Android/iOS, point to the live cloud backend!
+      try {
+        const type = window.localStorage.getItem('kelimesavasi_server_type') || 'pre';
+        if (type === 'dev') {
+          const noProtocol = DEV_APP_URL.replace(/^https?:\/\//, '');
+          return `wss://${noProtocol}/ws`;
+        }
+      } catch (e) {}
       const base = DEPLOYED_APP_URL;
       const noProtocol = base.replace(/^https?:\/\//, '');
       wsUrl = `wss://${noProtocol}/ws`;
-    } else if (hostname) {
-      const isRemote = hostname !== 'localhost' && 
-                       hostname !== '127.0.0.1' &&
-                       !hostname.startsWith('192.168.') &&
-                       !hostname.startsWith('10.');
-      if (isRemote) {
-        // Remote servers (e.g. Cloud Run) ALWAYS require secure WebSockets (wss://)
-        wsUrl = `wss://${host || hostname}/ws`;
-      }
+    } else if (isCloudRun) {
+      // Remote servers (e.g. Cloud Run) ALWAYS require secure WebSockets (wss://)
+      wsUrl = `wss://${host || hostname}/ws`;
     }
     
     if (!wsUrl && !isHybrid) {

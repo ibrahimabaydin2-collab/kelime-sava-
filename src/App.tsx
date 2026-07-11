@@ -173,38 +173,63 @@ export default function App() {
     return typeof window !== 'undefined' && window.location.pathname === '/connect';
   });
 
-  // Capacitor Deep Link Listener
+  // Capacitor Deep Link Listener (Supports both cold-start and warm-start)
   useEffect(() => {
     let isSubscribed = true;
     
+    const handleDeepLinkUrl = (urlStr: string) => {
+      try {
+        console.log('Processing deep link URL:', urlStr);
+        // Convert custom scheme to standard HTTPS scheme for seamless and reliable URL parsing
+        let cleanUrl = urlStr;
+        if (cleanUrl.startsWith('kelimesavasi://')) {
+          cleanUrl = cleanUrl.replace('kelimesavasi://', 'https://');
+        }
+        
+        const parsedUrl = new URL(cleanUrl);
+        const token = parsedUrl.searchParams.get('token');
+        const server = parsedUrl.searchParams.get('server');
+        
+        if (token) {
+          window.localStorage.setItem('aistudio_auth_token', token);
+          window.sessionStorage.setItem('aistudio_auth_token', token);
+          console.log('Deep link token stored successfully:', token.substring(0, 10) + '...');
+        }
+        if (server) {
+          window.localStorage.setItem('kelimesavasi_server_type', server);
+          console.log('Deep link server type stored successfully:', server);
+        }
+        
+        if (token || server) {
+          // Force reload to instantly reinitialize connections with new parameters
+          setTimeout(() => {
+            if (isSubscribed) {
+              window.location.reload();
+            }
+          }, 300);
+        }
+      } catch (e) {
+        console.error('Failed to process deep link URL:', e);
+      }
+    };
+
     const setupDeepLink = async () => {
       try {
         const { App: CapApp } = await import('@capacitor/app');
         
+        // 1. Handle COLD-START deep links (app is opened from completely closed state)
+        const launchUrlObj = await CapApp.getLaunchUrl();
+        if (launchUrlObj && launchUrlObj.url && isSubscribed) {
+          console.log('App launched via cold deep link:', launchUrlObj.url);
+          handleDeepLinkUrl(launchUrlObj.url);
+        }
+
+        // 2. Handle WARM-START deep links (app is already running in background)
         CapApp.addListener('appUrlOpen', (event: any) => {
           if (!isSubscribed) return;
-          console.log('App opened via deep link:', event.url);
-          try {
-            const parsedUrl = new URL(event.url);
-            if (parsedUrl.protocol === 'kelimesavasi:' || parsedUrl.host === 'connect' || parsedUrl.pathname.includes('connect')) {
-              const token = parsedUrl.searchParams.get('token');
-              const server = parsedUrl.searchParams.get('server');
-              
-              if (token) {
-                window.localStorage.setItem('aistudio_auth_token', token);
-                window.sessionStorage.setItem('aistudio_auth_token', token);
-              }
-              if (server) {
-                window.localStorage.setItem('kelimesavasi_server_type', server);
-              }
-              
-              // Force reload to instantly reinitialize and connect
-              setTimeout(() => {
-                window.location.reload();
-              }, 300);
-            }
-          } catch (e) {
-            console.error('Failed to parse app url open event:', e);
+          console.log('App opened via warm deep link:', event.url);
+          if (event.url) {
+            handleDeepLinkUrl(event.url);
           }
         });
       } catch (e) {
