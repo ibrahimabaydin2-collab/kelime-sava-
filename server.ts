@@ -183,6 +183,31 @@ app.post('/api/validate-word', async (req, res) => {
   }
 });
 
+// Endpoint for AI chat/assistant proxy using Gemini
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'API anahtarı sunucuda tanımlanmamış!' });
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: message,
+    });
+
+    const aiResponse = response.text || '';
+    res.json({ response: aiResponse });
+  } catch (error) {
+    console.error('Chat API Error:', error);
+    res.status(500).json({ error: 'Sunucu hatası oluştu.' });
+  }
+});
+
 // WebSocket Server Integration for Real-time Battles and Online Friends
 const clients = new Map<string, { ws: WebSocket; name: string; avatarUrl?: string; status: 'idle' | 'playing' }>();
 const matchmakingQueue = new Map<string, { wordLength: number }>();

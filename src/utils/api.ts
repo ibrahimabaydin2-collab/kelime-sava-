@@ -99,7 +99,41 @@ if (typeof window !== 'undefined') {
 }
 
 export function getBaseUrl(): string {
-  return DEV_APP_URL;
+  if (typeof window !== 'undefined') {
+    try {
+      const type = window.localStorage.getItem('kelimesavasi_server_type');
+      if (type === 'dev') {
+        return DEV_APP_URL;
+      } else if (type === 'pre') {
+        return DEPLOYED_APP_URL;
+      } else if (type === 'custom') {
+        const customUrl = window.localStorage.getItem('kelimesavasi_custom_server_url');
+        if (customUrl) return customUrl;
+      }
+      
+      // If no explicit setting exists (e.g., fresh install), auto-detect based on host/platform:
+      const isCapacitor = !!(window as any).Capacitor;
+      const protocol = window.location.protocol || '';
+      const hostname = window.location.hostname || '';
+      
+      // Standalone hybrid apps (like Capacitor APK) must default to the public live server out-of-the-box
+      const isHybrid = protocol === 'file:' || 
+                       protocol.startsWith('capacitor') || 
+                       protocol.startsWith('ionic') || 
+                       isCapacitor;
+      
+      if (isHybrid) {
+        return DEPLOYED_APP_URL;
+      }
+      
+      // Otherwise, check if we are currently previewing in the AI Studio development panel
+      const isDevEnv = hostname.includes('-dev-') || 
+                       hostname === 'localhost' || 
+                       hostname === '127.0.0.1';
+      return isDevEnv ? DEV_APP_URL : DEPLOYED_APP_URL;
+    } catch (e) {}
+  }
+  return DEPLOYED_APP_URL;
 }
 
 export function getApiUrl(endpoint: string): string {
