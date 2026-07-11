@@ -386,6 +386,26 @@ export default function App() {
   const [showMissionsModal, setShowMissionsModal] = useState<boolean>(false);
   const [showLobbyModal, setShowLobbyModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+    });
+  };
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = safeLocalStorage.getItem('kelimesavasi_settings');
     if (saved) {
@@ -576,7 +596,7 @@ export default function App() {
               break;
 
             case 'match_start': {
-              const { matchId, targetWord: sharedWord, wordLength: len, opponentId, opponentName } = data;
+              const { matchId, targetWord: sharedWord, wordLength: len, opponentId, opponentName, matchWordsCount, currentRound, roundsWon } = data;
               showToast(`Maç Başladı! Rakip: ${opponentName}`, 'success');
               
               // Transition to match state
@@ -597,6 +617,9 @@ export default function App() {
                 id: matchId,
                 wordLength: len,
                 targetWord: sharedWord,
+                matchWordsCount: matchWordsCount || 1,
+                currentRound: currentRound || 1,
+                roundsWon: roundsWon || { [profile.id]: 0, [opponentId]: 0 },
                 players: {
                   [profile.id]: {
                     name: profile.name,
@@ -618,6 +641,43 @@ export default function App() {
                   }
                 },
                 status: 'playing'
+              });
+              break;
+            }
+
+            case 'match_round_start': {
+              const { matchId, targetWord: sharedWord, currentRound: round, matchWordsCount: total, roundsWon: rw } = data;
+              showToast(`Tur ${round}/${total} Başladı! Yeni kelimeyi bul!`, 'success');
+              
+              setTargetWord(sharedWord);
+              setAttempts([]);
+              setCurrentAttempt('');
+              setGameStatus('playing');
+              setSecondsLeft(20);
+              setWordDefinition('');
+              setLetterStatuses({});
+
+              setActiveMatch((prev) => {
+                if (!prev) return null;
+                const updatedPlayers: any = {};
+                Object.keys(prev.players).forEach((pId) => {
+                  updatedPlayers[pId] = {
+                    ...prev.players[pId],
+                    attempts: [],
+                    currentAttempt: 0,
+                    completed: false,
+                    won: false,
+                    timeRemaining: 20
+                  };
+                });
+                return {
+                  ...prev,
+                  targetWord: sharedWord,
+                  currentRound: round,
+                  matchWordsCount: total,
+                  roundsWon: rw || prev.roundsWon,
+                  players: updatedPlayers
+                };
               });
               break;
             }
@@ -652,13 +712,14 @@ export default function App() {
               break;
 
             case 'match_end': {
-              const { winnerId, players: finalPlayers } = data;
+              const { winnerId, players: finalPlayers, roundsWon: rw } = data;
               setActiveMatch((prev) => {
                 if (!prev) return null;
                 return {
                   ...prev,
                   status: 'ended',
-                  winnerId
+                  winnerId,
+                  roundsWon: rw || prev.roundsWon
                 };
               });
 
@@ -1178,16 +1239,20 @@ export default function App() {
 
   // Reset User stats
   const resetStats = () => {
-    if (confirm('Tüm ilerleme ve istatistiklerinizi sıfırlamak istediğinize emin misiniz?')) {
-      setProfile((prev) => ({
-        ...prev,
-        stats: INITIAL_STATS,
-        badges: DEFAULT_BADGES,
-        missions: DEFAULT_MISSIONS,
-        dailyScore: 0
-      }));
-      showToast('Tüm istatistikler sıfırlandı.', 'info');
-    }
+    showConfirm(
+      'İstatistikleri Sıfırla',
+      'Tüm ilerleme ve istatistiklerinizi sıfırlamak istediğinize emin misiniz? Bu işlem geri alınamaz.',
+      () => {
+        setProfile((prev) => ({
+          ...prev,
+          stats: INITIAL_STATS,
+          badges: DEFAULT_BADGES,
+          missions: DEFAULT_MISSIONS,
+          dailyScore: 0
+        }));
+        showToast('Tüm istatistikler sıfırlandı.', 'info');
+      }
+    );
   };
 
   // Handle Character keys typed on physical or virtual keyboard
@@ -1293,7 +1358,7 @@ export default function App() {
     startNewGame(wordLength);
   };
 
-  const handleStartMatchmaking = () => {
+  const handleStartMatchmaking = (matchWordsCount?: number) => {
     if (!isOnline) {
       showToast('Kuyruğa girmek için sunucuya bağlı olmalısınız. Lütfen bekleyin veya çevrimdışı modu oynayın.', 'error');
       return;
@@ -1307,7 +1372,8 @@ export default function App() {
       } else {
         socketRef.current.send(JSON.stringify({
           type: 'join_matchmaking',
-          wordLength
+          wordLength,
+          matchWordsCount: matchWordsCount || 3
         }));
       }
     }
@@ -1412,12 +1478,19 @@ export default function App() {
               <div className="w-full max-w-3xl lg:max-w-4xl flex justify-between items-center mb-3">
                 <button
                   onClick={() => {
-                    if (gameStatus === 'playing' && attempts.length > 0 && !confirm('Mevcut oyundan çıkıp giriş ekranına dönmek istiyor musunuz?')) {
-                      return;
+                    if (gameStatus === 'playing' && attempts.length > 0) {
+                      showConfirm(
+                        'Oyundan Çık',
+                        'Mevcut oyundan çıkıp giriş ekranına dönmek istiyor musunuz? İlerlemeniz sıfırlanacaktır.',
+                        () => {
+                          setHasEnteredGame(false);
+                        }
+                      );
+                    } else {
+                      setHasEnteredGame(false);
                     }
-                    setHasEnteredGame(false);
                   }}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-gray-600 hover:text-emerald-500 dark:text-gray-300 dark:hover:text-emerald-400 bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800/80 rounded-xl shadow-sm hover:shadow transition duration-150 active:scale-[0.97]"
+                  className="flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-gray-600 dark:text-gray-300 hover:text-emerald-500 dark:hover:text-emerald-400 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border border-gray-200/80 dark:border-gray-800/80 rounded-xl shadow-sm hover:shadow-md transition duration-150 active:scale-[0.97] cursor-pointer"
                 >
                   <ArrowLeft size={16} className="stroke-[2.5]" />
                   <span>Giriş Ekranına Dön</span>
@@ -1432,14 +1505,28 @@ export default function App() {
 
             {/* Real-time Match Split View Banner */}
         {activeMatch && (
-          <div className="w-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-4 mb-4 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-sm animate-pulse">
+          <div className="w-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-4 mb-4 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <Swords size={24} className="text-emerald-500" />
-              <div>
-                <h4 className="font-bold text-sm text-gray-800 dark:text-white">Kelime Savaşı Sürüyor!</h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Her iki oyuncu da aynı {wordLength} harfli kelimeyi çözüyor. En az deneme ile en hızlı çözen kazanır!
+              <Swords size={24} className="text-emerald-500 shrink-0" />
+              <div className="text-left">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-bold text-sm text-gray-800 dark:text-white">Kelime Savaşı Sürüyor!</h4>
+                  {activeMatch.matchWordsCount && (
+                    <span className="text-[10px] font-black font-mono bg-emerald-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Tur {activeMatch.currentRound} / {activeMatch.matchWordsCount}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Aynı {wordLength} harfli kelimeyi çözüyorsunuz. {activeMatch.matchWordsCount && `${activeMatch.matchWordsCount} turda en fazla turu kazanan maçı alır!`}
                 </p>
+                {activeMatch.roundsWon && (
+                  <div className="flex gap-4 mt-2 text-xs font-bold font-mono">
+                    <span className="text-emerald-600 dark:text-emerald-400">SEN: {activeMatch.roundsWon[profile.id] || 0} Galibiyet</span>
+                    <span className="text-gray-400 dark:text-gray-600">|</span>
+                    <span className="text-amber-500">RAKİP: {activeMatch.roundsWon[opponent?.id || ''] || 0} Galibiyet</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1501,23 +1588,30 @@ export default function App() {
 
         {/* Game State Control Panel (Length selector / Reset) */}
         {!activeMatch && (
-          <div className="w-full max-w-3xl lg:max-w-4xl flex justify-between items-center bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-3 shadow-sm mb-4">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Harf Sayısı:</span>
-              <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg">
+          <div className="w-full max-w-3xl lg:max-w-4xl flex justify-between items-center bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border border-gray-150 dark:border-gray-800 rounded-2xl p-3 shadow-md mb-4 animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider font-mono">Harf Sayısı:</span>
+              <div className="flex gap-1 bg-gray-150/60 dark:bg-gray-950 p-1 rounded-xl">
                 {[3, 4, 5, 6, 7, 8].map((len) => (
                   <button
                     key={len}
                     onClick={() => {
-                      if (gameStatus === 'playing' && attempts.length > 0 && !confirm('Mevcut oyunu sıfırlamak istiyor musunuz?')) {
-                        return;
+                      if (gameStatus === 'playing' && attempts.length > 0) {
+                        showConfirm(
+                          'Harf Sayısını Değiştir',
+                          'Mevcut oyunu sıfırlayıp harf sayısını değiştirmek istediğinize emin misiniz?',
+                          () => {
+                            setWordLength(len);
+                          }
+                        );
+                      } else {
+                        setWordLength(len);
                       }
-                      setWordLength(len);
                     }}
-                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition ${
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs font-black transition-all duration-150 flex items-center justify-center cursor-pointer ${
                       wordLength === len
-                        ? 'bg-emerald-500 text-white shadow'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        ? 'bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-md shadow-emerald-500/20 scale-105'
+                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-850 hover:text-gray-800 dark:hover:text-white'
                     }`}
                   >
                     {len}
@@ -1526,24 +1620,58 @@ export default function App() {
               </div>
             </div>
 
-            <button
-              onClick={() => {
-                if (gameStatus === 'playing' && attempts.length > 0 && !confirm('Oyunu yeniden başlatmak istiyor musunuz?')) return;
-                startNewGame(wordLength);
-              }}
-              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-emerald-500 transition duration-150 flex items-center gap-1 text-xs font-semibold"
-              title="Yeni Kelime Al"
-            >
-              <RotateCcw size={16} />
-              Yenile
-            </button>
+            <div className="flex items-center gap-2">
+              {gameStatus === 'playing' && (
+                <button
+                  onClick={() => {
+                    showConfirm(
+                      'Pes Et',
+                      'Pes etmek ve doğru kelimeyi görmek istediğinize emin misiniz?',
+                      () => {
+                        handleGameLoss('Pes Ettiniz');
+                      }
+                    );
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100/50 dark:bg-red-950/20 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 transition duration-150 flex items-center gap-1.5 text-xs font-black uppercase tracking-wider font-mono cursor-pointer"
+                  title="Oyunu Sonlandır ve Kelimeyi Gör"
+                >
+                  <AlertCircle size={13} className="stroke-[2.5]" />
+                  Pes Et
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  if (gameStatus === 'playing' && attempts.length > 0) {
+                    showConfirm(
+                      'Oyunu Yeniden Başlat',
+                      'Oyunu yeniden başlatmak istiyor musunuz? Mevcut ilerleme sıfırlanacaktır.',
+                      () => {
+                        startNewGame(wordLength);
+                      }
+                    );
+                  } else {
+                    startNewGame(wordLength);
+                  }
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-gray-50 hover:bg-emerald-50/50 dark:bg-gray-950 dark:hover:bg-emerald-950/20 text-gray-500 hover:text-emerald-500 dark:text-gray-400 dark:hover:text-emerald-400 border border-gray-200 dark:border-gray-800 hover:border-emerald-200 dark:hover:border-emerald-900 transition duration-150 flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider font-mono cursor-pointer"
+                title="Yeni Kelime Al"
+              >
+                <RotateCcw size={13} className="stroke-[2.5]" />
+                Yenile
+              </button>
+            </div>
           </div>
         )}
 
         {/* Game Area Card */}
-        <div className="w-full max-w-3xl lg:max-w-4xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 sm:p-6 shadow-xl flex flex-col items-center justify-center transition-all duration-200">
+        <div className="w-full max-w-3xl lg:max-w-4xl bg-white/85 dark:bg-gray-900/85 backdrop-blur-md border border-gray-100 dark:border-gray-800 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden">
+          {/* Subtle atmospheric ambient glow inside the card */}
+          <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 dark:bg-emerald-500/3 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 dark:bg-teal-500/3 rounded-full blur-3xl pointer-events-none" />
+
           {/* Top Timer & Attempts Tracker */}
-          <div className="w-full flex justify-between items-center mb-4 px-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+          <div className="w-full flex justify-between items-center mb-4 px-2 border-b border-gray-100 dark:border-gray-800 pb-3 relative z-10">
             {gameStatus === 'playing' ? (
               <>
                 <div className="flex items-center gap-2">
@@ -1654,7 +1782,7 @@ export default function App() {
 
                   <div className="py-2.5 px-4 bg-white/70 dark:bg-gray-950/40 rounded-2xl border border-emerald-500/10 shadow-inner inline-block mx-auto">
                     <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mb-1">Bulunan Kelime</p>
-                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-widest uppercase">
+                    <span className="text-2xl sm:text-3xl font-extrabold tracking-widest uppercase bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 bg-clip-text text-transparent drop-shadow-sm filter drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]">
                       {targetWord}
                     </span>
                   </div>
@@ -1751,10 +1879,10 @@ export default function App() {
               <button
                 onClick={submitGuess}
                 disabled={currentAttempt.length !== wordLength || isValidating}
-                className={`w-full py-3.5 px-6 rounded-2xl font-bold text-sm tracking-wider shadow-lg transition-all duration-200 flex items-center justify-center gap-2 border ${
+                className={`w-full py-4 px-6 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest shadow-lg transition-all duration-200 flex items-center justify-center gap-2 border ${
                   currentAttempt.length === wordLength && !isValidating
-                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-400 hover:shadow-emerald-500/20 active:scale-[0.98]'
-                    : 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-gray-200 dark:border-gray-800 cursor-not-allowed'
+                    ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-500 hover:from-emerald-600 hover:to-teal-600 text-white border-emerald-400 hover:shadow-emerald-500/30 active:scale-[0.98] cursor-pointer'
+                    : 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-gray-200/60 dark:border-gray-800/40 cursor-not-allowed'
                 }`}
                 id="submit-guess-button-above-keyboard"
               >
@@ -2004,6 +2132,59 @@ export default function App() {
           onToggleDarkMode={() => setDarkMode(!darkMode)}
           onOpenStats={() => setShowStatsModal(true)}
         />
+      )}
+
+      {/* Custom Premium Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-gray-900/60 dark:bg-black/75 backdrop-blur-sm transition-opacity duration-200"
+            onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+          />
+          
+          {/* Modal Container */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl relative z-10 overflow-hidden">
+            {/* Atmospheric light glows */}
+            <div className="absolute -top-12 -right-12 w-32 h-32 bg-amber-500/10 dark:bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+
+            {/* Content */}
+            <div className="relative z-10 text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-500 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-200/50 dark:border-amber-900/30">
+                <AlertCircle size={24} className="stroke-[2.5]" />
+              </div>
+              
+              <div className="space-y-1.5">
+                <h3 className="text-base font-black text-gray-950 dark:text-white uppercase tracking-wider font-mono">
+                  {confirmModal.title}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                  {confirmModal.message}
+                </p>
+              </div>
+              
+              {/* Buttons */}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                  className="flex-1 py-3 px-4 rounded-xl border border-gray-200 dark:border-gray-800 text-xs font-black uppercase tracking-wider text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-850 transition cursor-pointer"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  onClick={() => {
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                    confirmModal.onConfirm();
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-black uppercase tracking-wider border border-emerald-400 shadow-md hover:shadow-lg hover:shadow-emerald-500/20 active:scale-95 transition cursor-pointer"
+                >
+                  Onayla
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

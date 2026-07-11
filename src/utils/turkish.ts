@@ -24,7 +24,9 @@ const LOWER_MAP: { [key: string]: string } = {
 
 export function turkishUpper(str: string): string {
   if (!str) return '';
-  return str
+  // Normalize string to NFC composed form and remove any combining dot above character (u0307)
+  const normalized = str.normalize('NFC').replace(/\u0307/g, '');
+  return normalized
     .split('')
     .map((char) => UPPER_MAP[char] || char.toUpperCase())
     .join('');
@@ -32,7 +34,9 @@ export function turkishUpper(str: string): string {
 
 export function turkishLower(str: string): string {
   if (!str) return '';
-  return str
+  // Normalize string to NFC composed form and remove any combining dot above character (u0307)
+  const normalized = str.normalize('NFC').replace(/\u0307/g, '');
+  return normalized
     .split('')
     .map((char) => LOWER_MAP[char] || char.toLowerCase())
     .join('');

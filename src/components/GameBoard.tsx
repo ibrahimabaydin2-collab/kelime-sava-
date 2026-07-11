@@ -61,32 +61,32 @@ export default function GameBoard({
     
     if (!isSubmitted) {
       if (char && char !== ' ') {
-        return `${base} border-slate-500 dark:border-slate-450 text-slate-900 dark:text-white bg-white dark:bg-slate-800 scale-105 shadow-sm`;
+        return `${base} border-slate-500 dark:border-slate-400 text-slate-900 dark:text-white bg-white dark:bg-slate-800 scale-105 shadow-sm`;
       }
-      return `${base} border-slate-400 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-900/40 text-slate-400`;
+      return `${base} border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 text-slate-400`;
     }
 
     // Dynamic colors based on boardTheme
-    let greenStyle = 'border-emerald-500 bg-emerald-500 text-white shadow-md shadow-emerald-500/20';
-    let orangeStyle = 'border-amber-500 bg-amber-500 text-white shadow-md shadow-amber-500/20';
-    let greyStyle = 'border-slate-300 dark:border-slate-700 bg-slate-300 dark:bg-slate-700 text-slate-100 dark:text-slate-400';
+    let greenStyle = 'border-emerald-400 bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-lg shadow-emerald-500/20';
+    let orangeStyle = 'border-amber-400 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-500/20';
+    let greyStyle = 'border-slate-300 dark:border-slate-700 bg-gradient-to-br from-slate-400 to-slate-500 dark:from-slate-700 dark:to-slate-800 text-slate-100 dark:text-slate-300 shadow-sm';
 
     if (boardTheme === 'ocean') {
-      greenStyle = 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-500/20';
-      orangeStyle = 'border-sky-400 bg-sky-400 text-white shadow-md shadow-sky-400/20';
-      greyStyle = 'border-slate-300 dark:border-slate-800 bg-slate-300 dark:bg-slate-800 text-slate-100 dark:text-slate-450';
+      greenStyle = 'border-blue-500 bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20';
+      orangeStyle = 'border-sky-400 bg-gradient-to-br from-sky-400 to-cyan-500 text-white shadow-lg shadow-sky-400/20';
+      greyStyle = 'border-slate-300 dark:border-slate-800 bg-gradient-to-br from-slate-400 to-slate-500 dark:from-slate-800 dark:to-slate-900 text-slate-100 dark:text-slate-400 shadow-sm';
     } else if (boardTheme === 'neon') {
-      greenStyle = 'border-fuchsia-500 bg-fuchsia-500 text-white shadow-md shadow-fuchsia-500/20';
-      orangeStyle = 'border-cyan-400 bg-cyan-400 text-slate-950 shadow-md shadow-cyan-400/20';
-      greyStyle = 'border-zinc-600 dark:border-zinc-800 bg-zinc-600 dark:bg-zinc-800 text-zinc-100 dark:text-zinc-450';
+      greenStyle = 'border-fuchsia-500 bg-gradient-to-br from-fuchsia-500 to-pink-600 text-white shadow-lg shadow-fuchsia-500/30';
+      orangeStyle = 'border-cyan-400 bg-gradient-to-br from-cyan-400 to-teal-400 text-slate-950 shadow-lg shadow-cyan-400/30';
+      greyStyle = 'border-zinc-600 dark:border-zinc-800 bg-gradient-to-br from-zinc-600 to-zinc-700 dark:from-zinc-800 dark:to-zinc-900 text-zinc-100 dark:text-zinc-400 shadow-sm';
     } else if (boardTheme === 'autumn') {
-      greenStyle = 'border-orange-600 bg-orange-600 text-white shadow-md shadow-orange-500/20';
-      orangeStyle = 'border-amber-600 bg-amber-600 text-white shadow-md shadow-amber-500/20';
-      greyStyle = 'border-stone-500 dark:border-stone-850 bg-stone-500 dark:bg-stone-850 text-stone-100 dark:text-stone-400';
+      greenStyle = 'border-orange-500 bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/20';
+      orangeStyle = 'border-amber-500 bg-gradient-to-br from-amber-500 to-yellow-500 text-white shadow-lg shadow-amber-500/20';
+      greyStyle = 'border-stone-400 dark:border-stone-800 bg-gradient-to-br from-stone-500 to-stone-600 dark:from-stone-800 dark:to-stone-900 text-stone-100 dark:text-stone-300 shadow-sm';
     } else if (boardTheme === 'pastel') {
-      greenStyle = 'border-teal-300 bg-teal-300 text-teal-950 shadow-md shadow-teal-300/10';
-      orangeStyle = 'border-rose-300 bg-rose-300 text-rose-950 shadow-md shadow-rose-300/10';
-      greyStyle = 'border-slate-200 dark:border-slate-800 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
+      greenStyle = 'border-teal-300 bg-gradient-to-br from-teal-200 to-emerald-300 text-teal-950 shadow-md shadow-teal-300/20';
+      orangeStyle = 'border-rose-300 bg-gradient-to-br from-rose-200 to-orange-300 text-rose-950 shadow-md shadow-rose-300/20';
+      greyStyle = 'border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-800 dark:to-slate-900 text-slate-600 dark:text-slate-300 shadow-sm';
     }
 
     switch (feedback) {

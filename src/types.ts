@@ -60,9 +60,13 @@ export interface RealtimeMatch {
   id: string;
   wordLength: number;
   targetWord: string;
+  matchWordsCount?: number;
+  currentRound?: number;
+  roundsWon?: { [id: string]: number };
   players: {
     [id: string]: {
       name: string;
+      avatarUrl?: string;
       attempts: GameAttempt[];
       currentAttempt: number;
       completed: boolean;

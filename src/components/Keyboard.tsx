@@ -33,34 +33,34 @@ export default function Keyboard({
   const rows = keyboardLayout === 'F' ? fRows : qRows;
 
   const getKeyClass = (char: string) => {
-    const base = 'flex-1 h-[clamp(2.2rem,5.2vh,3.75rem)] rounded-lg text-xs sm:text-sm font-black flex items-center justify-center transition-colors duration-200 cursor-pointer select-none';
+    const base = 'flex-1 h-[clamp(2.2rem,5.2vh,3.75rem)] rounded-xl text-xs sm:text-sm font-black flex items-center justify-center transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-sm';
     const status = letterStatuses[char.toLocaleUpperCase('tr-TR')];
 
     if (char === 'ENTER' || char === 'SIL') {
-      return `${base} bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 text-[10px] sm:text-xs px-2`;
+      return `${base} bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 hover:from-slate-300 hover:to-slate-400 dark:hover:from-slate-600 dark:hover:to-slate-700 text-slate-800 dark:text-slate-100 text-[10px] sm:text-xs px-2 border border-slate-300 dark:border-slate-600`;
     }
 
     // Dynamic styles based on boardTheme
-    let greenStyle = 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm';
-    let orangeStyle = 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm';
-    let greyStyle = 'bg-slate-400 dark:bg-slate-800 text-slate-100 dark:text-slate-500 opacity-60';
+    let greenStyle = 'bg-gradient-to-br from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-white shadow-md shadow-emerald-500/20';
+    let orangeStyle = 'bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white shadow-md shadow-amber-500/20';
+    let greyStyle = 'bg-slate-300 dark:bg-slate-800 text-slate-100 dark:text-slate-500 opacity-50';
 
     if (boardTheme === 'ocean') {
-      greenStyle = 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm';
-      orangeStyle = 'bg-sky-400 hover:bg-sky-500 text-white shadow-sm';
-      greyStyle = 'bg-slate-400 dark:bg-slate-800 text-slate-200 dark:text-slate-550 opacity-60';
+      greenStyle = 'bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md shadow-blue-500/20';
+      orangeStyle = 'bg-gradient-to-br from-sky-400 to-cyan-500 hover:from-sky-500 hover:to-cyan-600 text-white shadow-md shadow-sky-400/20';
+      greyStyle = 'bg-slate-400 dark:bg-slate-800 text-slate-200 dark:text-slate-600 opacity-50';
     } else if (boardTheme === 'neon') {
-      greenStyle = 'bg-fuchsia-500 hover:bg-fuchsia-600 text-white shadow-sm';
-      orangeStyle = 'bg-cyan-400 hover:bg-cyan-500 text-slate-950 shadow-sm';
-      greyStyle = 'bg-zinc-650 dark:bg-zinc-800 text-zinc-300 dark:text-zinc-550 opacity-60';
+      greenStyle = 'bg-gradient-to-br from-fuchsia-500 to-pink-600 hover:from-fuchsia-600 hover:to-pink-700 text-white shadow-md shadow-fuchsia-500/35';
+      orangeStyle = 'bg-gradient-to-br from-cyan-400 to-teal-400 hover:from-cyan-500 hover:to-teal-500 text-slate-950 shadow-md shadow-cyan-400/35';
+      greyStyle = 'bg-zinc-700 dark:bg-zinc-800 text-zinc-300 dark:text-zinc-500 opacity-50';
     } else if (boardTheme === 'autumn') {
-      greenStyle = 'bg-orange-600 hover:bg-orange-700 text-white shadow-sm';
-      orangeStyle = 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm';
-      greyStyle = 'bg-stone-500 dark:bg-stone-800 text-stone-200 dark:text-stone-500 opacity-60';
+      greenStyle = 'bg-gradient-to-br from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-md shadow-orange-500/20';
+      orangeStyle = 'bg-gradient-to-br from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-md shadow-amber-500/20';
+      greyStyle = 'bg-stone-500 dark:bg-stone-800 text-stone-200 dark:text-stone-500 opacity-50';
     } else if (boardTheme === 'pastel') {
-      greenStyle = 'bg-teal-300 hover:bg-teal-400 text-teal-950 shadow-sm';
-      orangeStyle = 'bg-rose-300 hover:bg-rose-400 text-rose-950 shadow-sm';
-      greyStyle = 'bg-slate-200 dark:bg-slate-850 text-slate-400 dark:text-slate-600 opacity-60';
+      greenStyle = 'bg-gradient-to-br from-teal-250 to-emerald-300 hover:from-teal-300 hover:to-emerald-400 text-teal-950 shadow-sm shadow-teal-300/10';
+      orangeStyle = 'bg-gradient-to-br from-rose-250 to-orange-300 hover:from-rose-300 hover:to-orange-400 text-rose-950 shadow-sm shadow-rose-300/10';
+      greyStyle = 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 opacity-50';
     }
 
     switch (status) {
@@ -71,7 +71,7 @@ export default function Keyboard({
       case 'grey':
         return `${base} ${greyStyle}`;
       default:
-        return `${base} bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-750`;
+        return `${base} bg-white dark:bg-gray-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800`;
     }
   };
 

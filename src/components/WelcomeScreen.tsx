@@ -18,7 +18,7 @@ interface WelcomeScreenProps {
   wordLength: number;
   onChangeWordLength: (length: number) => void;
   onStartSoloGame: () => void;
-  onStartMatchmaking: () => void;
+  onStartMatchmaking: (matchWordsCount?: number) => void;
   onOpenLobby: () => void;
   onOpenSettings: () => void;
   onOpenMissions?: () => void;
@@ -72,6 +72,7 @@ export default function WelcomeScreen({
   const [showRulesModal, setShowRulesModal] = useState<boolean>(false);
   const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [selectedMatchWords, setSelectedMatchWords] = useState<number>(3);
 
   // Profile Inline Editor State
   const [isEditing, setIsEditing] = useState<boolean>(false);
@@ -376,8 +377,11 @@ export default function WelcomeScreen({
         )}
       </div>
       
-      {/* Play Settings & Action Hub - Simplified centered card */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+      {/* Play Settings & Action Hub - Beautiful blurred frosted card */}
+      <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border border-gray-150 dark:border-gray-800 rounded-3xl p-4 sm:p-5.5 shadow-xl space-y-4 relative overflow-hidden">
+        {/* Decorative subtle atmospheric color splash inside settings card */}
+        <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+
         {/* Quick Word Settings */}
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -464,17 +468,53 @@ export default function WelcomeScreen({
         </div>
 
         {/* Action Play Buttons */}
-        <div className="space-y-2 pt-1">
+        <div className="space-y-3 pt-1">
+          {/* 1v1 Online Matchmaking Round Selection */}
+          {isOnline && matchmakingStatus !== 'queued' && (
+            <div className="space-y-1.5 text-left bg-gray-50 dark:bg-gray-950 p-2.5 rounded-xl border border-gray-150 dark:border-gray-800">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase flex items-center gap-1">
+                  <Swords size={11} className="text-emerald-500" /> DÜELLO TUR ALTERNATİFİ (3 ya da 5 KELİME)
+                </span>
+                <span className="text-[10px] font-bold text-emerald-500 font-mono bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/60">
+                  {selectedMatchWords} Kelime
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setSelectedMatchWords(3)}
+                  className={`py-1.5 rounded-lg text-xs font-black transition duration-150 flex items-center justify-center gap-1.5 border cursor-pointer ${
+                    selectedMatchWords === 3
+                      ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm shadow-emerald-500/10'
+                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:bg-gray-150 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <span>3 Kelime (3 Tur)</span>
+                </button>
+                <button
+                  onClick={() => setSelectedMatchWords(5)}
+                  className={`py-1.5 rounded-lg text-xs font-black transition duration-150 flex items-center justify-center gap-1.5 border cursor-pointer ${
+                    selectedMatchWords === 5
+                      ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm shadow-emerald-500/10'
+                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:bg-gray-150 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <span>5 Kelime (5 Tur)</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* 1v1 Online Matchmaking */}
           <button
-            onClick={onStartMatchmaking}
+            onClick={() => onStartMatchmaking(selectedMatchWords)}
             disabled={matchmakingStatus === 'queued' || !isOnline}
-            className={`w-full flex items-center justify-between font-bold py-2.5 px-4 rounded-xl transition duration-150 active:scale-[0.99] text-xs uppercase tracking-wider border cursor-pointer ${
+            className={`w-full flex items-center justify-between font-black py-3 px-5 rounded-xl transition-all duration-150 active:scale-[0.98] text-xs uppercase tracking-widest border cursor-pointer ${
               !isOnline 
                 ? 'bg-gray-50 dark:bg-gray-900/40 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-800 cursor-not-allowed opacity-60'
                 : matchmakingStatus === 'queued'
-                ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-900 animate-pulse'
-                : 'bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-400 shadow-sm'
+                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400 shadow-lg shadow-orange-500/20 animate-pulse'
+                : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/20 shadow-md'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -489,7 +529,7 @@ export default function WelcomeScreen({
           {/* Solo Game - Made Primary */}
           <button
             onClick={onStartSoloGame}
-            className="w-full flex items-center justify-between bg-gray-900 hover:bg-gray-850 dark:bg-gray-800 dark:hover:bg-gray-750 text-white font-bold py-2.5 px-4 rounded-xl border border-gray-850 dark:border-gray-750 transition duration-150 active:scale-[0.99] text-xs uppercase tracking-wider cursor-pointer"
+            className="w-full flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-850 hover:to-slate-950 dark:from-slate-750 dark:to-slate-850 dark:hover:from-slate-800 dark:hover:to-slate-900 text-white font-black py-3 px-5 rounded-xl border border-slate-750 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-150 active:scale-[0.98] text-xs uppercase tracking-widest cursor-pointer"
           >
             <div className="flex items-center gap-2">
               <Play size={12} className="fill-white" />
@@ -502,7 +542,7 @@ export default function WelcomeScreen({
           {onStartGroupRace && (
             <button
               onClick={onStartGroupRace}
-              className="w-full flex items-center justify-between bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold py-2.5 px-4 rounded-xl shadow-sm transition duration-150 active:scale-[0.99] text-xs uppercase tracking-wider cursor-pointer"
+              className="w-full flex items-center justify-between bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-500 hover:via-yellow-500 hover:to-amber-600 text-slate-950 font-black py-3 px-5 rounded-xl shadow-md hover:shadow-lg transition-all duration-150 active:scale-[0.98] text-xs uppercase tracking-widest cursor-pointer border border-yellow-300/40"
             >
               <div className="flex items-center gap-2">
                 <Trophy size={13} />

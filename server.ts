@@ -76,6 +76,60 @@ const ai = new GoogleGenAI({
 const wordCache: { [key: string]: { valid: boolean; definition: string } } = {};
 let geminiCooldownUntil = 0;
 
+// Heuristic linguistic validation to prevent keyboard smashing or repeated consonants (like "rrrrr")
+function validateTurkishLinguistics(word: string, length: number): { valid: boolean; reason: string } {
+  const normalized = turkishLower(word)
+    .replace(/â/g, 'a')
+    .replace(/î/g, 'i')
+    .replace(/û/g, 'u')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ş/g, 's')
+    .replace(/ü/g, 'u');
+
+  // 1. Check for valid characters: Turkish letters only (standard lower alphabet is a-z except q, w, x)
+  const validCharsRegex = /^[a-z]+$/;
+  if (!validCharsRegex.test(normalized)) {
+    return { valid: false, reason: 'Kelime Türkçe alfabesinde bulunmayan geçersiz karakterler barındırıyor.' };
+  }
+
+  // 2. Must contain at least one vowel
+  const vowels = /[aeiou]/g;
+  const vowelMatches = normalized.match(vowels);
+  if (!vowelMatches || vowelMatches.length === 0) {
+    return { valid: false, reason: 'Türkçe kelimelerde en az bir sesli harf bulunmalıdır.' };
+  }
+
+  // 3. Repeating characters: No character can be repeated 3 or more times consecutively.
+  for (let i = 0; i < normalized.length - 2; i++) {
+    if (normalized[i] === normalized[i + 1] && normalized[i] === normalized[i + 2]) {
+      return { valid: false, reason: 'Aynı harf ardışık 3 veya daha fazla kez tekrarlanamaz.' };
+    }
+  }
+
+  // 4. Consecutive consonants: maximum 4 consecutive consonants (e.g. "ekspres" has 4: "kspr").
+  const consecutiveConsonantsRegex = /[^aeiou]{5,}/;
+  if (consecutiveConsonantsRegex.test(normalized)) {
+    return { valid: false, reason: 'Türkçe hece yapısına aykırı ardışık sessiz harf grubu barındırıyor.' };
+  }
+
+  // 5. Letter diversity: If length >= 3 and unique letters is 1 (e.g. "rrrrr" or "aaaaa"), it's definitely invalid
+  const uniqueChars = new Set(normalized.split(''));
+  if (uniqueChars.size === 1 && length >= 3) {
+    return { valid: false, reason: 'Tek bir harfin tekrarından oluşan bir kelime geçerli olamaz.' };
+  }
+
+  // 6. Minimum vowel count: For words of length >= 7, there must be at least 2 vowels (e.g. "ekspres" has 2, "sürpriz" has 2).
+  const vowelCount = vowelMatches.length;
+  if (length >= 7 && vowelCount < 2) {
+    return { valid: false, reason: 'Uzun Türkçe kelimelerde en az 2 sesli harf bulunmalıdır.' };
+  }
+
+  return { valid: true, reason: '' };
+}
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
@@ -113,13 +167,70 @@ app.post('/api/validate-word', async (req, res) => {
       });
     }
 
+    // 1.5 Heuristic linguistic validation (blocks keyboard smash, repetitive letters like rrrrr before cache or API calls)
+    const linguisticCheck = validateTurkishLinguistics(normalized, wordLength);
+    if (!linguisticCheck.valid) {
+      return res.json({
+        valid: false,
+        definition: linguisticCheck.reason
+      });
+    }
+
     // 2. Check cache
     const cacheKey = `${normalized}_${wordLength}`;
     if (wordCache[cacheKey]) {
       return res.json(wordCache[cacheKey]);
     }
 
-    // 2.5 Check cooldown for Gemini API
+    // 2.2 Direct official TDK GTS API verification
+    let tdkValidated = false;
+    let tdkResult = null;
+
+    try {
+      const lowercaseWord = turkishLower(normalized);
+      const tdkResponse = await fetch(`https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lowercaseWord)}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      
+      if (tdkResponse.ok) {
+        const tdkData = await tdkResponse.json() as any;
+        tdkValidated = true;
+        
+        if (Array.isArray(tdkData) && tdkData.length > 0) {
+          let definition = 'TDK Sözlüğünde mevcut bir kelime.';
+          try {
+            const meanings = tdkData[0].anlamlarListe;
+            if (Array.isArray(meanings) && meanings.length > 0) {
+              definition = meanings[0].anlam || 'TDK Sözlüğünde mevcut.';
+            }
+          } catch (e) {
+            // Ignore meaning parse errors
+          }
+          tdkResult = {
+            valid: true,
+            definition
+          };
+        } else {
+          // Explicitly not found in TDK (returns {"error": "Sonuç bulunamadı"} or similar structure)
+          tdkResult = {
+            valid: false,
+            definition: 'Bu kelime TDK sözlüğünde bulunamadı.'
+          };
+        }
+      }
+    } catch (tdkErr) {
+      console.warn('TDK GTS API Request failed:', tdkErr);
+    }
+
+    if (tdkValidated && tdkResult) {
+      // Save to cache and return the absolute source of truth
+      wordCache[cacheKey] = tdkResult;
+      return res.json(tdkResult);
+    }
+
+    // 2.5 Check cooldown for Gemini API (Fallback option if TDK API is down)
     if (Date.now() < geminiCooldownUntil) {
       return res.json({
         valid: true,
@@ -219,7 +330,7 @@ app.post('/api/chat', async (req, res) => {
 
 // WebSocket Server Integration for Real-time Battles and Online Friends
 const clients = new Map<string, { ws: WebSocket; name: string; avatarUrl?: string; status: 'idle' | 'playing' }>();
-const matchmakingQueue = new Map<string, { wordLength: number }>();
+const matchmakingQueue = new Map<string, { wordLength: number; matchWordsCount?: number }>();
 const challenges = new Map<string, {
   id: string;
   challengerId: string;
@@ -233,6 +344,9 @@ const matches = new Map<string, {
   id: string;
   wordLength: number;
   targetWord: string;
+  matchWordsCount?: number;
+  currentRound?: number;
+  roundsWon?: { [id: string]: number };
   players: {
     [id: string]: {
       name: string;
@@ -431,6 +545,12 @@ const setupWebSocket = (server: any) => {
                   id: matchId,
                   wordLength: challenge.wordLength,
                   targetWord,
+                  matchWordsCount: 1,
+                  currentRound: 1,
+                  roundsWon: {
+                    [challenge.challengerId]: 0,
+                    [challenge.challengedId]: 0
+                  },
                   players: {
                     [challenge.challengerId]: {
                       name: challenge.challengerName,
@@ -461,6 +581,12 @@ const setupWebSocket = (server: any) => {
                   matchId,
                   targetWord,
                   wordLength: challenge.wordLength,
+                  matchWordsCount: 1,
+                  currentRound: 1,
+                  roundsWon: {
+                    [challenge.challengerId]: 0,
+                    [challenge.challengedId]: 0
+                  },
                   opponentId: challenge.challengedId,
                   opponentName: challenge.challengedName,
                   players: {
@@ -474,6 +600,12 @@ const setupWebSocket = (server: any) => {
                   matchId,
                   targetWord,
                   wordLength: challenge.wordLength,
+                  matchWordsCount: 1,
+                  currentRound: 1,
+                  roundsWon: {
+                    [challenge.challengerId]: 0,
+                    [challenge.challengedId]: 0
+                  },
                   opponentId: challenge.challengerId,
                   opponentName: challenge.challengerName,
                   players: {
@@ -542,53 +674,121 @@ const setupWebSocket = (server: any) => {
                 // Check if match should end (both players completed)
                 const allCompleted = Object.values(match.players).every(p => p.completed);
                 if (allCompleted) {
-                  match.status = 'ended';
-                  
                   const p1Id = Object.keys(match.players)[0];
                   const p2Id = Object.keys(match.players)[1];
                   const p1 = match.players[p1Id];
                   const p2 = match.players[p2Id];
 
-                  let winnerId: string | 'draw' = 'draw';
+                  // Determine current round winner
+                  let roundWinnerId: string | 'draw' = 'draw';
                   if (p1.won && !p2.won) {
-                    winnerId = p1Id;
+                    roundWinnerId = p1Id;
                   } else if (!p1.won && p2.won) {
-                    winnerId = p2Id;
+                    roundWinnerId = p2Id;
                   } else if (p1.won && p2.won) {
                     // If both won, solve in fewer attempts wins. If attempts equal, higher score/faster solver wins
                     if (p1.currentAttempt < p2.currentAttempt) {
-                      winnerId = p1Id;
+                      roundWinnerId = p1Id;
                     } else if (p2.currentAttempt < p1.currentAttempt) {
-                      winnerId = p2Id;
+                      roundWinnerId = p2Id;
                     } else if (p1.score > p2.score) {
-                      winnerId = p1Id;
+                      roundWinnerId = p1Id;
                     } else if (p2.score > p1.score) {
-                      winnerId = p2Id;
+                      roundWinnerId = p2Id;
                     }
                   }
 
-                  match.winnerId = winnerId;
-
-                  const endPayload = JSON.stringify({
-                    type: 'match_end',
-                    matchId,
-                    winnerId,
-                    players: match.players
-                  });
-
-                  // Notify both players
-                  const p1Client = clients.get(p1Id);
-                  const p2Client = clients.get(p2Id);
-                  if (p1Client) {
-                    p1Client.status = 'idle';
-                    if (p1Client.ws.readyState === WebSocket.OPEN) p1Client.ws.send(endPayload);
+                  // Record round win
+                  if (!match.roundsWon) {
+                    match.roundsWon = {
+                      [p1Id]: 0,
+                      [p2Id]: 0
+                    };
                   }
-                  if (p2Client) {
-                    p2Client.status = 'idle';
-                    if (p2Client.ws.readyState === WebSocket.OPEN) p2Client.ws.send(endPayload);
+                  if (roundWinnerId !== 'draw') {
+                    match.roundsWon[roundWinnerId] = (match.roundsWon[roundWinnerId] || 0) + 1;
                   }
 
-                  broadcastLobby();
+                  const currentRound = match.currentRound || 1;
+                  const totalRounds = match.matchWordsCount || 1;
+
+                  if (currentRound < totalRounds) {
+                    // Advance to next round!
+                    match.currentRound = currentRound + 1;
+                    const nextTargetWord = getRandomWord(match.wordLength);
+                    match.targetWord = nextTargetWord;
+
+                    // Reset players round-specific states
+                    for (const pId of [p1Id, p2Id]) {
+                      match.players[pId].attempts = [];
+                      match.players[pId].currentAttempt = 0;
+                      match.players[pId].completed = false;
+                      match.players[pId].won = false;
+                      match.players[pId].timeRemaining = 20;
+                    }
+
+                    // Notify both players of the round completion and new round details
+                    const nextRoundPayload = JSON.stringify({
+                      type: 'match_round_start',
+                      matchId,
+                      targetWord: nextTargetWord,
+                      currentRound: match.currentRound,
+                      matchWordsCount: totalRounds,
+                      roundsWon: match.roundsWon,
+                      roundWinnerId,
+                      players: match.players
+                    });
+
+                    const p1Client = clients.get(p1Id);
+                    const p2Client = clients.get(p2Id);
+                    if (p1Client && p1Client.ws.readyState === WebSocket.OPEN) {
+                      p1Client.ws.send(nextRoundPayload);
+                    }
+                    if (p2Client && p2Client.ws.readyState === WebSocket.OPEN) {
+                      p2Client.ws.send(nextRoundPayload);
+                    }
+                  } else {
+                    // End the match!
+                    match.status = 'ended';
+
+                    // Determine overall winner based on roundsWon
+                    let finalWinnerId: string | 'draw' = 'draw';
+                    const r1Wins = match.roundsWon[p1Id] || 0;
+                    const r2Wins = match.roundsWon[p2Id] || 0;
+
+                    if (r1Wins > r2Wins) {
+                      finalWinnerId = p1Id;
+                    } else if (r2Wins > r1Wins) {
+                      finalWinnerId = p2Id;
+                    } else {
+                      // Fallback if round wins are equal
+                      finalWinnerId = roundWinnerId;
+                    }
+
+                    match.winnerId = finalWinnerId;
+
+                    const endPayload = JSON.stringify({
+                      type: 'match_end',
+                      matchId,
+                      winnerId: finalWinnerId,
+                      roundsWon: match.roundsWon,
+                      players: match.players
+                    });
+
+                    // Notify both players
+                    const p1Client = clients.get(p1Id);
+                    const p2Client = clients.get(p2Id);
+                    if (p1Client) {
+                      p1Client.status = 'idle';
+                      if (p1Client.ws.readyState === WebSocket.OPEN) p1Client.ws.send(endPayload);
+                    }
+                    if (p2Client) {
+                      p2Client.status = 'idle';
+                      if (p2Client.ws.readyState === WebSocket.OPEN) p2Client.ws.send(endPayload);
+                    }
+
+                    broadcastLobby();
+                  }
                 }
               }
             }
@@ -622,26 +822,39 @@ const setupWebSocket = (server: any) => {
           }
 
           case 'join_matchmaking': {
-            const { wordLength } = data;
+            const { wordLength, matchWordsCount } = data;
             const selfClient = clients.get(playerId);
             if (!selfClient || selfClient.status === 'playing') break;
 
-            console.log(`Player joined matchmaking queue: ${selfClient.name} (${playerId}) for ${wordLength} letters`);
-            matchmakingQueue.set(playerId, { wordLength });
+            const requestedWordsCount = matchWordsCount || 3;
+            console.log(`Player joined matchmaking queue: ${selfClient.name} (${playerId}) for ${wordLength} letters, ${requestedWordsCount} words`);
+            matchmakingQueue.set(playerId, { wordLength, matchWordsCount: requestedWordsCount });
 
             // Look for another player in the queue
             let opponentId = '';
             for (const [id, info] of matchmakingQueue.entries()) {
               if (id !== playerId) {
-                // Find opponent. It's best if they want the same wordLength, but if not we can match them and use the requested length or 5
-                if (info.wordLength === wordLength) {
+                // Find opponent with same wordLength and same matchWordsCount first
+                if (info.wordLength === wordLength && info.matchWordsCount === requestedWordsCount) {
                   opponentId = id;
                   break;
                 }
               }
             }
 
-            // Fallback: match with anyone in queue if none with same length
+            // Fallback 1: match with same length
+            if (!opponentId) {
+              for (const [id, info] of matchmakingQueue.entries()) {
+                if (id !== playerId) {
+                  if (info.wordLength === wordLength) {
+                    opponentId = id;
+                    break;
+                  }
+                }
+              }
+            }
+
+            // Fallback 2: match with anyone in queue
             if (!opponentId) {
               for (const [id] of matchmakingQueue.entries()) {
                 if (id !== playerId) {
@@ -666,6 +879,7 @@ const setupWebSocket = (server: any) => {
 
                 // Use the player's requested wordLength or fallback
                 const finalWordLength = wordLength || opponentInfo.wordLength || 5;
+                const finalMatchWordsCount = requestedWordsCount || opponentInfo.matchWordsCount || 3;
                 const targetWord = getRandomWord(finalWordLength);
                 const matchId = `match_${Date.now()}`;
 
@@ -673,6 +887,12 @@ const setupWebSocket = (server: any) => {
                   id: matchId,
                   wordLength: finalWordLength,
                   targetWord,
+                  matchWordsCount: finalMatchWordsCount,
+                  currentRound: 1,
+                  roundsWon: {
+                    [playerId]: 0,
+                    [opponentId]: 0
+                  },
                   players: {
                     [playerId]: {
                       name: selfClient.name,
@@ -703,6 +923,12 @@ const setupWebSocket = (server: any) => {
                   matchId,
                   targetWord,
                   wordLength: finalWordLength,
+                  matchWordsCount: finalMatchWordsCount,
+                  currentRound: 1,
+                  roundsWon: {
+                    [playerId]: 0,
+                    [opponentId]: 0
+                  },
                   opponentId: opponentId,
                   opponentName: opponentClient.name,
                   players: {
@@ -716,6 +942,12 @@ const setupWebSocket = (server: any) => {
                   matchId,
                   targetWord,
                   wordLength: finalWordLength,
+                  matchWordsCount: finalMatchWordsCount,
+                  currentRound: 1,
+                  roundsWon: {
+                    [playerId]: 0,
+                    [opponentId]: 0
+                  },
                   opponentId: playerId,
                   opponentName: selfClient.name,
                   players: {
