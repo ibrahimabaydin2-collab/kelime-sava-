@@ -49,10 +49,11 @@ jobs:
             npx cap add android
           fi
           
-          # Fix potential corrupt gradle-wrapper.jar from git line ending conversions
-          echo "Downloading a fresh and verified gradle-wrapper.jar..."
-          mkdir -p android/gradle/wrapper
-          curl -sSLo android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.1/gradle/wrapper/gradle-wrapper.jar
+          # Fix potential corrupt gradle-wrapper.jar from git line ending conversions by regenerating the wrapper using gradle
+          echo "Regenerating gradle-wrapper.jar with gradle wrapper..."
+          cd android
+          gradle wrapper --gradle-version 8.12.1 --distribution-type all
+          cd ..
           
           npx cap sync android
           chmod +x android/gradlew
