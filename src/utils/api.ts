@@ -1,3 +1,5 @@
+import { BACKUP_TOKEN } from './tokenBackup';
+
 const DEPLOYED_APP_URL = "https://ais-pre-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app";
 const DEV_APP_URL = "https://ais-dev-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app";
 
@@ -92,6 +94,10 @@ export function getApiUrl(endpoint: string): string {
       try {
         token = window.sessionStorage.getItem('aistudio_auth_token') || window.localStorage.getItem('aistudio_auth_token');
       } catch (e) {}
+    }
+    
+    if (!token) {
+      token = BACKUP_TOKEN;
     }
     
     if (token) {
@@ -206,6 +212,10 @@ export function getWsUrl(): string {
       try {
         token = window.sessionStorage.getItem('aistudio_auth_token') || window.localStorage.getItem('aistudio_auth_token');
       } catch (e) {}
+    }
+    
+    if (!token) {
+      token = BACKUP_TOKEN;
     }
     
     if (token) {

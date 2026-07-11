@@ -169,6 +169,131 @@ export default function App() {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
+  const [isConnectPage] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && window.location.pathname === '/connect';
+  });
+
+  // Capacitor Deep Link Listener
+  useEffect(() => {
+    let isSubscribed = true;
+    
+    const setupDeepLink = async () => {
+      try {
+        const { App: CapApp } = await import('@capacitor/app');
+        
+        CapApp.addListener('appUrlOpen', (event: any) => {
+          if (!isSubscribed) return;
+          console.log('App opened via deep link:', event.url);
+          try {
+            const parsedUrl = new URL(event.url);
+            if (parsedUrl.protocol === 'kelimesavasi:' || parsedUrl.host === 'connect' || parsedUrl.pathname.includes('connect')) {
+              const token = parsedUrl.searchParams.get('token');
+              const server = parsedUrl.searchParams.get('server');
+              
+              if (token) {
+                window.localStorage.setItem('aistudio_auth_token', token);
+                window.sessionStorage.setItem('aistudio_auth_token', token);
+              }
+              if (server) {
+                window.localStorage.setItem('kelimesavasi_server_type', server);
+              }
+              
+              // Force reload to instantly reinitialize and connect
+              setTimeout(() => {
+                window.location.reload();
+              }, 300);
+            }
+          } catch (e) {
+            console.error('Failed to parse app url open event:', e);
+          }
+        });
+      } catch (e) {
+        console.log('Capacitor App plugin not available:', e);
+      }
+    };
+    
+    setupDeepLink();
+    
+    return () => {
+      isSubscribed = false;
+    };
+  }, []);
+
+  if (isConnectPage) {
+    const searchParams = new URLSearchParams(window.location.search);
+    const token = searchParams.get('token') || '';
+    const server = searchParams.get('server') || 'pre';
+    const deepLinkUrl = `kelimesavasi://connect?token=${encodeURIComponent(token)}&server=${server}`;
+    const webFallbackUrl = `/?___aistudio_auth_token=${encodeURIComponent(token)}`;
+
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-800'}`}>
+        <div className="w-full max-w-md bg-white dark:bg-gray-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-2xl text-center space-y-6 animate-scale-up">
+          {/* Header */}
+          <div className="space-y-2">
+            <div className="mx-auto w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white text-3xl font-black">
+              W
+            </div>
+            <h2 className="text-xl font-black tracking-tight font-sans">Kelime Savaşı Mobil Bağlantı</h2>
+            <p className="text-xs text-gray-400 dark:text-gray-500 font-sans">Telefonunuzdaki yüklü uygulamayı otomatik olarak internete bağlayın</p>
+          </div>
+
+          {/* Action Card */}
+          <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/60 p-5 rounded-2xl space-y-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed text-left font-sans">
+              Bu sayfa, telefonunuzdaki Kelime Savaşı APK/AAB uygulamasının bulut sunucularına güvenli bir şekilde erişmesini sağlar.
+            </p>
+
+            <button
+              onClick={() => {
+                window.location.href = deepLinkUrl;
+              }}
+              className="w-full py-4 px-6 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-sm rounded-xl shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition flex items-center justify-center gap-2 cursor-pointer font-sans"
+            >
+              <Swords size={16} />
+              MOBİL UYGULAMADA AÇ VE BAĞLAN
+            </button>
+          </div>
+
+          {/* Steps */}
+          <div className="text-left space-y-3.5 px-1">
+            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-sans">Nasıl Bağlanır?</h4>
+            <div className="flex gap-3 items-start">
+              <span className="w-5 h-5 bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 font-bold rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 font-sans">1</span>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-normal font-sans">
+                Samsung/Android telefonunuzda Kelime Savaşı uygulamasının yüklü olduğundan emin olun.
+              </p>
+            </div>
+            <div className="flex gap-3 items-start">
+              <span className="w-5 h-5 bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 font-bold rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 font-sans">2</span>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-normal font-sans">
+                Yukarıdaki yeşil <strong>"MOBİL UYGULAMADA AÇ VE BAĞLAN"</strong> butonuna tıklayın.
+              </p>
+            </div>
+            <div className="flex gap-3 items-start">
+              <span className="w-5 h-5 bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 font-bold rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 font-sans">3</span>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-normal font-sans">
+                Telefonunuz onay istediğinde açılmasına izin verin. Uygulama otomatik açılacak ve internete bağlanacaktır!
+              </p>
+            </div>
+          </div>
+
+          {/* Browser Alternative */}
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80">
+            <button
+              onClick={() => {
+                window.location.href = webFallbackUrl;
+              }}
+              className="text-xs font-bold text-emerald-500 hover:text-emerald-600 transition flex items-center justify-center gap-1.5 mx-auto cursor-pointer font-sans"
+            >
+              <span>Veya bu tarayıcıda oynamaya devam et &rarr;</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // User Profile
   const [profile, setProfile] = useState<UserProfile>(() => {
     let saved = safeLocalStorage.getItem('kelimesavasi_profile');
