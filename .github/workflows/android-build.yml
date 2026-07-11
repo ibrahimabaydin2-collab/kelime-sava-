@@ -49,14 +49,18 @@ jobs:
             npx cap add android
           fi
           
-          # Fix potential corrupt gradle-wrapper.jar from git line ending conversions by regenerating the wrapper using gradle
-          echo "Regenerating gradle-wrapper.jar with gradle wrapper..."
-          cd android
-          gradle wrapper --gradle-version 8.12.1 --distribution-type all
-          cd ..
+          # Ensure fresh, uncorrupted gradle-wrapper.jar and gradlew from the official Gradle repository
+          echo "Downloading official uncorrupted Gradle 8.12.1 wrapper files..."
+          mkdir -p android/gradle/wrapper
+          curl -sSLo android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.1/gradle/wrapper/gradle-wrapper.jar
+          curl -sSLo android/gradlew https://raw.githubusercontent.com/gradle/gradle/v8.12.1/gradlew
+          curl -sSLo android/gradlew.bat https://raw.githubusercontent.com/gradle/gradle/v8.12.1/gradlew.bat
+          
+          # Force LF line endings for gradlew to prevent bash bad interpreter errors
+          sed -i 's/\r$//' android/gradlew
+          chmod +x android/gradlew
           
           npx cap sync android
-          chmod +x android/gradlew
 
       - name: Debug APK Derle (Telefon için)
         run: |

@@ -176,10 +176,81 @@ export default function WelcomeScreen({
               </button>
             </div>
 
-            {/* Avatar Selector Grid */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 font-mono uppercase tracking-wider block">BİR NİŞAN (AVATAR) SEÇ</label>
+            {/* Avatar Selector Grid with Custom Photo Upload */}
+            <div className="space-y-2.5">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] font-bold text-gray-400 font-mono uppercase tracking-wider block">BİR NİŞAN (AVATAR) SEÇ</label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="custom-avatar-upload"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          const img = new Image();
+                          img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 128;
+                            const MAX_HEIGHT = 128;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height) {
+                              if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                              }
+                            } else {
+                              if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                              }
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            if (ctx) {
+                              ctx.drawImage(img, 0, 0, width, height);
+                              const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                              setSelectedAvatar(dataUrl);
+                            }
+                          };
+                          img.src = reader.result as string;
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="custom-avatar-upload"
+                    className="text-[9.5px] bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-300 font-black px-2.5 py-1 rounded-lg transition duration-150 cursor-pointer uppercase font-mono tracking-wider flex items-center gap-1"
+                  >
+                    <span>Fotoğraf Yükle 📸</span>
+                  </label>
+                </div>
+              </div>
+
               <div className="grid grid-cols-6 sm:grid-cols-9 gap-2 p-2 bg-black/30 rounded-2xl border border-white/5 max-h-24 overflow-y-auto">
+                {/* Show custom uploaded photo if present */}
+                {selectedAvatar && selectedAvatar.length >= 4 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAvatar(selectedAvatar)}
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition duration-150 active:scale-90 relative group overflow-hidden ${
+                      selectedAvatar.length >= 4
+                        ? 'ring-2 ring-emerald-500 scale-105 shadow-md shadow-emerald-500/25'
+                        : ''
+                    }`}
+                  >
+                    <img src={selectedAvatar} alt="Custom Avatar" className="w-full h-full object-cover rounded-xl" referrerPolicy="no-referrer" />
+                    <span className="absolute inset-0 bg-black/40 flex items-center justify-center text-[7px] font-black opacity-0 group-hover:opacity-100 transition duration-150 text-white leading-none">SEÇİLİ</span>
+                  </button>
+                )}
                 {AVATAR_PRESETS.map((preset) => (
                   <button
                     key={preset}
