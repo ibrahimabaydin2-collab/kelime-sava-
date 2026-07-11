@@ -5,7 +5,8 @@ const config: CapacitorConfig = {
   appName: 'Kelime Savaşı',
   webDir: 'dist',
   server: {
-    androidScheme: 'https'
+    androidScheme: 'https',
+    cleartext: true
   }
 };
 
