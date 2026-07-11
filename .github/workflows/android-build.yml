@@ -49,6 +49,12 @@ jobs:
             npx cap add android
           fi
           
+          # Fix potential corrupt gradle-wrapper.jar from git line ending conversions by regenerating the wrapper using gradle
+          echo "Regenerating gradle-wrapper.jar with gradle wrapper..."
+          cd android
+          gradle wrapper --gradle-version 8.12.1 --distribution-type all
+          cd ..
+          
           npx cap sync android
           chmod +x android/gradlew
 
