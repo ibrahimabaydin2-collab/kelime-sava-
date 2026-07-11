@@ -52,7 +52,7 @@ jobs:
           # Fix potential corrupt gradle-wrapper.jar from git line ending conversions
           echo "Downloading a fresh and verified gradle-wrapper.jar..."
           mkdir -p android/gradle/wrapper
-          curl -sSLo android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.14.3/gradle/wrapper/gradle-wrapper.jar
+          curl -sSLo android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.1/gradle/wrapper/gradle-wrapper.jar
           
           npx cap sync android
           chmod +x android/gradlew
