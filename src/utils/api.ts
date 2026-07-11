@@ -50,7 +50,7 @@ if (typeof window !== 'undefined') {
 
     if (isMobile) {
       const originalFetch = window.fetch;
-      window.fetch = async function (input, init) {
+      const customFetch = async function (this: any, input: any, init: any) {
         let url = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input as any).url);
         
         if (url && (url.includes('run.app') || url.startsWith('/api/'))) {
@@ -71,8 +71,24 @@ if (typeof window !== 'undefined') {
           }
           init.headers = headers;
         }
-        return originalFetch.call(this, input, init);
+        return originalFetch.call(this || window, input, init);
       };
+
+      try {
+        Object.defineProperty(window, 'fetch', {
+          value: customFetch,
+          writable: true,
+          configurable: true,
+          enumerable: true
+        });
+      } catch (definePropertyError) {
+        console.warn('[Capacitor] Object.defineProperty failed for window.fetch, falling back to direct assignment:', definePropertyError);
+        try {
+          (window as any).fetch = customFetch;
+        } catch (directAssignError) {
+          console.error('[Capacitor] Failed to install fetch interceptor entirely:', directAssignError);
+        }
+      }
       
       // Perform initial sync
       syncCapacitorCookies();

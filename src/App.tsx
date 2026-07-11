@@ -716,7 +716,7 @@ export default function App() {
 
       ws.onerror = (err) => {
         clearTimeout(connTimeout);
-        console.error(`WebSocket connection error to URL: ${wsUrl}`, err);
+        console.warn(`WebSocket connection warning (handled by auto-reconnect) to URL: ${wsUrl}`, err);
         if (socketRef.current === ws) {
           setIsOnline(false);
           try {
