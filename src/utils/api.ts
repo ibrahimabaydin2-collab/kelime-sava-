@@ -1,7 +1,86 @@
 import { BACKUP_TOKEN } from './tokenBackup';
+import { Capacitor, CapacitorCookies } from '@capacitor/core';
 
 const DEPLOYED_APP_URL = "https://ais-pre-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app";
 const DEV_APP_URL = "https://ais-dev-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app";
+
+export async function syncCapacitorCookies(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    let token = new URLSearchParams(window.location.search).get('___aistudio_auth_token');
+    if (!token) {
+      token = window.sessionStorage.getItem('aistudio_auth_token') || window.localStorage.getItem('aistudio_auth_token');
+    }
+    if (!token) {
+      token = BACKUP_TOKEN;
+    }
+
+    if (token) {
+      const urls = [DEV_APP_URL, DEPLOYED_APP_URL];
+      for (const url of urls) {
+        await CapacitorCookies.setCookie({
+          url,
+          key: '__SECURE-aistudio_auth_token',
+          value: token,
+          path: '/',
+        });
+        await CapacitorCookies.setCookie({
+          url,
+          key: 'aistudio_auth_token',
+          value: token,
+          path: '/',
+        });
+      }
+      console.log('[Capacitor] Synchronized auth tokens in native cookies.');
+    }
+  } catch (e) {
+    console.warn('[Capacitor] Failed to synchronize cookies:', e);
+  }
+}
+
+// Auto-patch fetch on mobile devices to append Cookie headers natively via CapacitorHttp
+if (typeof window !== 'undefined') {
+  try {
+    const isCapacitor = !!(window as any).Capacitor;
+    const ua = navigator.userAgent || '';
+    const isAndroid = /android/i.test(ua);
+    const isIOS = /iphone|ipad|ipod/i.test(ua);
+    const isMobile = isAndroid || isIOS || isCapacitor;
+
+    if (isMobile) {
+      const originalFetch = window.fetch;
+      window.fetch = async function (input, init) {
+        let url = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input as any).url);
+        
+        if (url && (url.includes('run.app') || url.startsWith('/api/'))) {
+          init = init || {};
+          const headers = new Headers(init.headers || {});
+          
+          let token = new URLSearchParams(window.location.search).get('___aistudio_auth_token');
+          if (!token) {
+            token = window.sessionStorage.getItem('aistudio_auth_token') || window.localStorage.getItem('aistudio_auth_token');
+          }
+          if (!token) {
+            token = BACKUP_TOKEN;
+          }
+          
+          if (token) {
+            headers.set('Cookie', `__SECURE-aistudio_auth_token=${token}; aistudio_auth_token=${token}`);
+            headers.set('X-AI-Studio-Auth', token);
+          }
+          init.headers = headers;
+        }
+        return originalFetch.call(this, input, init);
+      };
+      
+      // Perform initial sync
+      syncCapacitorCookies();
+    }
+  } catch (e) {
+    console.error('Failed to install fetch interceptor:', e);
+  }
+}
 
 export function getBaseUrl(): string {
   return DEV_APP_URL;
@@ -11,6 +90,11 @@ export function getApiUrl(endpoint: string): string {
   const base = getBaseUrl();
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   let url = `${base}${cleanEndpoint}`;
+  
+  // Trigger cookie sync asynchronously
+  if (typeof window !== 'undefined') {
+    syncCapacitorCookies();
+  }
   
   // Append ___aistudio_auth_token to bypass cookie blocking in iframes
   if (typeof window !== 'undefined') {
@@ -42,6 +126,11 @@ export function getApiUrl(endpoint: string): string {
 
 export function getWsUrl(): string {
   let wsUrl = '';
+
+  // Trigger cookie sync asynchronously
+  if (typeof window !== 'undefined') {
+    syncCapacitorCookies();
+  }
 
   if (typeof window !== 'undefined') {
     try {
