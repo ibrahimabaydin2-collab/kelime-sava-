@@ -541,13 +541,21 @@ export default function App() {
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event: CloseEvent) => {
         clearTimeout(connTimeout);
         if (pingInterval) clearInterval(pingInterval);
         
         if (socketRef.current === ws) {
           setIsOnline(false);
           socketRef.current = null;
+          
+          // Prevent infinite reconnect fights between multiple tabs/windows of the same user ID
+          if (event && event.code === 1000 && event.reason === 'Replaced by new connection') {
+            console.warn('Connection closed because it was replaced by another active session/tab. Disabling auto-reconnect.');
+            showToast('Bağlantı başka bir sekme tarafından devralındı.', 'info');
+            return;
+          }
+
           // Attempt reconnect after 3 seconds
           if (!isDisposed) {
             if (reconnectTimeout) clearTimeout(reconnectTimeout);
