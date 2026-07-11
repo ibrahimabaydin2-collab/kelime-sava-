@@ -86,10 +86,11 @@ export function getApiUrl(endpoint: string): string {
     if (token) {
       try {
         window.sessionStorage.setItem('aistudio_auth_token', token);
+        window.localStorage.setItem('aistudio_auth_token', token);
       } catch (e) {}
     } else {
       try {
-        token = window.sessionStorage.getItem('aistudio_auth_token');
+        token = window.sessionStorage.getItem('aistudio_auth_token') || window.localStorage.getItem('aistudio_auth_token');
       } catch (e) {}
     }
     
@@ -199,10 +200,11 @@ export function getWsUrl(): string {
     if (token) {
       try {
         window.sessionStorage.setItem('aistudio_auth_token', token);
+        window.localStorage.setItem('aistudio_auth_token', token);
       } catch (e) {}
     } else {
       try {
-        token = window.sessionStorage.getItem('aistudio_auth_token');
+        token = window.sessionStorage.getItem('aistudio_auth_token') || window.localStorage.getItem('aistudio_auth_token');
       } catch (e) {}
     }
     

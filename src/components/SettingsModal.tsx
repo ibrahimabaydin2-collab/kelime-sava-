@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2, Wifi, Server } from 'lucide-react';
+import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2, Wifi, Server, Key, Copy } from 'lucide-react';
 
 export interface AppSettings {
   boardTheme: 'classic' | 'ocean' | 'neon' | 'autumn' | 'pastel';
@@ -39,6 +39,31 @@ export default function SettingsModal({
     }
     return '';
   });
+
+  const [tokenInput, setTokenInput] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('aistudio_auth_token') || '';
+    }
+    return '';
+  });
+
+  const [copied, setCopied] = useState<boolean>(false);
+
+  const handleCopyToken = () => {
+    if (tokenInput) {
+      navigator.clipboard.writeText(tokenInput);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleTokenChange = (val: string) => {
+    setTokenInput(val);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('aistudio_auth_token', val);
+      window.sessionStorage.setItem('aistudio_auth_token', val);
+    }
+  };
   
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     onChangeSettings({
@@ -248,7 +273,7 @@ export default function SettingsModal({
             Mobil APK veya dış ağlardan oyuna bağlandığınızda sunucu seçebilir, veya kendi yerel/özel IP adresinizi tanımlayabilirsiniz.
           </p>
           
-          <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col gap-3 bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
             <div className="grid grid-cols-3 gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
               <button
                 type="button"
@@ -295,7 +320,7 @@ export default function SettingsModal({
             </div>
 
             {serverType === 'custom' && (
-              <div className="space-y-1.5 mt-1.5 animate-scale-up">
+              <div className="space-y-1.5 animate-scale-up">
                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Özel Sunucu Adresi (HTTP/HTTPS/WS)</label>
                 <div className="flex gap-2">
                   <input
@@ -313,15 +338,53 @@ export default function SettingsModal({
               </div>
             )}
 
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-1 select-all break-all bg-white dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
-              <span className="font-bold text-emerald-500 shrink-0">Aktif Hedef:</span>
-              <span className="truncate">
-                {serverType === 'pre' 
-                  ? 'https://ais-pre-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app' 
-                  : serverType === 'dev' 
-                  ? 'https://ais-dev-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app' 
-                  : customUrl || 'Lütfen özel adres girin'}
-              </span>
+            {/* AI Studio Auth Token Bypass */}
+            <div className="space-y-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <Key size={10} className="text-emerald-500 animate-pulse" />
+                  AI Studio Güvenlik Tokenı (Bypass)
+                </label>
+                {tokenInput && (
+                  <button
+                    type="button"
+                    onClick={handleCopyToken}
+                    className="text-[10px] text-emerald-500 hover:text-emerald-600 font-bold flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <Copy size={10} />
+                    {copied ? 'Kopyalandı!' : 'Kopyala'}
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal">
+                Samsung telefondan AI Studio canlı/geliştirme sunucusuna bağlanmak için bu belirteç gereklidir. Bilgisayarınızdan açıp kopyaladıktan sonra telefona yapıştırın.
+              </p>
+              <input
+                type="text"
+                value={tokenInput}
+                onChange={(e) => handleTokenChange(e.target.value)}
+                placeholder="Örn: aistudio_auth_token_xyz..."
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1 text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-1 bg-white dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-emerald-500 shrink-0">Aktif Hedef:</span>
+                <span className="truncate">
+                  {serverType === 'pre' 
+                    ? 'https://ais-pre-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app' 
+                    : serverType === 'dev' 
+                    ? 'https://ais-dev-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app' 
+                    : customUrl || 'Lütfen özel adres girin'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 border-t border-slate-100/50 dark:border-slate-800/50 pt-1 mt-1 font-sans">
+                <span className="font-bold text-amber-500 shrink-0">Durum:</span>
+                <span className={tokenInput ? "text-emerald-500" : "text-amber-500 animate-pulse"}>
+                  {tokenInput ? "✓ Güvenlik belirteci aktif" : "⚠️ Belirteç yok (Yalnızca yerel / özel IP)"}
+                </span>
+              </div>
             </div>
           </div>
         </div>
