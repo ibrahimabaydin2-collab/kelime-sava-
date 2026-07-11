@@ -50,20 +50,20 @@ jobs:
           fi
           
           # Forcefully download a fresh Gradle distribution and regenerate gradle wrapper to bypass any git line ending corruption of binary files
-          echo "Downloading fresh Gradle 8.10.2 binary..."
-          wget -q https://services.gradle.org/distributions/gradle-8.10.2-bin.zip
-          unzip -q gradle-8.10.2-bin.zip
-          chmod +x gradle-8.10.2/bin/gradle
-          export PATH=$PWD/gradle-8.10.2/bin:$PATH
+          echo "Downloading fresh Gradle 8.8 binary..."
+          wget -q https://services.gradle.org/distributions/gradle-8.8-bin.zip
+          unzip -q gradle-8.8-bin.zip
+          chmod +x gradle-8.8/bin/gradle
+          export PATH=$PWD/gradle-8.8/bin:$PATH
           
           echo "Regenerating gradle wrapper..."
           cd android
           rm -f gradle/wrapper/gradle-wrapper.jar gradlew gradlew.bat
-          gradle wrapper --gradle-version 8.10.2 --distribution-type all
+          gradle wrapper --gradle-version 8.8 --distribution-type all
           cd ..
           
           echo "Cleaning up temp Gradle download..."
-          rm -rf gradle-8.10.2 gradle-8.10.2-bin.zip
+          rm -rf gradle-8.8 gradle-8.8-bin.zip
           
           npx cap sync android
           chmod +x android/gradlew
