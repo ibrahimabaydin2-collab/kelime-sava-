@@ -191,17 +191,26 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ error: 'API anahtarı sunucuda tanımlanmamış!' });
-    }
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: message,
+    // Call the user's live Render server instead of local Gemini API
+    const response = await fetch('https://kelime-sava.onrender.com/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ message })
     });
 
-    const aiResponse = response.text || '';
-    res.json({ response: aiResponse });
+    if (!response.ok) {
+      throw new Error(`Render canlı sunucu bağlantısı başarısız oldu: ${response.status}`);
+    }
+
+    const data = (await response.json()) as { response?: string; error?: string };
+    
+    if (data.error) {
+      return res.status(500).json({ error: data.error });
+    }
+
+    res.json({ response: data.response || '' });
   } catch (error) {
     console.error('Chat API Error:', error);
     res.status(500).json({ error: 'Sunucu hatası oluştu.' });
