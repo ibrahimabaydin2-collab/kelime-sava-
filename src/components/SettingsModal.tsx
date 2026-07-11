@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2, Wifi, Server, Key, Copy } from 'lucide-react';
+import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2, Wifi, Server, Key, Copy, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react';
+import { BACKUP_TOKEN } from '../utils/tokenBackup';
 
 export interface AppSettings {
   boardTheme: 'classic' | 'ocean' | 'neon' | 'autumn' | 'pastel';
@@ -47,6 +48,7 @@ export default function SettingsModal({
   });
   const [isCopied, setIsCopied] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [serverType, setServerType] = useState(() => {
     return typeof window !== 'undefined'
@@ -275,133 +277,172 @@ export default function SettingsModal({
           <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
             <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-2">
               <Wifi size={14} className="text-emerald-500" />
-              Sunucu & Mobil Bağlantı Ayarları
+              Mobil İnternet & Veri Bağlantısı
             </h4>
             
-            {/* Automatic QR Code Connection */}
-            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3">
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 block">Yöntem 1: Hızlı QR Kod Bağlantısı</span>
-              {activeToken ? (
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm shrink-0 flex items-center justify-center">
-                    <img
-                      src={qrCodeUrl}
-                      alt="Bağlantı Karekodu"
-                      className="w-24 h-24 select-none"
-                      referrerPolicy="no-referrer"
+            {/* WhatsApp-Style Auto-Connection Status */}
+            <div className="bg-emerald-50/20 dark:bg-emerald-950/20 p-4 rounded-2xl border border-emerald-500/20 dark:border-emerald-500/10 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0 mt-0.5">
+                  <ShieldCheck size={18} className="stroke-[2.5]" />
+                </div>
+                <div className="space-y-1 text-left flex-1">
+                  <div className="flex items-center gap-2">
+                    <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">Otomatik Bağlantı Etkin (WhatsApp Modu)</h5>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 text-[8px] font-black uppercase tracking-wider animate-pulse">
+                      ● BAĞLI
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">
+                    Tıpkı WhatsApp gibi, oyun her açıldığında internete ve sunucuya <strong>otomatik ve şifreli</strong> olarak bağlanır. Herhangi bir anahtar girmeden veya karekod okutmadan doğrudan oynayabilirsiniz.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Advanced Settings Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-[10px] font-bold transition flex items-center justify-between gap-2 cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5">
+                <Server size={12} />
+                Gelişmiş Sunucu & Manuel Bağlantı Ayarları
+              </span>
+              {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+
+            {/* Collapsible Advanced Content */}
+            {showAdvanced && (
+              <div className="space-y-4 pt-1">
+                {/* Automatic QR Code Connection */}
+                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 block">Yöntem 1: Hızlı QR Kod Bağlantısı</span>
+                  {activeToken ? (
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm shrink-0 flex items-center justify-center">
+                        <img
+                          src={qrCodeUrl}
+                          alt="Bağlantı Karekodu"
+                          className="w-24 h-24 select-none"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div className="space-y-1.5 text-left flex-1">
+                        <h5 className="text-xs font-bold text-slate-700 dark:text-slate-300 font-sans font-semibold">Telefon Kamerasıyla Taratın</h5>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal font-sans">
+                          Kameranızı bu karekoda tutun ve çıkan bağlantıya tıklayın. Uygulamanız otomatik olarak açılacak ve internete bağlanacaktır.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(activeToken);
+                            setIsCopied(true);
+                            setTimeout(() => setIsCopied(false), 2000);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 transition"
+                        >
+                          {isCopied ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                          <span>{isCopied ? 'Anahtar Kopyalandı!' : 'Bağlantı Anahtarını Kopyala'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full text-center py-2 text-slate-400 dark:text-slate-500 text-xs flex flex-col items-center gap-1.5">
+                      <Key size={18} className="text-amber-500 animate-pulse" />
+                      <span>Güvenlik belirteci bulunamadı. Lütfen oyunu bilgisayar tarayıcısından açın.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Manual Connection Settings */}
+                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 block">Yöntem 2: Manuel Bağlantı & Gelişmiş Ayarlar</span>
+                  
+                  {/* Server Type Selector */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                      <Server size={12} />
+                      Bağlanılacak Sunucu Türü
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-150 dark:border-slate-800">
+                      {[
+                        { id: 'pre', name: 'Canlı (Pre)' },
+                        { id: 'dev', name: 'Geliştirme' },
+                        { id: 'custom', name: 'Özel (IP/URL)' }
+                      ].map((srv) => (
+                        <button
+                          key={srv.id}
+                          type="button"
+                          onClick={() => setServerType(srv.id as any)}
+                          className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                            serverType === srv.id
+                              ? 'bg-emerald-500 text-white shadow-sm'
+                              : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                          }`}
+                        >
+                          {srv.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom Server URL Input */}
+                  {serverType === 'custom' && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Özel Sunucu Adresi (örn: http://192.168.1.50:3000)</label>
+                      <input
+                        type="text"
+                        value={customServerUrl}
+                        onChange={(e) => setCustomServerUrl(e.target.value)}
+                        placeholder="http://192.168.1.100:3000"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                  )}
+
+                  {/* Token Input */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                      <Key size={12} />
+                      Bağlantı Anahtarı (Token)
+                    </label>
+                    <input
+                      type="text"
+                      value={tokenInput}
+                      onChange={(e) => setTokenInput(e.target.value)}
+                      placeholder="AI Studio Bağlantı Anahtarını Buraya Yapıştırın"
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none font-mono text-slate-800 dark:text-slate-100"
                     />
                   </div>
-                  <div className="space-y-1.5 text-left flex-1">
-                    <h5 className="text-xs font-bold text-slate-700 dark:text-slate-300 font-sans">Telefon Kamerasıyla Taratın</h5>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal font-sans">
-                      Kameranızı bu karekoda tutun ve çıkan bağlantıya tıklayın. Uygulamanız otomatik olarak açılacak ve internete bağlanacaktır.
-                    </p>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(activeToken);
-                        setIsCopied(true);
-                        setTimeout(() => setIsCopied(false), 2000);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 transition"
-                    >
-                      {isCopied ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
-                      <span>{isCopied ? 'Anahtar Kopyalandı!' : 'Bağlantı Anahtarını Kopyala'}</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="w-full text-center py-2 text-slate-400 dark:text-slate-500 text-xs flex flex-col items-center gap-1.5">
-                  <Key size={18} className="text-amber-500 animate-pulse" />
-                  <span>Güvenlik belirteci bulunamadı. Lütfen oyunu bilgisayar tarayıcısından açın.</span>
-                </div>
-              )}
-            </div>
 
-            {/* Manual Connection Settings */}
-            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 block">Yöntem 2: Manuel Bağlantı & Gelişmiş Ayarlar</span>
-              
-              {/* Server Type Selector */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
-                  <Server size={12} />
-                  Bağlanılacak Sunucu Türü
-                </label>
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-150 dark:border-slate-800">
-                  {[
-                    { id: 'pre', name: 'Canlı (Pre)' },
-                    { id: 'dev', name: 'Geliştirme' },
-                    { id: 'custom', name: 'Özel (IP/URL)' }
-                  ].map((srv) => (
-                    <button
-                      key={srv.id}
-                      type="button"
-                      onClick={() => setServerType(srv.id as any)}
-                      className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                        serverType === srv.id
-                          ? 'bg-emerald-500 text-white shadow-sm'
-                          : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800/50'
-                      }`}
-                    >
-                      {srv.name}
-                    </button>
-                  ))}
+                  {/* Save Connection Action */}
+                  <button
+                    type="button"
+                    onClick={handleSaveConnection}
+                    disabled={saveStatus === 'saved'}
+                    className={`w-full py-2.5 rounded-xl text-xs font-black tracking-wide transition flex items-center justify-center gap-2 cursor-pointer ${
+                      saveStatus === 'saved'
+                        ? 'bg-emerald-600 text-white cursor-not-allowed'
+                        : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/10'
+                    }`}
+                  >
+                    {saveStatus === 'saved' ? (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                        Bağlantı Güncellendi! Yeniden Başlatılıyor...
+                      </>
+                    ) : (
+                      <>
+                        <Wifi size={14} />
+                        Mobil Bağlantıyı Kaydet ve Uygula
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
-
-              {/* Custom Server URL Input */}
-              {serverType === 'custom' && (
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Özel Sunucu Adresi (örn: http://192.168.1.50:3000)</label>
-                  <input
-                    type="text"
-                    value={customServerUrl}
-                    onChange={(e) => setCustomServerUrl(e.target.value)}
-                    placeholder="http://192.168.1.100:3000"
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 dark:text-slate-100"
-                  />
-                </div>
-              )}
-
-              {/* Token Input */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
-                  <Key size={12} />
-                  Bağlantı Anahtarı (Token)
-                </label>
-                <input
-                  type="text"
-                  value={tokenInput}
-                  onChange={(e) => setTokenInput(e.target.value)}
-                  placeholder="AI Studio Bağlantı Anahtarını Buraya Yapıştırın"
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none font-mono text-slate-800 dark:text-slate-100"
-                />
-              </div>
-
-              {/* Save Connection Action */}
-              <button
-                type="button"
-                onClick={handleSaveConnection}
-                disabled={saveStatus === 'saved'}
-                className={`w-full py-2.5 rounded-xl text-xs font-black tracking-wide transition flex items-center justify-center gap-2 cursor-pointer ${
-                  saveStatus === 'saved'
-                    ? 'bg-emerald-600 text-white cursor-not-allowed'
-                    : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/10'
-                }`}
-              >
-                {saveStatus === 'saved' ? (
-                  <>
-                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                    Bağlantı Güncellendi! Yeniden Başlatılıyor...
-                  </>
-                ) : (
-                  <>
-                    <Wifi size={14} />
-                    Mobil Bağlantıyı Kaydet ve Uygula
-                  </>
-                )}
-              </button>
-            </div>
+            )}
           </div>
 
         </div>

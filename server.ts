@@ -29,7 +29,20 @@ app.use((req, res, next) => {
 
 // Auto-backup AI Studio auth token to keep mobile APK/AAB connection persistent
 app.use((req, res, next) => {
-  const token = req.query.___aistudio_auth_token;
+  let token = req.query.___aistudio_auth_token;
+  
+  // Extract token from cookies if not present in query string
+  if (!token && req.headers.cookie) {
+    const cookies = req.headers.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, val] = cookie.trim().split('=');
+      if (name === '__SECURE-aistudio_auth_token' || name === 'aistudio_auth_token') {
+        token = decodeURIComponent(val);
+        break;
+      }
+    }
+  }
+
   if (token && typeof token === 'string') {
     try {
       const filePath = path.join(process.cwd(), 'src', 'utils', 'tokenBackup.ts');
