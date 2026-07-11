@@ -94,13 +94,13 @@ export default function WelcomeScreen({
     setIsEditing(false);
   };
 
-  // Determine dynamic warrior title based on dailyScore
+  // Determine dynamic inclusive player title based on dailyScore
   const getWarriorTitle = (score: number) => {
-    if (score < 100) return 'Acemi Er 🎖️';
-    if (score < 500) return 'Kelime Savaşçısı ⚔️';
-    if (score < 1500) return 'Hece Şövalyesi 🛡️';
-    if (score < 3000) return 'Kelime Muhafızı 🔮';
-    return 'Efsanevi Sözlük Üstadı 👑';
+    if (score < 100) return '1. Seviye: Kelime Kaşifi 🔍';
+    if (score < 500) return '2. Seviye: Hece Gezgini 🗺️';
+    if (score < 1500) return '3. Seviye: Sözcük Mimarı 🧱';
+    if (score < 3000) return '4. Seviye: Dil Sanatçısı 🎨';
+    return '5. Seviye: Efsanevi Kelime Bilgesi 👑';
   };
 
   // Filter other online players
@@ -113,8 +113,8 @@ export default function WelcomeScreen({
   return (
     <div className="w-full max-w-2xl mx-auto space-y-3 px-3 py-1.5 animate-fade-in" id="welcome-screen-root">
 
-      {/* Interactive Savaşçı Kartı (Warrior Profile Card) */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 dark:border-gray-800 rounded-3xl p-3.5 sm:p-5 shadow-xl relative overflow-hidden text-white" id="warrior-profile-card">
+      {/* Interactive Oyuncu Profil Kartı (Player Profile Card) */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 dark:border-gray-800 rounded-3xl p-3.5 sm:p-5 shadow-xl relative overflow-hidden text-white" id="player-profile-card">
         {/* Background ambient lighting effects */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-teal-500/10 rounded-full blur-2xl pointer-events-none" />
@@ -166,7 +166,7 @@ export default function WelcomeScreen({
           <div className="space-y-4 relative z-10 text-left animate-scale-up" id="profile-edit-mode">
             <div className="flex justify-between items-center pb-2 border-b border-white/10">
               <span className="text-xs font-bold font-mono text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
-                <Sparkles size={13} className="animate-pulse" /> Savaşçı Profilini Düzenle
+                <Sparkles size={13} className="animate-pulse" /> Profilinizi Düzenleyin
               </span>
               <button 
                 onClick={() => setIsEditing(false)}
@@ -270,14 +270,14 @@ export default function WelcomeScreen({
 
             {/* Name Input field */}
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 font-mono uppercase tracking-wider block">SAVAŞÇI ADI</label>
+              <label className="text-[10px] font-bold text-gray-400 font-mono uppercase tracking-wider block">OYUNCU ADI</label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   maxLength={16}
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  placeholder="Savaşçı adını yaz..."
+                  placeholder="Oyuncu adını yaz..."
                   className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-bold text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
                 <button
@@ -310,7 +310,7 @@ export default function WelcomeScreen({
                 {/* Name & Title */}
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold text-gray-400 font-mono uppercase tracking-wider block">AKTİF SAVAŞÇI</span>
+                    <span className="text-[10px] font-bold text-gray-400 font-mono uppercase tracking-wider block">AKTİF OYUNCU</span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <h2 className="text-base sm:text-lg font-black tracking-tight text-white uppercase truncate max-w-[160px] sm:max-w-[200px]">
@@ -331,9 +331,9 @@ export default function WelcomeScreen({
                 </div>
               </div>
 
-              {/* Rütbe / Savaşçı Ünvanı */}
+              {/* Oyuncu Seviyesi / Unvanı */}
               <div className="text-right">
-                <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block font-bold leading-none">ASKERİ RÜTBE</span>
+                <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block font-bold leading-none">OYUNCU UNVANI</span>
                 <span className="inline-block mt-1 px-2.5 py-0.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 text-[9px] font-extrabold uppercase rounded-full tracking-wider font-mono">
                   {getWarriorTitle(profile.dailyScore)}
                 </span>

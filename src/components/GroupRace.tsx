@@ -657,7 +657,7 @@ export default function GroupRace({
             <div className="flex justify-between items-center px-1">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Users size={14} />
-                Düello Meydanındaki Savaşçılar ({lobbyPlayers.length}/20)
+                Düello Alanındaki Oyuncular ({lobbyPlayers.length}/20)
               </span>
               <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-bold">
                 Aktif Katılım Sürüyor
@@ -717,7 +717,7 @@ export default function GroupRace({
                     TUR #{currentRound} <span className="text-amber-500 font-extrabold">({wordLength} Harf)</span>
                   </h2>
                   <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase">
-                    Kalan Savaşçı Sayısı: {competitors.filter(c => !c.eliminated).length} / 20
+                    Kalan Oyuncu Sayısı: {competitors.filter(c => !c.eliminated).length} / 20
                   </p>
                 </div>
               </div>
@@ -853,7 +853,7 @@ export default function GroupRace({
               <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                   <Users size={14} />
-                  Sıralama ({competitors.filter(c => !c.eliminated).length} Savaşçı)
+                  Sıralama ({competitors.filter(c => !c.eliminated).length} Oyuncu)
                 </span>
                 <span className="text-[9px] font-extrabold bg-amber-500/10 text-amber-500 px-2.5 py-0.5 rounded-full uppercase">
                   {currentRound === 1 ? 'TOP 10 TUR ATLAR' : currentRound === 2 ? 'TOP 5 TUR ATLAR' : currentRound === 3 ? 'TOP 2 TUR ATLAR' : 'ŞAMPİYONLUK MAÇI'}
@@ -953,7 +953,7 @@ export default function GroupRace({
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-6 text-center" id="elimination-results">
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Tur #{currentRound} <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Savaş Raporu</span>
+              Tur #{currentRound} <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Tur Raporu</span>
             </h1>
             <p className="text-xs text-slate-400 font-semibold uppercase">
               Gizli Kelime: <span className="text-emerald-500 font-extrabold underline">{targetWord}</span>
@@ -963,7 +963,7 @@ export default function GroupRace({
           {/* Results dashboard list */}
           <div className="max-w-2xl mx-auto border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
             <div className="bg-slate-50 dark:bg-slate-950 px-4 py-2 text-left border-b border-slate-100 dark:border-slate-800 flex justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
-              <span>Savaşçı Adı</span>
+              <span>Oyuncu Adı</span>
               <span>Tur Skoru / Durumu</span>
             </div>
 
@@ -1119,7 +1119,7 @@ export default function GroupRace({
             
             <div className="space-y-2">
               <div className="flex justify-between items-center text-xs py-1 border-b border-slate-800">
-                <span className="text-slate-400">Toplam Savaşçı Limit</span>
+                <span className="text-slate-400">Toplam Oyuncu Limiti</span>
                 <span className="font-bold text-slate-100">20 Kişi</span>
               </div>
               <div className="flex justify-between items-center text-xs py-1 border-b border-slate-800">
