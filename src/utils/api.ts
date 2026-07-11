@@ -141,12 +141,20 @@ export function getWsUrl(): string {
     const isCapacitor = !!(window as any).Capacitor;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || !hostname;
     
-    const isHybrid = protocol === 'file:' || 
+    const isRemote = hostname && 
+                     hostname !== 'localhost' && 
+                     hostname !== '127.0.0.1' &&
+                     !hostname.startsWith('192.168.') &&
+                     !hostname.startsWith('10.');
+
+    const isHybrid = !isRemote && (
+                     protocol === 'file:' || 
                      protocol.startsWith('capacitor') || 
                      protocol.startsWith('ionic') || 
                      isWebView ||
                      isCapacitor ||
-                     (isMobile && isLocalhost);
+                     (isMobile && isLocalhost)
+    );
 
     if (isHybrid) {
       // For mobile hybrid applications/WebViews on Android/iOS, point to the live cloud backend!

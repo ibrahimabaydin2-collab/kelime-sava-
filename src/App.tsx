@@ -270,6 +270,7 @@ export default function App() {
   const [activeMatch, setActiveMatch] = useState<RealtimeMatch | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
+  const wasOnlineRef = useRef<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleManualReconnect = () => {
@@ -330,6 +331,21 @@ export default function App() {
 
     const connectWS = () => {
       if (isDisposed) return;
+
+      // Safety check: if there is an active socket that is already OPEN or CONNECTING, do NOT create a new one!
+      if (socketRef.current) {
+        if (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING) {
+          console.log('WebSocket already active or connecting. Skipping duplicate connection attempt.');
+          return;
+        }
+      }
+
+      // Unconditionally clear any pending reconnect timeout before starting a new connection
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+
       console.log('Connecting to WebSocket at:', wsUrl);
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
@@ -348,6 +364,7 @@ export default function App() {
       ws.onopen = () => {
         clearTimeout(connTimeout);
         setIsOnline(true);
+        wasOnlineRef.current = true;
         lastMessageTime = Date.now();
         // Register client
         ws.send(JSON.stringify({
@@ -526,15 +543,16 @@ export default function App() {
 
       ws.onclose = () => {
         clearTimeout(connTimeout);
+        if (pingInterval) clearInterval(pingInterval);
+        
         if (socketRef.current === ws) {
           setIsOnline(false);
           socketRef.current = null;
-        }
-        if (pingInterval) clearInterval(pingInterval);
-        // Attempt reconnect after 3 seconds
-        if (!isDisposed) {
-          if (reconnectTimeout) clearTimeout(reconnectTimeout);
-          reconnectTimeout = setTimeout(connectWS, 3000);
+          // Attempt reconnect after 3 seconds
+          if (!isDisposed) {
+            if (reconnectTimeout) clearTimeout(reconnectTimeout);
+            reconnectTimeout = setTimeout(connectWS, 3000);
+          }
         }
       };
 
@@ -542,13 +560,12 @@ export default function App() {
         clearTimeout(connTimeout);
         console.error(`WebSocket connection error to URL: ${wsUrl}`, err);
         if (socketRef.current === ws) {
-          showToast(`Sunucu bağlantı hatası. Çevrimdışı moda geçiliyor...`, 'error');
           setIsOnline(false);
-        }
-        try {
-          ws.close(); // Guarantees triggering onclose and scheduling reconnect
-        } catch (e) {
-          // ignore
+          try {
+            ws.close(); // Guarantees triggering onclose and scheduling reconnect
+          } catch (e) {
+            // ignore
+          }
         }
       };
     };
@@ -591,7 +608,19 @@ export default function App() {
         socketRef.current = null;
       }
     };
-  }, [profile.id, profile.name, profile.avatarUrl, reconnectCounter]);
+  }, [profile.id, reconnectCounter]);
+
+  // Synchronize profile changes (name/avatar) on the existing WebSocket connection
+  useEffect(() => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'join',
+        id: profile.id,
+        name: profile.name,
+        avatarUrl: profile.avatarUrl
+      }));
+    }
+  }, [profile.id, profile.name, profile.avatarUrl]);
 
   // Synchronize game updates to WebSocket if in active match
   const syncMatchState = (
@@ -1061,14 +1090,16 @@ export default function App() {
 
   // Handle Multiplayer Challenge Actions
   const handleChallengePlayer = (player: LobbyPlayer, length: number) => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({
-        type: 'challenge',
-        challengedId: player.id,
-        wordLength: length
-      }));
-      showToast(`${player.name} oyuncusuna meydan okundu, yanıt bekleniyor...`, 'info');
+    if (!isOnline || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      showToast('Meydan okumak için sunucuya bağlı olmalısınız.', 'error');
+      return;
     }
+    socketRef.current.send(JSON.stringify({
+      type: 'challenge',
+      challengedId: player.id,
+      wordLength: length
+    }));
+    showToast(`${player.name} oyuncusuna meydan okundu, yanıt bekleniyor...`, 'info');
   };
 
   const handleAcceptChallenge = (challengeId: string) => {
