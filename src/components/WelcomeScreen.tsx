@@ -83,6 +83,10 @@ export default function WelcomeScreen({
   const [editName, setEditName] = useState<string>(profile.name);
   const [selectedAvatar, setSelectedAvatar] = useState<string>(profile.avatarUrl || '🧠');
 
+  React.useEffect(() => {
+    setEditName(profile.name);
+  }, [profile.name]);
+
   const AVATAR_PRESETS = ['⚔️', '🧠', '🐺', '🦁', '🧙‍♂️', '🦊', '👾', '🦄', '⚡', '👑', '🎯', '🚀', '🔥', '🐉', '🐼', '🛡️', '🏆', '🦉'];
 
   const handleCopyLink = () => {
@@ -372,435 +376,354 @@ export default function WelcomeScreen({
     );
   }
 
-  return (
-    <div className="w-full max-w-2xl mx-auto space-y-3 px-3 py-1.5 animate-fade-in" id="welcome-screen-root">
+  return isEditing ? (
+    <div className="w-full max-w-md mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="welcome-screen-root">
+      {/* Sparkles / Title */}
+      <div className="flex justify-between items-center pb-2 border-b border-white/10">
+        <span className="text-sm font-bold font-mono text-amber-200 uppercase tracking-widest flex items-center gap-1.5">
+          <Sparkles size={14} className="animate-pulse" /> Profilini Düzenle
+        </span>
+        <button 
+          onClick={() => setIsEditing(false)}
+          className="text-xs text-[#FAF6E9]/70 hover:text-white transition"
+        >
+          Kapat
+        </button>
+      </div>
 
-      {/* Interactive Oyuncu Profil Kartı (Player Profile Card) */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 dark:border-gray-800 rounded-3xl p-3.5 sm:p-5 shadow-xl relative overflow-hidden text-white" id="player-profile-card">
-        {/* Background ambient lighting effects */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-teal-500/10 rounded-full blur-2xl pointer-events-none" />
+      {/* Avatar Selector Grid */}
+      <div className="space-y-3 text-left">
+        <div className="flex justify-between items-center">
+          <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">BİR AVATAR SEÇİN</label>
+          <div className="relative">
+            <input
+              type="file"
+              accept="image/*"
+              id="custom-avatar-upload"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const img = new Image();
+                    img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      const MAX_WIDTH = 128;
+                      const MAX_HEIGHT = 128;
+                      let width = img.width;
+                      let height = img.height;
 
-        {/* Unified App Header (Integrated Inside Warrior Card) */}
-        <div className="flex justify-between items-center pb-3 border-b border-white/5 relative z-10 mb-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="relative">
-              <img 
-                src="./logo.svg" 
-                alt="Kelime Savaşı Logo" 
-                className="w-8 h-8 rounded-xl shadow-lg border border-emerald-500/15 transition duration-500 hover:rotate-6"
-                referrerPolicy="no-referrer"
-              />
-              <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-            </div>
-            <div className="text-left">
-              <h1 className="text-sm sm:text-base font-black tracking-tight text-white uppercase leading-none drop-shadow-md">
-                Kelime Savaşı
-              </h1>
-              <p className="text-[8px] sm:text-[8.5px] text-emerald-400 font-mono font-bold tracking-wider uppercase mt-0.5 leading-none">
-                KELİME BULMACA DÜELLOSU
-              </p>
-            </div>
+                      if (width > height) {
+                        if (width > MAX_WIDTH) {
+                          height *= MAX_WIDTH / width;
+                          width = MAX_WIDTH;
+                        }
+                      } else {
+                        if (height > MAX_HEIGHT) {
+                          width *= MAX_HEIGHT / height;
+                          height = MAX_HEIGHT;
+                        }
+                      }
+
+                      canvas.width = width;
+                      canvas.height = height;
+                      const ctx = canvas.getContext('2d');
+                      if (ctx) {
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                        setSelectedAvatar(dataUrl);
+                      }
+                    };
+                    img.src = reader.result as string;
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+            />
+            <label
+              htmlFor="custom-avatar-upload"
+              className="text-[9.5px] bg-[#FAF6E9] hover:bg-[#F3EFE0] text-slate-900 font-black px-3 py-1.5 rounded-xl transition duration-150 cursor-pointer uppercase tracking-wider flex items-center gap-1 shadow-sm"
+            >
+              <span>Fotoğraf Yükle 📸</span>
+            </label>
           </div>
-          
-          {/* Connection status with instant reconnect */}
-          <div className="flex items-center gap-1.5 bg-black/45 border border-white/10 rounded-full px-2.5 py-1 shadow-inner">
-            <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-            <span className="text-[8px] sm:text-[8.5px] font-black text-gray-250 font-mono tracking-wider uppercase leading-none">
-              {isOnline ? 'AKTİF' : 'ÇEVRİMDIŞI'}
-            </span>
-            {!isOnline && onReconnect && (
-              <button
-                onClick={onReconnect}
-                className="text-[7.5px] px-1.5 py-0.5 bg-rose-500/20 text-rose-300 hover:bg-rose-500/35 rounded font-black transition duration-150 cursor-pointer animate-pulse ml-1"
-              >
-                BAĞLAN
-              </button>
+        </div>
+
+        <div className="grid grid-cols-6 gap-2 p-2.5 bg-black/30 rounded-2xl border border-white/5 max-h-32 overflow-y-auto">
+          {selectedAvatar && selectedAvatar.length >= 4 && (
+            <button
+              type="button"
+              onClick={() => setSelectedAvatar(selectedAvatar)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition duration-150 active:scale-90 relative overflow-hidden ring-2 ring-amber-400 scale-105 shadow"
+            >
+              <img src={selectedAvatar} alt="Custom Avatar" className="w-full h-full object-cover rounded-xl" referrerPolicy="no-referrer" />
+            </button>
+          )}
+          {AVATAR_PRESETS.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => setSelectedAvatar(preset)}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center text-xl transition duration-150 active:scale-90 hover:bg-white/10 ${
+                selectedAvatar === preset 
+                  ? 'bg-gradient-to-tr from-amber-400 to-amber-200 text-slate-900 scale-105 shadow' 
+                  : ''
+              }`}
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Edit Name Input */}
+      <div className="space-y-2 text-left">
+        <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">TAKMA ADINIZ</label>
+        <input
+          type="text"
+          maxLength={16}
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          placeholder="Takma adınızı yazın..."
+          className="w-full bg-[#2E3748]/55 border border-white/5 rounded-xl px-4 py-2.5 text-sm font-bold text-[#FAF6E9] focus:outline-none focus:ring-2 focus:ring-amber-200/40"
+        />
+      </div>
+
+      {/* Save / Cancel buttons */}
+      <div className="flex gap-2 mt-2">
+        <button
+          onClick={() => setIsEditing(false)}
+          className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-xs font-bold text-gray-300 hover:text-white hover:bg-white/5 transition"
+        >
+          Vazgeç
+        </button>
+        <button
+          onClick={handleSaveProfile}
+          disabled={!editName.trim()}
+          className="flex-1 py-3 px-4 rounded-xl bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] text-xs font-black transition shadow-md"
+        >
+          Onayla
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div className="w-full max-w-md mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-6" id="welcome-screen-root">
+      
+      {/* Glowing 4-point star accent in bottom right */}
+      <div className="absolute bottom-6 right-8 text-amber-100/30 animate-pulse select-none pointer-events-none">
+        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0c.5 6.5 5.5 11.5 12 12-.5 6.5-5.5 11.5-12 12-.5-6.5-5.5-11.5-12-12 .5-6.5 5.5-11.5 12-12z" />
+        </svg>
+      </div>
+
+      {/* Connection status with instant reconnect absolute-positioned at the top right */}
+      <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-black/25 border border-white/5 rounded-full px-2.5 py-0.5 text-[8px] font-bold text-amber-200/80">
+        <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+        <span>{isOnline ? 'AKTİF' : 'ÇEVRİMDIŞI'}</span>
+        {!isOnline && onReconnect && (
+          <button
+            onClick={onReconnect}
+            className="text-[7px] px-1 py-0.5 bg-rose-500/20 text-rose-300 hover:bg-rose-500/35 rounded font-black transition cursor-pointer"
+          >
+            BAĞLAN
+          </button>
+        )}
+      </div>
+
+      {/* Elegant Glowing Book Icon at the top */}
+      <div className="relative flex flex-col items-center justify-center pt-2">
+        {/* Floating magic/sparkle dots above book */}
+        <div className="absolute -top-1.5 flex gap-1 animate-pulse text-amber-200/80">
+          <span className="text-[10px] delay-100 animate-bounce">✦</span>
+          <span className="text-xs -translate-y-1 animate-bounce">✦</span>
+          <span className="text-[9px] delay-200 animate-bounce">✦</span>
+        </div>
+        <svg className="w-14 h-14 text-amber-100/90 drop-shadow-[0_0_12px_rgba(251,191,36,0.3)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+        </svg>
+      </div>
+
+      {/* App title */}
+      <div className="text-center">
+        <h1 className="text-2xl sm:text-3xl font-serif font-medium tracking-[0.15em] text-[#FAF6E9] uppercase drop-shadow-md">
+          KELİME SAVAŞI
+        </h1>
+      </div>
+
+      {/* User Profile Section with Halo and Name */}
+      <div className="flex items-center justify-center gap-4 py-1 relative z-10">
+        <div className="relative">
+          {/* Golden Glowing Ring around Avatar */}
+          <div 
+            onClick={() => {
+              setEditName(profile.name);
+              setSelectedAvatar(profile.avatarUrl || '🧠');
+              setIsEditing(true);
+            }}
+            className="w-16 h-16 rounded-full bg-[#3D4756] border-2 border-amber-200/60 shadow-[0_0_15px_rgba(251,191,36,0.25)] flex items-center justify-center text-3xl overflow-hidden transition-transform duration-300 hover:scale-105 cursor-pointer"
+          >
+            {profile.avatarUrl && profile.avatarUrl.length > 3 ? (
+              <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="select-none">{profile.avatarUrl || '🧠'}</span>
             )}
           </div>
-        </div>
-
-        {isEditing ? (
-          // Profile Edit Mode
-          <div className="space-y-4 relative z-10 text-left animate-scale-up" id="profile-edit-mode">
-            <div className="flex justify-between items-center pb-2 border-b border-white/10">
-              <span className="text-xs font-bold font-mono text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
-                <Sparkles size={13} className="animate-pulse" /> Profilinizi Düzenleyin
-              </span>
-              <button 
-                onClick={() => setIsEditing(false)}
-                className="text-xs text-gray-400 hover:text-white transition"
-              >
-                İptal
-              </button>
-            </div>
-
-            {/* Avatar Selector Grid with Custom Photo Upload */}
-            <div className="space-y-2.5">
-              <div className="flex justify-between items-center">
-                <label className="text-[10px] font-bold text-gray-400 font-mono uppercase tracking-wider block">BİR NİŞAN (AVATAR) SEÇ</label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    id="custom-avatar-upload"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          const img = new Image();
-                          img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            const MAX_WIDTH = 128;
-                            const MAX_HEIGHT = 128;
-                            let width = img.width;
-                            let height = img.height;
-
-                            if (width > height) {
-                              if (width > MAX_WIDTH) {
-                                height *= MAX_WIDTH / width;
-                                width = MAX_WIDTH;
-                              }
-                            } else {
-                              if (height > MAX_HEIGHT) {
-                                width *= MAX_HEIGHT / height;
-                                height = MAX_HEIGHT;
-                              }
-                            }
-
-                            canvas.width = width;
-                            canvas.height = height;
-                            const ctx = canvas.getContext('2d');
-                            if (ctx) {
-                              ctx.drawImage(img, 0, 0, width, height);
-                              const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                              setSelectedAvatar(dataUrl);
-                            }
-                          };
-                          img.src = reader.result as string;
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                  />
-                  <label
-                    htmlFor="custom-avatar-upload"
-                    className="text-[9.5px] bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-300 font-black px-2.5 py-1 rounded-lg transition duration-150 cursor-pointer uppercase font-mono tracking-wider flex items-center gap-1"
-                  >
-                    <span>Fotoğraf Yükle 📸</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-6 sm:grid-cols-9 gap-2 p-2 bg-black/30 rounded-2xl border border-white/5 max-h-24 overflow-y-auto">
-                {/* Show custom uploaded photo if present */}
-                {selectedAvatar && selectedAvatar.length >= 4 && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAvatar(selectedAvatar)}
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition duration-150 active:scale-90 relative group overflow-hidden ${
-                      selectedAvatar.length >= 4
-                        ? 'ring-2 ring-emerald-500 scale-105 shadow-md shadow-emerald-500/25'
-                        : ''
-                    }`}
-                  >
-                    <img src={selectedAvatar} alt="Custom Avatar" className="w-full h-full object-cover rounded-xl" referrerPolicy="no-referrer" />
-                    <span className="absolute inset-0 bg-black/40 flex items-center justify-center text-[7px] font-black opacity-0 group-hover:opacity-100 transition duration-150 text-white leading-none">SEÇİLİ</span>
-                  </button>
-                )}
-                {AVATAR_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setSelectedAvatar(preset)}
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center text-lg transition duration-150 active:scale-90 hover:bg-white/10 ${
-                      selectedAvatar === preset 
-                        ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 scale-110 shadow-lg shadow-emerald-500/20' 
-                        : ''
-                    }`}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Name Input field */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 font-mono uppercase tracking-wider block">OYUNCU ADI</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  maxLength={16}
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="Oyuncu adını yaz..."
-                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-bold text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                />
-                <button
-                  onClick={handleSaveProfile}
-                  disabled={!editName.trim()}
-                  className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-700 disabled:opacity-50 text-white font-extrabold text-xs px-5 rounded-xl transition flex items-center gap-1.5 shadow-md shadow-emerald-500/10 cursor-pointer"
-                >
-                  <CheckCircle2 size={13} />
-                  <span>KAYDET</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          // Profile Showcase Mode
-          <div className="space-y-4 relative z-10 text-left animate-fade-in" id="profile-showcase-mode">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {/* Profile Picture/Avatar */}
-                <div className="relative group shrink-0">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-slate-800/80 border border-white/10 flex items-center justify-center text-2xl sm:text-3xl shadow-inner relative overflow-hidden ring-2 ring-emerald-500/10 group-hover:ring-emerald-500/30 transition duration-300">
-                    {selectedAvatar.length < 4 ? (
-                      <span className="select-none animate-bounce" style={{ animationDuration: '4s' }}>{selectedAvatar}</span>
-                    ) : (
-                      <img src={selectedAvatar} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    )}
-                  </div>
-                </div>
-
-                {/* Name & Title */}
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold text-gray-400 font-mono uppercase tracking-wider block">AKTİF OYUNCU</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <h2 className="text-base sm:text-lg font-black tracking-tight text-white uppercase truncate max-w-[160px] sm:max-w-[200px]">
-                      {profile.name}
-                    </h2>
-                    <button 
-                      onClick={() => {
-                        setEditName(profile.name);
-                        setSelectedAvatar(profile.avatarUrl || '🧠');
-                        setIsEditing(true);
-                      }}
-                      className="p-1 rounded bg-white/5 hover:bg-white/15 hover:text-emerald-400 text-gray-400 transition duration-150 cursor-pointer"
-                      title="Profili Düzenle"
-                    >
-                      <Edit2 size={11} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Oyuncu Seviyesi / Unvanı */}
-              <div className="text-right">
-                <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block font-bold leading-none">OYUNCU UNVANI</span>
-                <span className="inline-block mt-1 px-2.5 py-0.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 text-[9px] font-extrabold uppercase rounded-full tracking-wider font-mono">
-                  {getWarriorTitle(profile.dailyScore)}
-                </span>
-              </div>
-            </div>
-
-            {/* Warrior Quick Stats Horizontal Bento-Grid */}
-            <div className="grid grid-cols-4 gap-1.5 sm:gap-2.5">
-              {/* Daily Score Badge */}
-              <div className="bg-white/5 hover:bg-white/10 p-1.5 sm:p-3 rounded-xl border border-white/5 transition duration-150 text-center flex flex-col items-center justify-center space-y-0.5 animate-pulse" style={{ animationDuration: '6s' }}>
-                <Award size={12} className="text-yellow-400 animate-spin" style={{ animationDuration: '4s' }} />
-                <span className="text-[8px] font-mono text-gray-400 uppercase tracking-wider block leading-none">SKOR</span>
-                <span className="text-xs sm:text-sm font-black text-yellow-400">{profile.dailyScore}</span>
-              </div>
-
-              {/* Win Streak Badge */}
-              <div className="bg-white/5 hover:bg-white/10 p-1.5 sm:p-3 rounded-xl border border-white/5 transition duration-150 text-center flex flex-col items-center justify-center space-y-0.5">
-                <Flame size={12} className={profile.stats?.currentStreak > 0 ? 'text-orange-500 animate-pulse' : 'text-gray-400'} />
-                <span className="text-[8px] font-mono text-gray-400 uppercase tracking-wider block leading-none">SERİ</span>
-                <span className={`text-xs sm:text-sm font-black ${profile.stats?.currentStreak > 0 ? 'text-orange-500' : 'text-white'}`}>
-                  {profile.stats?.currentStreak || 0} 🔥
-                </span>
-              </div>
-
-              {/* Played Games Badge */}
-              <div className="bg-white/5 hover:bg-white/10 p-1.5 sm:p-3 rounded-xl border border-white/5 transition duration-150 text-center flex flex-col items-center justify-center space-y-0.5">
-                <Swords size={12} className="text-blue-400" />
-                <span className="text-[8px] font-mono text-gray-400 uppercase tracking-wider block leading-none">MAÇ</span>
-                <span className="text-xs sm:text-sm font-black text-blue-400">{profile.stats?.gamesPlayed || 0}</span>
-              </div>
-
-              {/* Win Rate Badge */}
-              <div className="bg-white/5 hover:bg-white/10 p-1.5 sm:p-3 rounded-xl border border-white/5 transition duration-150 text-center flex flex-col items-center justify-center space-y-0.5">
-                <TrendingUp size={12} className="text-teal-400" />
-                <span className="text-[8px] font-mono text-gray-400 uppercase tracking-wider block leading-none">KAZANMA</span>
-                <span className="text-xs sm:text-sm font-black text-teal-400">%{winRate}</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Play Settings & Action Hub - Beautiful blurred frosted card */}
-      <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border border-gray-150 dark:border-gray-800 rounded-3xl p-4 sm:p-5.5 shadow-xl space-y-4 relative overflow-hidden" id="action-settings-card">
-        {/* Decorative subtle atmospheric color splash inside settings card */}
-        <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
-
-        {/* SINGLE CLEAN 'OYUNA BAŞLA' BUTTON */}
-        <div className="space-y-3.5 animate-fade-in" id="clean-play-trigger">
-          <button
+          <button 
             onClick={() => {
-              setShowGameSetup(true);
-              // Default to 'pvp' if online, else 'solo'
-              setSelectedTab(isOnline ? 'pvp' : 'solo');
+              setEditName(profile.name);
+              setSelectedAvatar(profile.avatarUrl || '🧠');
+              setIsEditing(true);
             }}
-            className="w-full relative group overflow-hidden bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-extrabold py-5 px-6 rounded-2xl transition-all duration-300 active:scale-[0.98] shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 flex flex-col items-center justify-center cursor-pointer border border-emerald-400"
-            id="start-game-wizard-button"
+            className="absolute -bottom-1 -right-1 bg-amber-400 hover:bg-amber-300 text-slate-950 p-1.5 rounded-full shadow-md transition"
+            title="Profili Düzenle"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-500 opacity-0 group-hover:opacity-100 transition duration-500 blur-md -z-10" />
-            <span className="text-lg sm:text-xl font-black tracking-wider uppercase flex items-center gap-2.5 drop-shadow-md">
-              <Swords className="animate-pulse" size={20} /> OYUNA BAŞLA <Swords className="animate-pulse" size={20} />
-            </span>
-            <span className="text-[9.5px] text-emerald-100 font-mono tracking-wider mt-1 uppercase opacity-90">
-              Solo Pratik Yap, Düelloya Katıl veya Turnuvaya Gir!
-            </span>
+            <Edit2 size={10} strokeWidth={2.5} />
           </button>
-
-          {/* Matchmaking Queue Status - Always visible when active even if setup closed */}
-          {matchmakingStatus === 'queued' && (
-            <div className="bg-amber-500/10 border border-amber-500/30 p-3 sm:p-3.5 rounded-xl flex items-center justify-between animate-fade-in" id="matchmaking-queue-status">
-              <div className="text-left">
-                <span className="text-[10px] sm:text-xs font-black text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-mono uppercase tracking-wide">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                  </span>
-                  Eşleşme Aranıyor...
-                </span>
-                <span className="text-[9.5px] text-gray-500 dark:text-gray-400 block mt-0.5">
-                  {wordLength} Harfli • {selectedMatchWords} Kelimelik Maç • Lobi bekletiliyor
-                </span>
-              </div>
-              <button
-                onClick={() => onStartMatchmaking(selectedMatchWords)}
-                className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[9.5px] uppercase tracking-wider rounded-lg transition duration-150 shadow-sm cursor-pointer"
-              >
-                Sıradan Çık
-              </button>
-            </div>
-          )}
         </div>
+        
+        <div className="flex items-center gap-2">
+          <span className="text-3xl font-medium tracking-wide text-[#FAF6E9]">{profile.name}</span>
+        </div>
+      </div>
 
-        {/* Direct Challenge Notification on Main Screen */}
-        {activeChallenges.length > 0 && (
-          <div className="bg-amber-500/10 border-2 border-dashed border-amber-500/30 p-3 rounded-xl space-y-2 animate-pulse text-left relative overflow-hidden mt-2" id="direct-challenge-container">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 font-mono flex items-center gap-1">
-                <Zap size={11} className="text-amber-500 fill-current animate-bounce" />
-                DÜELLO DAVETİ VAR!
-              </span>
+      {/* Mini Stats Pill */}
+      <div className="flex justify-center items-center gap-3 text-[11px] font-medium text-[#FAF6E9]/80 bg-[#3D4756]/40 px-4 py-1.5 rounded-full border border-white/5 w-fit mx-auto">
+        <span className="flex items-center gap-1"><Award size={13} className="text-amber-400" /> {profile.dailyScore} Puan</span>
+        <span className="text-white/15">|</span>
+        <span className="flex items-center gap-1"><Flame size={13} className="text-orange-400 animate-pulse" /> {profile.stats?.currentStreak || 0} Seri</span>
+        <span className="text-white/15">|</span>
+        <span className="flex items-center gap-1"><Swords size={13} className="text-blue-400" /> %{winRate} Galibiyet</span>
+      </div>
+
+      {/* Glassmorphic Nickname Input Box */}
+      <div className="w-full bg-[#4B5563]/40 border border-white/10 rounded-2xl p-4 text-left shadow-inner space-y-1">
+        <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-widest block font-sans">KULLANICI ADINIZ</label>
+        <input
+          type="text"
+          maxLength={16}
+          value={editName}
+          onChange={(e) => {
+            const newVal = e.target.value;
+            setEditName(newVal);
+            if (newVal.trim().length > 0) {
+              onUpdateProfile(newVal.trim(), profile.avatarUrl);
+            }
+          }}
+          placeholder="Kullanıcı adınızı yazın..."
+          className="w-full bg-[#2E3748]/55 border border-white/5 rounded-xl px-4 py-2.5 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40 focus:border-transparent transition"
+        />
+      </div>
+
+      {/* Direct Challenge Notification */}
+      {activeChallenges.length > 0 && (
+        <div className="bg-amber-500/10 border-2 border-dashed border-amber-500/30 p-3 rounded-2xl space-y-2 animate-pulse text-left relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 font-mono flex items-center gap-1">
+              <Zap size={11} className="text-amber-500 fill-current animate-bounce" />
+              DÜELLO DAVETİ VAR!
+            </span>
+          </div>
+          <div className="flex items-center justify-between bg-slate-800/80 p-2.5 rounded-xl border border-amber-500/20">
+            <div className="text-left max-w-[150px] truncate">
+              <span className="font-black text-xs text-[#FAF6E9] block leading-tight">{activeChallenges[0].challenger.name}</span>
+              <span className="text-[9px] text-gray-400 block mt-0.5">{activeChallenges[0].wordLength} Harfli</span>
+            </div>
+            <div className="flex gap-1">
               <button
-                onClick={() => setShowFriendsModal(true)}
-                className="text-[9px] font-bold text-amber-600 dark:text-amber-400 underline hover:text-amber-700 cursor-pointer"
+                onClick={() => onDeclineChallenge?.(activeChallenges[0].id)}
+                className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-gray-300 text-[9.5px] font-bold rounded-lg transition"
               >
-                Tümünü Gör
+                Red
+              </button>
+              <button
+                onClick={() => onAcceptChallenge?.(activeChallenges[0].id)}
+                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 text-[9.5px] font-black rounded-lg transition shadow-sm"
+              >
+                Kabul
               </button>
             </div>
-            <div className="flex items-center justify-between bg-white dark:bg-gray-950 p-2.5 rounded-lg border border-amber-200/50 dark:border-amber-900/40">
-              <div className="text-left">
-                <span className="font-black text-xs text-gray-800 dark:text-gray-150 block leading-tight">
-                  {activeChallenges[0].challenger.name}
+          </div>
+        </div>
+      )}
+
+      {/* Main Play Action Button - 3D retro styled cream button */}
+      <div className="w-full flex flex-col gap-2">
+        <button
+          onClick={() => {
+            setShowGameSetup(true);
+            setSelectedTab(isOnline ? 'pvp' : 'solo');
+          }}
+          className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-base sm:text-lg py-4 px-6 rounded-2xl shadow-[0_5px_0_#D9D4C3,0_8px_15px_rgba(0,0,0,0.2)] hover:shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5] relative overflow-hidden"
+        >
+          <span>OYUNA BAŞLA</span>
+        </button>
+
+        {/* Matchmaking Queue Status */}
+        {matchmakingStatus === 'queued' && (
+          <div className="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl flex items-center justify-between animate-fade-in mt-1">
+            <div className="text-left">
+              <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1.5 font-mono uppercase tracking-wide">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                 </span>
-                <span className="text-[9px] text-gray-400 block mt-0.5">
-                  {activeChallenges[0].wordLength} Harfli Maç Teklifi
-                </span>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                <button
-                  onClick={() => onDeclineChallenge?.(activeChallenges[0].id)}
-                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-600 dark:text-gray-300 text-[9.5px] font-bold rounded transition cursor-pointer"
-                >
-                  Reddet
-                </button>
-                <button
-                  onClick={() => onAcceptChallenge?.(activeChallenges[0].id)}
-                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[9.5px] font-black rounded transition shadow-sm cursor-pointer"
-                >
-                  Savaşa Gir
-                </button>
-              </div>
+                Eşleşme Aranıyor...
+              </span>
+              <span className="text-[9.5px] text-gray-400 block mt-0.5">
+                {wordLength} Harf • {selectedMatchWords} Kelime
+              </span>
             </div>
+            <button
+              onClick={() => onStartMatchmaking(selectedMatchWords)}
+              className="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition shadow"
+            >
+              Çık
+            </button>
           </div>
         )}
       </div>
 
-      {/* Side-by-Side rectangular folder cards ("dosya misali yanyana" - 4 columns) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2.5" id="welcome-bottom-folders">
-        {/* Card 1: Savaş Görevleri */}
+      {/* Beautiful Cream 2x2 Action Grid */}
+      <div className="grid grid-cols-2 gap-3 w-full">
+        {/* Button 1: REKABET */}
         <button
-          onClick={onOpenMissions}
-          className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-xl p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-850/40 transition duration-150 cursor-pointer text-left flex flex-col justify-between h-14 relative overflow-hidden shadow-xs hover:border-emerald-500 dark:hover:border-emerald-500/50 group"
+          onClick={onOpenStats}
+          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer"
         >
-          <div className="absolute top-0 right-0 w-12 h-12 bg-amber-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-amber-500/10 transition" />
-          <div className="flex items-center gap-1 text-[8.5px] font-extrabold font-mono uppercase tracking-wider text-amber-600 dark:text-amber-400 leading-none">
-            <Trophy size={10} className="text-amber-500 animate-pulse" />
-            <span>GÖREVLER</span>
-          </div>
-          <div>
-            <span className="text-[10px] sm:text-[11px] font-black text-gray-850 dark:text-gray-100 block leading-tight">Savaş Görevleri</span>
-          </div>
+          <Trophy size={24} className="stroke-[2.5]" />
+          <span className="text-[11px] font-black uppercase tracking-widest">REKABET</span>
         </button>
 
-        {/* Card 2: Nasıl Oynanır */}
-        <button
-          onClick={() => setShowRulesModal(true)}
-          className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-xl p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-850/40 transition duration-150 cursor-pointer text-left flex flex-col justify-between h-14 relative overflow-hidden shadow-xs hover:border-emerald-500 dark:hover:border-emerald-500/50 group"
-        >
-          <div className="absolute top-0 right-0 w-12 h-12 bg-emerald-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/10 transition" />
-          <div className="flex items-center gap-1 text-[8.5px] font-extrabold font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400 leading-none">
-            <HelpCircle size={10} className="text-emerald-500" />
-            <span>KURALLAR</span>
-          </div>
-          <div>
-            <span className="text-[10px] sm:text-[11px] font-black text-gray-850 dark:text-gray-100 block leading-tight">Nasıl Oynanır?</span>
-          </div>
-        </button>
-
-        {/* Card 3: Oyun Ayarları */}
-        <button
-          onClick={onOpenSettings}
-          className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-xl p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-850/40 transition duration-150 cursor-pointer text-left flex flex-col justify-between h-14 relative overflow-hidden shadow-xs hover:border-emerald-500 dark:hover:border-emerald-500/50 group"
-        >
-          <div className="absolute top-0 right-0 w-12 h-12 bg-blue-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-blue-500/10 transition" />
-          <div className="flex items-center gap-1 text-[8.5px] font-extrabold font-mono uppercase tracking-wider text-blue-600 dark:text-blue-400 leading-none">
-            <Sliders size={10} className="text-blue-500" />
-            <span>AYARLAR</span>
-          </div>
-          <div>
-            <span className="text-[10px] sm:text-[11px] font-black text-gray-850 dark:text-gray-100 block leading-tight">Oyun Ayarları</span>
-          </div>
-        </button>
-
-        {/* Card 4: Aktif Arkadaşlar */}
+        {/* Button 2: ARKADAŞLAR */}
         <button
           onClick={() => setShowFriendsModal(true)}
-          className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-xl p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-850/40 transition duration-150 cursor-pointer text-left flex flex-col justify-between h-14 relative overflow-hidden shadow-xs hover:border-teal-500 dark:hover:border-teal-500/50 group"
+          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer relative"
         >
-          <div className="absolute top-0 right-0 w-12 h-12 bg-teal-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-teal-500/10 transition" />
-          <div className="flex items-center gap-1 text-[8.5px] font-extrabold font-mono uppercase tracking-wider text-teal-600 dark:text-teal-400 leading-none">
-            <Users size={10} className="text-teal-500" />
-            <span className="flex items-center gap-1">
-              ARKADAŞLAR
-              {otherPlayers.length > 0 && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              )}
-            </span>
-          </div>
-          <div className="flex items-center justify-between w-full leading-none">
-            <span className="text-[10px] sm:text-[11px] font-black text-gray-850 dark:text-gray-100 block truncate leading-none">Aktif Arkadaşlar</span>
-            {otherPlayers.length > 0 && (
-              <span className="text-[8px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-extrabold px-1 rounded scale-90 sm:scale-100">
-                {otherPlayers.length}
-              </span>
-            )}
-          </div>
+          <Users size={24} className="stroke-[2.5]" />
+          <span className="text-[11px] font-black uppercase tracking-widest">ARKADAŞLAR</span>
+          {otherPlayers.length > 0 && (
+            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse border-2 border-[#FAF6E9]" />
+          )}
+        </button>
+
+        {/* Button 3: AYARLAR */}
+        <button
+          onClick={onOpenSettings}
+          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer"
+        >
+          <Sliders size={24} className="stroke-[2.5]" />
+          <span className="text-[11px] font-black uppercase tracking-widest">AYARLAR</span>
+        </button>
+
+        {/* Button 4: KURALLAR */}
+        <button
+          onClick={() => setShowRulesModal(true)}
+          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer"
+        >
+          <HelpCircle size={24} className="stroke-[2.5]" />
+          <span className="text-[11px] font-black uppercase tracking-widest">KURALLAR</span>
         </button>
       </div>
 

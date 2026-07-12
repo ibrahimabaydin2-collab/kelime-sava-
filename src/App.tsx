@@ -420,7 +420,8 @@ export default function App() {
       bgTheme: 'default',
       keyboardLayout: 'Q',
       soundEnabled: true,
-      hapticEnabled: true
+      hapticEnabled: true,
+      fontFamily: 'poppins'
     };
   });
 
@@ -921,7 +922,7 @@ export default function App() {
 
   // Countdown timer logic
   useEffect(() => {
-    if (gameStatus !== 'playing' || isValidating || !hasEnteredGame || gameMode === 'untimed') {
+    if (gameStatus !== 'playing' || isValidating || !hasEnteredGame || (gameMode === 'untimed' && !activeMatch)) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
@@ -941,7 +942,7 @@ export default function App() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode]); // Resets interval on attempt submission or validation change or exit or gameMode change
+  }, [gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch]); // Resets interval on attempt submission or validation change or exit or gameMode change
 
   // Handle Game Loss
   const handleGameLoss = async (reason: string = 'Hakkınız Bitti') => {
@@ -1406,10 +1407,28 @@ export default function App() {
     }
   };
 
+  const getFontFamilyClass = () => {
+    switch (settings.fontFamily) {
+      case 'montserrat':
+        return 'font-montserrat';
+      case 'fredoka':
+        return 'font-fredoka';
+      case 'inter':
+        return 'font-inter';
+      case 'pacifico':
+        return 'font-pacifico';
+      case 'roboto-mono':
+        return 'font-roboto-mono';
+      case 'poppins':
+      default:
+        return 'font-poppins';
+    }
+  };
+
   const opponent = activeMatch ? Object.values(activeMatch.players).find(p => (p as any).name !== profile.name) as any : null;
 
   return (
-    <div className={`min-h-screen flex flex-col transition-all duration-300 ${getBgThemeClass()}`}>
+    <div className={`min-h-screen flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
       {/* Main Container */}
       <main className="flex-1 flex flex-col items-center justify-center py-2 sm:py-4 px-1.5 sm:px-4 max-w-5xl lg:max-w-6xl w-full mx-auto relative">
         {/* Toast Notification */}
@@ -1588,7 +1607,7 @@ export default function App() {
 
         {/* Game State Control Panel (Length selector / Reset) */}
         {!activeMatch && (
-          <div className="w-full max-w-3xl lg:max-w-4xl flex justify-between items-center bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border border-gray-150 dark:border-gray-800 rounded-2xl p-3 shadow-md mb-4 animate-fadeIn">
+          <div className="w-full max-w-3xl lg:max-w-4xl flex flex-col sm:flex-row gap-3 justify-between items-center bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border border-gray-150 dark:border-gray-800 rounded-2xl p-3 shadow-md mb-4 animate-fadeIn">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider font-mono">Harf Sayısı:</span>
               <div className="flex gap-1 bg-gray-150/60 dark:bg-gray-950 p-1 rounded-xl">
@@ -1682,7 +1701,7 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {gameMode === 'timed' ? (
+                  {(gameMode === 'timed' || activeMatch) ? (
                     <>
                       <Hourglass size={16} className={`animate-spin ${secondsLeft <= 5 ? 'text-rose-500' : 'text-emerald-500'}`} />
                       <div className={`text-sm font-bold font-mono px-2.5 py-1 rounded-lg border ${

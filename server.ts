@@ -130,6 +130,8 @@ function validateTurkishLinguistics(word: string, length: number): { valid: bool
   return { valid: true, reason: '' };
 }
 
+
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
@@ -182,10 +184,7 @@ app.post('/api/validate-word', async (req, res) => {
       return res.json(wordCache[cacheKey]);
     }
 
-    // 2.2 Direct official TDK GTS API verification
-    let tdkValidated = false;
-    let tdkResult = null;
-
+    // 2.2 Direct official TDK GTS API verification on the exact word
     try {
       const lowercaseWord = turkishLower(normalized);
       const tdkResponse = await fetch(`https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lowercaseWord)}`, {
@@ -196,10 +195,9 @@ app.post('/api/validate-word', async (req, res) => {
       
       if (tdkResponse.ok) {
         const tdkData = await tdkResponse.json() as any;
-        tdkValidated = true;
         
         if (Array.isArray(tdkData) && tdkData.length > 0) {
-          let definition = 'TDK Sözlüğünde mevcut bir kelime.';
+          let definition = 'TDK Sözlüğünde mevcut.';
           try {
             const meanings = tdkData[0].anlamlarListe;
             if (Array.isArray(meanings) && meanings.length > 0) {
@@ -208,102 +206,32 @@ app.post('/api/validate-word', async (req, res) => {
           } catch (e) {
             // Ignore meaning parse errors
           }
-          tdkResult = {
+          const tdkResult = {
             valid: true,
             definition
           };
+          wordCache[cacheKey] = tdkResult;
+          return res.json(tdkResult);
         } else {
-          // Explicitly not found in TDK (returns {"error": "Sonuç bulunamadı"} or similar structure)
-          tdkResult = {
+          const notFoundResult = {
             valid: false,
             definition: 'Bu kelime TDK sözlüğünde bulunamadı.'
           };
+          wordCache[cacheKey] = notFoundResult;
+          return res.json(notFoundResult);
         }
       }
     } catch (tdkErr) {
       console.warn('TDK GTS API Request failed:', tdkErr);
     }
 
-    if (tdkValidated && tdkResult) {
-      // Save to cache and return the absolute source of truth
-      wordCache[cacheKey] = tdkResult;
-      return res.json(tdkResult);
-    }
-
-    // 2.5 Check cooldown for Gemini API (Fallback option if TDK API is down)
-    if (Date.now() < geminiCooldownUntil) {
-      return res.json({
-        valid: false,
-        definition: 'Sözlük doğrulama sunucusu yoğun ve kelime listemizde bulunamadı!'
-      });
-    }
-
-    // 3. Fallback to Gemini AI Validation
-    if (!process.env.GEMINI_API_KEY) {
-      return res.json({
-        valid: false,
-        definition: 'Sözlük doğrulama servisi geçici olarak aktif değil ve kelime listemizde bulunamadı!'
-      });
-    }
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
-      contents: `Sen son derece katı bir Türkçe TDK Sözlük doğrulama motorusun.
-Görevin, "${normalized}" kelimesinin TDK (Türk Dil Kurumu) Güncel Türkçe Sözlük'te birebir yer alan, gerçek, anlamlı ve geçerli bir Türkçe kelime olup olmadığını kontrol etmektir.
-
-Kurallar:
-1. Sadece standart TDK sözlüğünde doğrudan madde başı olarak bulunan isimler, sıfatlar, zarflar veya isim-fiil/mastar kökenli kelimeler geçerli (valid: true) sayılmalıdır.
-2. Çekim ekleri veya şahıs/zaman ekleri (yönelme, bulunma, ayrılma, çoğul, dı/di geçmiş zaman, yor şimdiki zaman vb.) almış kelimeler, eğer TDK sözlüğünde müstakil bir madde başı olarak tanımlı değillerse GEÇERSİZ (valid: false) sayılmalıdır. Örnek: "kalemler" veya "eve" veya "koştu" geçersizdir; "kalem", "ev", "koşma" geçerlidir.
-3. Rastgele basılmış harfler (keyboard smash), uydurma kelimeler, anlamsız harf dizilimleri, Türkçe hece yapısına uymayan kelimeler KESİNLİKLE GEÇERSİZ (valid: false) sayılmalıdır.
-4. Özel isimler, şehir adları, şahıs adları, kısaltmalar TDK Güncel Türkçe Sözlük'te cins isim olarak yer almıyorsa geçersizdir.
-5. Kelime tam olarak ${wordLength} harfli olmalıdır. Türkçe karakter uyumluluğuna (ı, i, ş, ç, ğ, ü, ö) tam dikkat et.
-6. En ufak bir şüphen varsa, kelime uydurmaysa veya Türkçe sözlükte madde başı değilse kesinlikle 'valid': false olarak dönmelisin. Güvenli tarafta kalıp şüpheli veya uydurma/anlamsız kelimeleri kesinlikle reddet.
-
-Örnekler:
-- "kalem": valid = true (anlamlı sözlük kelimesi)
-- "asdas": valid = false (klavye tuşlaması/gibberish)
-- "kelim": valid = false (uydurma/anlamsız)
-- "kaleml": valid = false (uydurma/hatalı)
-- "qwerty": valid = false (klavye tuşlaması)
-- "blabla": valid = false (anlamsız kelime)
-- "harrf": valid = false (uydurma/hatalı harf tekrarı)
-- "sdffg": valid = false (klavye tuşlaması)
-- "yapacak": valid = false (çekimli fiil, sözlükte madde başı değildir)
-- "koştu": valid = false (çekimli fiil, sözlükte madde başı değildir)`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            valid: {
-              type: Type.BOOLEAN,
-              description: 'Kelime TDK sözlüğünde gerçekten mevcut ve anlamlı bir Türkçe kelime ise true, aksi halde false.'
-            },
-            definition: {
-              type: Type.STRING,
-              description: 'Kelimenin kısa TDK Türkçe sözlük anlamı/tanımı. Eğer kelime geçersizse açıklama/sebep.'
-            }
-          },
-          required: ['valid', 'definition']
-        }
-      }
+    // Default to false if offline or TDK API fails, as requested by the user.
+    return res.json({
+      valid: false,
+      definition: 'Sözlük doğrulama servisine şu an erişilemiyor veya kelime bulunamadı.'
     });
-
-    const resultText = response.text?.trim() || '{}';
-    const result = JSON.parse(resultText);
-
-    // Save to cache
-    wordCache[cacheKey] = result;
-
-    res.json(result);
-  } catch (error) {
-    // Use neutral info logging to avoid triggering false alarms in environment monitors
-    console.log(`[Word Validation] Validation active (local check applied).`);
-    
-    // Enter 5-minute cooldown quietly under high-demand/quota limits to prevent redundant calls
-    geminiCooldownUntil = Date.now() + 5 * 60 * 1000;
-
-    // Fallback to rejecting the word so we don't break dictionary rules
+  } catch (error: any) {
+    console.error('[Word Validation ERROR]:', error?.message || error);
     res.json({
       valid: false,
       definition: 'Sözlük doğrulanamadı ve kelime listenizde bulunamadı!'

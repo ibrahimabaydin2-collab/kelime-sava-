@@ -1,4 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;600;700&family=Montserrat:wght@400;600;700&family=Pacifico&family=Poppins:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;600;700&display=swap');
 @import "tailwindcss";
+
+.font-poppins {
+  font-family: 'Poppins', 'Inter', sans-serif;
+}
+
+.font-montserrat {
+  font-family: 'Montserrat', sans-serif;
+}
+
+.font-fredoka {
+  font-family: 'Fredoka', cursive, sans-serif;
+}
+
+.font-inter {
+  font-family: 'Inter', sans-serif;
+}
+
+.font-pacifico {
+  font-family: 'Pacifico', cursive;
+}
+
+.font-roboto-mono {
+  font-family: 'Roboto Mono', monospace;
+}
 
 @keyframes flicker {
   0%, 100% { transform: scale(1) rotate(-2deg); filter: brightness(1); }

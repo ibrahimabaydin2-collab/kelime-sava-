@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2, Wifi, Server, Key, Copy, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react';
+import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2, Wifi, Server, Key, Copy, ChevronDown, ChevronUp, ShieldCheck, Type } from 'lucide-react';
 import { BACKUP_TOKEN } from '../utils/tokenBackup';
 
 export interface AppSettings {
@@ -8,6 +8,7 @@ export interface AppSettings {
   keyboardLayout: 'Q' | 'F';
   soundEnabled: boolean;
   hapticEnabled: boolean;
+  fontFamily?: 'poppins' | 'montserrat' | 'fredoka' | 'inter' | 'pacifico' | 'roboto-mono';
 }
 
 interface SettingsModalProps {
@@ -178,6 +179,47 @@ export default function SettingsModal({
                 {settings.bgTheme === theme.id && (
                   <span className="absolute bottom-1 right-1 bg-emerald-500 text-white rounded-full p-0.5 shadow">
                     <Check size={10} />
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Section 2.5: Font Selection */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-2">
+            <Type size={14} />
+            Yazı Tipi Modu (Font Selection)
+          </h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {[
+              { id: 'poppins', name: 'Poppins', class: 'font-poppins', desc: 'Modern & Dengeli' },
+              { id: 'montserrat', name: 'Montserrat', class: 'font-montserrat', desc: 'Şık & Geometrik' },
+              { id: 'fredoka', name: 'Fredoka', class: 'font-fredoka', desc: 'Tombul & Eğlenceli' },
+              { id: 'inter', name: 'Inter', class: 'font-inter', desc: 'Minimalist & Net' },
+              { id: 'pacifico', name: 'Pacifico', class: 'font-pacifico', desc: 'El Yazısı Tarzı' },
+              { id: 'roboto-mono', name: 'Roboto Mono', class: 'font-roboto-mono', desc: 'Havalı Retro Kod' },
+            ].map((fontItem) => (
+              <button
+                key={fontItem.id}
+                onClick={() => updateSetting('fontFamily', fontItem.id as any)}
+                className={`p-2.5 rounded-xl border-2 flex flex-col justify-center items-center text-center gap-1 transition-all relative ${fontItem.class} ${
+                  settings.fontFamily === fontItem.id || (!settings.fontFamily && fontItem.id === 'poppins')
+                    ? 'border-emerald-500 bg-emerald-50/10 dark:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400 scale-[1.02] ring-2 ring-emerald-500/15 font-bold'
+                    : 'border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850/40 bg-slate-50/50 dark:bg-slate-950/20'
+                }`}
+              >
+                <span className="text-sm tracking-wide">
+                  {fontItem.name}
+                </span>
+                <span className="text-[9px] text-slate-400 dark:text-slate-500 block leading-tight font-sans">
+                  {fontItem.desc}
+                </span>
+                
+                {(settings.fontFamily === fontItem.id || (!settings.fontFamily && fontItem.id === 'poppins')) && (
+                  <span className="absolute top-1 right-1 bg-emerald-500 text-white rounded-full p-0.5 shadow">
+                    <Check size={8} />
                   </span>
                 )}
               </button>
