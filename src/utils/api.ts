@@ -1,8 +1,8 @@
 import { BACKUP_TOKEN } from './tokenBackup';
 import { Capacitor, CapacitorCookies } from '@capacitor/core';
 
-const DEPLOYED_APP_URL = "https://ais-pre-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app";
-const DEV_APP_URL = "https://ais-dev-vzpmai7eoao3e226nj2zhy-132556631899.europe-west2.run.app";
+const DEPLOYED_APP_URL = "https://kelime-sava.onrender.com";
+const DEV_APP_URL = "https://kelime-sava.onrender.com";
 
 export async function syncCapacitorCookies(): Promise<void> {
   if (typeof window === 'undefined') return;
@@ -53,7 +53,7 @@ if (typeof window !== 'undefined') {
       const customFetch = async function (this: any, input: any, init: any) {
         let url = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input as any).url);
         
-        if (url && (url.includes('run.app') || url.startsWith('/api/'))) {
+        if (url && (url.includes('run.app') || url.includes('onrender.com') || url.startsWith('/api/'))) {
           init = init || {};
           const headers = new Headers(init.headers || {});
           
