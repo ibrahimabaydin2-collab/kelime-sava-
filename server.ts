@@ -303,7 +303,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     // Call the user's live Render server instead of local Gemini API
-    const response = await fetch('https://kelime-sava.onrender.com/api/chat', {
+    const response = await fetch('https://kelime-sava-.onrender.com/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
