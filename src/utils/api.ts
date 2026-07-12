@@ -101,6 +101,15 @@ if (typeof window !== 'undefined') {
 export function getBaseUrl(): string {
   if (typeof window !== 'undefined') {
     try {
+      const hostname = window.location.hostname || '';
+      const isDevEnv = hostname.includes('run.app') || 
+                       hostname === 'localhost' || 
+                       hostname === '127.0.0.1';
+      
+      if (isDevEnv) {
+        return window.location.origin;
+      }
+
       const type = window.localStorage.getItem('kelimesavasi_server_type');
       if (type === 'dev') {
         return DEV_APP_URL;
@@ -114,7 +123,6 @@ export function getBaseUrl(): string {
       // If no explicit setting exists (e.g., fresh install), auto-detect based on host/platform:
       const isCapacitor = !!(window as any).Capacitor;
       const protocol = window.location.protocol || '';
-      const hostname = window.location.hostname || '';
       
       // Standalone hybrid apps (like Capacitor APK) must default to the public live server out-of-the-box
       const isHybrid = protocol === 'file:' || 
@@ -126,11 +134,7 @@ export function getBaseUrl(): string {
         return DEPLOYED_APP_URL;
       }
       
-      // Otherwise, check if we are currently previewing in the AI Studio development panel
-      const isDevEnv = hostname.includes('-dev-') || 
-                       hostname === 'localhost' || 
-                       hostname === '127.0.0.1';
-      return isDevEnv ? DEV_APP_URL : DEPLOYED_APP_URL;
+      return DEPLOYED_APP_URL;
     } catch (e) {}
   }
   return DEPLOYED_APP_URL;
