@@ -3,7 +3,7 @@ import {
   Swords, Play, Globe, ShieldAlert, Sparkles, 
   Trophy, Users, HelpCircle, ChevronDown, ChevronUp, 
   Copy, Check, Flame, Zap, Target, Edit2, User, Award, CheckCircle2, TrendingUp,
-  Sun, Moon, Sliders, BarChart2, X
+  Sun, Moon, Sliders, BarChart2, X, ArrowLeft
 } from 'lucide-react';
 import { UserProfile, LobbyPlayer, Challenge } from '../types.js';
 import { getBaseUrl } from '../utils/api.js';
@@ -73,6 +73,10 @@ export default function WelcomeScreen({
   const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [selectedMatchWords, setSelectedMatchWords] = useState<number>(3);
+  
+  // Game setup states
+  const [showGameSetup, setShowGameSetup] = useState<boolean>(false);
+  const [selectedTab, setSelectedTab] = useState<'solo' | 'pvp' | 'group'>('solo');
 
   // Profile Inline Editor State
   const [isEditing, setIsEditing] = useState<boolean>(false);
@@ -110,6 +114,263 @@ export default function WelcomeScreen({
   const winRate = profile.stats?.gamesPlayed
     ? Math.round(((profile.stats?.gamesWon || 0) / profile.stats.gamesPlayed) * 100)
     : 0;
+
+  if (showGameSetup) {
+    return (
+      <div className="w-full max-w-2xl mx-auto space-y-4 px-3 py-3 animate-scale-up animate-fade-in" id="welcome-setup-page">
+        {/* Beautiful Game Setup Navbar */}
+        <div className="flex justify-between items-center bg-slate-900/90 dark:bg-slate-950/90 border border-slate-800 dark:border-gray-800 rounded-2xl p-3 shadow-lg text-white">
+          <button
+            onClick={() => setShowGameSetup(false)}
+            className="flex items-center gap-1.5 text-xs font-black text-gray-300 hover:text-white transition bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl border border-white/5 cursor-pointer animate-fade-in"
+          >
+            <ArrowLeft size={14} />
+            <span>Geri Dön</span>
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <img 
+              src="./logo.svg" 
+              alt="Kelime Savaşı Logo" 
+              className="w-5.5 h-5.5 rounded-lg animate-pulse"
+              referrerPolicy="no-referrer"
+            />
+            <div className="text-right animate-fade-in">
+              <h2 className="text-xs font-black text-white uppercase tracking-tight leading-none">
+                Yeni Savaş Kur
+              </h2>
+              <p className="text-[7.5px] text-emerald-400 font-mono tracking-wider mt-0.5 leading-none">
+                MODUNU BELİRLE
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Setup Content - The frosted glass card */}
+        <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-gray-150 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-5 relative overflow-hidden" id="action-settings-card">
+          {/* Decorative subtle atmospheric color splash inside settings card */}
+          <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+
+          {/* STEP-BY-STEP GAME SETUP WIZARD */}
+          <div className="space-y-4" id="game-setup-wizard">
+            {/* Mode Tab Selector - Styled as premium large cards/buttons */}
+            <div className="grid grid-cols-3 gap-2">
+              {/* PvP Tab */}
+              <button
+                onClick={() => setSelectedTab('pvp')}
+                className={`py-3.5 px-2 rounded-2xl border transition duration-150 flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer ${
+                  selectedTab === 'pvp'
+                    ? 'bg-gradient-to-tr from-emerald-500 to-teal-500 border-emerald-400 text-white shadow-md shadow-emerald-500/10'
+                    : 'bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-400 border-gray-150 dark:border-gray-850 hover:bg-gray-100 dark:hover:bg-gray-900'
+                }`}
+              >
+                <span className="text-xl">⚔️</span>
+                <span className="text-[10px] font-black uppercase tracking-wider leading-none">1v1 Düello</span>
+              </button>
+
+              {/* Solo Tab */}
+              <button
+                onClick={() => setSelectedTab('solo')}
+                className={`py-3.5 px-2 rounded-2xl border transition duration-150 flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer ${
+                  selectedTab === 'solo'
+                    ? 'bg-gradient-to-tr from-emerald-500 to-teal-500 border-emerald-400 text-white shadow-md shadow-emerald-500/10'
+                    : 'bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-400 border-gray-150 dark:border-gray-850 hover:bg-gray-100 dark:hover:bg-gray-900'
+                }`}
+              >
+                <span className="text-xl">🧩</span>
+                <span className="text-[10px] font-black uppercase tracking-wider leading-none">Solo Pratik</span>
+              </button>
+
+              {/* Group Tab */}
+              {onStartGroupRace && (
+                <button
+                  onClick={() => setSelectedTab('group')}
+                  className={`py-3.5 px-2 rounded-2xl border transition duration-150 flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer ${
+                    selectedTab === 'group'
+                      ? 'bg-gradient-to-tr from-emerald-500 to-teal-500 border-emerald-400 text-white shadow-md shadow-emerald-500/10'
+                      : 'bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-400 border-gray-150 dark:border-gray-850 hover:bg-gray-100 dark:hover:bg-gray-900'
+                  }`}
+                >
+                  <span className="text-xl">🏆</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider leading-none">Grup Yarışı</span>
+                </button>
+              )}
+            </div>
+
+            {/* Parameter Controls specific to selected mode */}
+            {selectedTab !== 'group' && (
+              <div className="space-y-4 bg-gray-50/50 dark:bg-gray-950/25 p-4 rounded-2xl border border-gray-150 dark:border-gray-850/65">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Word Length Selector */}
+                  <div className="space-y-1.5 text-left">
+                    <span className="text-[9px] font-extrabold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase">HARF SAYISI</span>
+                    <div className="grid grid-cols-6 gap-1 p-0.5 bg-gray-50 dark:bg-gray-950 rounded-lg border border-gray-150 dark:border-gray-800">
+                      {[3, 4, 5, 6, 7, 8].map((len) => (
+                        <button
+                          key={len}
+                          onClick={() => onChangeWordLength(len)}
+                          className={`py-1.5 rounded-md text-[12px] font-black transition duration-150 ${
+                            wordLength === len
+                              ? 'bg-emerald-500 text-white shadow-sm'
+                              : 'text-gray-500 dark:text-gray-400 hover:bg-gray-250 dark:hover:bg-gray-800'
+                          }`}
+                        >
+                          {len}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Dictionary Mode Selector */}
+                  <div className="space-y-1.5 text-left">
+                    <span className="text-[9px] font-extrabold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase">SÖZLÜK MODU</span>
+                    <div className="grid grid-cols-2 gap-1 bg-gray-50 dark:bg-gray-950 p-0.5 rounded-lg border border-gray-150 dark:border-gray-800">
+                      <button
+                        onClick={() => onChangeDictionaryMode('tdk_online')}
+                        className={`py-1.5 rounded-md text-[12px] font-black transition duration-150 flex items-center justify-center gap-1.5 ${
+                          dictionaryMode === 'tdk_online'
+                            ? 'bg-white dark:bg-gray-900 text-emerald-600 dark:text-emerald-400 shadow-sm border border-gray-150 dark:border-gray-800'
+                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-250 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        <Globe size={12} />
+                        <span>TDK</span>
+                      </button>
+                      <button
+                        onClick={() => onChangeDictionaryMode('no_validation')}
+                        className={`py-1.5 rounded-md text-[12px] font-black transition duration-150 flex items-center justify-center gap-1.5 ${
+                          dictionaryMode === 'no_validation'
+                            ? 'bg-white dark:bg-gray-900 text-amber-500 dark:text-amber-400 shadow-sm border border-gray-150 dark:border-gray-800'
+                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-250 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        <ShieldAlert size={12} />
+                        <span>Serbest</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mode-specific secondary settings */}
+                {selectedTab === 'solo' ? (
+                  <div className="space-y-1.5 text-left border-t border-gray-100 dark:border-gray-850 pt-3">
+                    <span className="text-[9px] font-extrabold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase flex items-center gap-1">
+                      <Zap size={11} className="text-amber-500 animate-pulse" /> SÜRE DURUMU
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => onChangeGameMode('timed')}
+                        className={`py-2 px-3 rounded-xl text-[12px] font-black transition duration-150 flex items-center justify-center gap-2 border text-left cursor-pointer ${
+                          gameMode === 'timed'
+                            ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm'
+                            : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-150 dark:border-gray-850 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        <span>⏱️ Süreli Oyun</span>
+                      </button>
+                      <button
+                        onClick={() => onChangeGameMode('untimed')}
+                        className={`py-2 px-3 rounded-xl text-[12px] font-black transition duration-150 flex items-center justify-center gap-2 border text-left cursor-pointer ${
+                          gameMode === 'untimed'
+                            ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm'
+                            : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-150 dark:border-gray-850 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        <span>♾️ Süresiz Oyun</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 text-left border-t border-gray-100 dark:border-gray-850 pt-3">
+                    <span className="text-[9px] font-extrabold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase flex items-center gap-1">
+                      <Swords size={11} className="text-emerald-500" /> DÜELLO TUR SAYISI (KAÇ KELİME)
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setSelectedMatchWords(3)}
+                        className={`py-2 rounded-xl text-[12px] font-black transition duration-150 flex items-center justify-center gap-1.5 border cursor-pointer ${
+                          selectedMatchWords === 3
+                            ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm'
+                            : 'bg-white dark:bg-gray-900 text-gray-650 dark:text-gray-400 border-gray-150 dark:border-gray-850 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        <span>3 Kelime (3 Tur)</span>
+                      </button>
+                      <button
+                        onClick={() => setSelectedMatchWords(5)}
+                        className={`py-2 rounded-xl text-[12px] font-black transition duration-150 flex items-center justify-center gap-1.5 border cursor-pointer ${
+                          selectedMatchWords === 5
+                            ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm'
+                            : 'bg-white dark:bg-gray-900 text-gray-650 dark:text-gray-400 border-gray-150 dark:border-gray-850 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        <span>5 Kelime (5 Tur)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Launch Actions */}
+            {selectedTab === 'solo' && (
+              <button
+                onClick={() => {
+                  onStartSoloGame();
+                  setShowGameSetup(false);
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-black py-4 px-5 rounded-2xl border border-emerald-400 shadow-md hover:shadow-lg transition-all duration-150 active:scale-[0.98] text-xs uppercase tracking-widest cursor-pointer"
+              >
+                <Play size={14} className="fill-white" />
+                <span>Tek Oyuncu Başlat</span>
+              </button>
+            )}
+
+            {selectedTab === 'pvp' && (
+              <button
+                onClick={() => {
+                  onStartMatchmaking(selectedMatchWords);
+                  setShowGameSetup(false);
+                }}
+                disabled={matchmakingStatus === 'queued' || !isOnline}
+                className={`w-full flex items-center justify-center gap-2 font-black py-4 px-5 rounded-2xl transition-all duration-150 active:scale-[0.98] text-xs uppercase tracking-widest border cursor-pointer ${
+                  !isOnline
+                    ? 'bg-gray-50 dark:bg-gray-900/40 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-800 cursor-not-allowed opacity-60'
+                    : matchmakingStatus === 'queued'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400 shadow-lg shadow-orange-500/20 animate-pulse'
+                    : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/20 shadow-md'
+                }`}
+              >
+                <Swords size={14} className={matchmakingStatus === 'queued' ? 'animate-bounce' : ''} />
+                <span>{matchmakingStatus === 'queued' ? 'Aranıyor...' : '1v1 Düello Başlat'}</span>
+              </button>
+            )}
+
+            {selectedTab === 'group' && onStartGroupRace && (
+              <div className="space-y-3">
+                <div className="bg-amber-500/5 border border-dashed border-amber-500/25 p-3 rounded-xl text-left space-y-1">
+                  <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 block font-mono">GRUP TURNUVASI YARIŞI</span>
+                  <p className="text-[10.5px] text-gray-500 dark:text-gray-400 leading-normal">
+                    Aynı oda koduyla bağlanan tüm arkadaşlarınızla gerçek zamanlı olarak en hızlı kim kelimeyi bulacak yarışın!
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    onStartGroupRace();
+                    setShowGameSetup(false);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-500 hover:via-yellow-500 hover:to-amber-600 text-slate-950 font-black py-4 px-5 rounded-2xl shadow-md hover:shadow-lg transition-all duration-150 active:scale-[0.98] text-xs uppercase tracking-widest cursor-pointer border border-yellow-300/40"
+                >
+                  <Trophy size={14} />
+                  <span>Grup Yarış Odası Kur / Katıl</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-3 px-3 py-1.5 animate-fade-in" id="welcome-screen-root">
@@ -376,204 +637,66 @@ export default function WelcomeScreen({
           </div>
         )}
       </div>
-      
+
       {/* Play Settings & Action Hub - Beautiful blurred frosted card */}
-      <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border border-gray-150 dark:border-gray-800 rounded-3xl p-4 sm:p-5.5 shadow-xl space-y-4 relative overflow-hidden">
+      <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border border-gray-150 dark:border-gray-800 rounded-3xl p-4 sm:p-5.5 shadow-xl space-y-4 relative overflow-hidden" id="action-settings-card">
         {/* Decorative subtle atmospheric color splash inside settings card */}
         <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Quick Word Settings */}
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Word Length Selector */}
-            <div className="space-y-1 text-left">
-              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase">HARF SAYISI</span>
-              <div className="grid grid-cols-6 gap-0.5 p-0.5 bg-gray-50 dark:bg-gray-950 rounded-lg border border-gray-150 dark:border-gray-800">
-                {[3, 4, 5, 6, 7, 8].map((len) => (
-                  <button
-                    key={len}
-                    onClick={() => onChangeWordLength(len)}
-                    className={`py-1 rounded-md text-xs font-bold transition duration-150 ${
-                      wordLength === len
-                        ? 'bg-emerald-500 text-white shadow-sm'
-                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    {len}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Dictionary Mode Selector */}
-            <div className="space-y-1 text-left">
-              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase">SÖZLÜK MODU</span>
-              <div className="grid grid-cols-2 gap-0.5 bg-gray-50 dark:bg-gray-950 p-0.5 rounded-lg border border-gray-150 dark:border-gray-800">
-                <button
-                  onClick={() => onChangeDictionaryMode('tdk_online')}
-                  className={`py-1 rounded-md text-xs font-bold transition duration-150 flex items-center justify-center gap-1 ${
-                    dictionaryMode === 'tdk_online'
-                      ? 'bg-white dark:bg-gray-900 text-emerald-600 dark:text-emerald-400 shadow-sm border border-gray-150 dark:border-gray-800'
-                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <Globe size={11} />
-                  <span>TDK</span>
-                </button>
-                <button
-                  onClick={() => onChangeDictionaryMode('no_validation')}
-                  className={`py-1 rounded-md text-xs font-bold transition duration-150 flex items-center justify-center gap-1 ${
-                    dictionaryMode === 'no_validation'
-                      ? 'bg-white dark:bg-gray-900 text-amber-500 dark:text-amber-400 shadow-sm border border-gray-150 dark:border-gray-800'
-                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <ShieldAlert size={11} />
-                  <span>Serbest</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Game Mode Selector - Timed vs Untimed */}
-          <div className="space-y-1 text-left border-t border-gray-100 dark:border-gray-800 pt-2.5">
-            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase flex items-center gap-1">
-              <Zap size={11} className="text-amber-500 animate-pulse" /> OYUN MODU
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => onChangeGameMode('timed')}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition duration-150 flex items-center justify-center gap-2 border text-left cursor-pointer ${
-                  gameMode === 'timed'
-                    ? 'bg-emerald-500 border-emerald-400 text-white shadow-md shadow-emerald-500/10'
-                    : 'bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-400 border-transparent hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                <span className="text-sm">⏱️</span>
-                <span className={`text-xs font-black leading-tight ${gameMode === 'timed' ? 'text-white' : 'text-gray-700 dark:text-gray-200'}`}>Süreli Oyun</span>
-              </button>
-              <button
-                onClick={() => onChangeGameMode('untimed')}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition duration-150 flex items-center justify-center gap-2 border text-left cursor-pointer ${
-                  gameMode === 'untimed'
-                    ? 'bg-emerald-500 border-emerald-400 text-white shadow-md shadow-emerald-500/10'
-                    : 'bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-400 border-transparent hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                <span className="text-sm">♾️</span>
-                <span className={`text-xs font-black leading-tight ${gameMode === 'untimed' ? 'text-white' : 'text-gray-700 dark:text-gray-200'}`}>Süresiz Oyun</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Play Buttons */}
-        <div className="space-y-3 pt-1">
-          {/* 1v1 Online Matchmaking Round Selection */}
-          {isOnline && matchmakingStatus !== 'queued' && (
-            <div className="space-y-1.5 text-left bg-gray-50 dark:bg-gray-950 p-2.5 rounded-xl border border-gray-150 dark:border-gray-800">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 font-mono tracking-wider uppercase flex items-center gap-1">
-                  <Swords size={11} className="text-emerald-500" /> DÜELLO TUR ALTERNATİFİ (3 ya da 5 KELİME)
-                </span>
-                <span className="text-[10px] font-bold text-emerald-500 font-mono bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/60">
-                  {selectedMatchWords} Kelime
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setSelectedMatchWords(3)}
-                  className={`py-1.5 rounded-lg text-xs font-black transition duration-150 flex items-center justify-center gap-1.5 border cursor-pointer ${
-                    selectedMatchWords === 3
-                      ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm shadow-emerald-500/10'
-                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:bg-gray-150 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <span>3 Kelime (3 Tur)</span>
-                </button>
-                <button
-                  onClick={() => setSelectedMatchWords(5)}
-                  className={`py-1.5 rounded-lg text-xs font-black transition duration-150 flex items-center justify-center gap-1.5 border cursor-pointer ${
-                    selectedMatchWords === 5
-                      ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm shadow-emerald-500/10'
-                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:bg-gray-150 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <span>5 Kelime (5 Tur)</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 1v1 Online Matchmaking */}
+        {/* SINGLE CLEAN 'OYUNA BAŞLA' BUTTON */}
+        <div className="space-y-3.5 animate-fade-in" id="clean-play-trigger">
           <button
-            onClick={() => onStartMatchmaking(selectedMatchWords)}
-            disabled={matchmakingStatus === 'queued' || !isOnline}
-            className={`w-full flex items-center justify-between font-black py-3 px-5 rounded-xl transition-all duration-150 active:scale-[0.98] text-xs uppercase tracking-widest border cursor-pointer ${
-              !isOnline 
-                ? 'bg-gray-50 dark:bg-gray-900/40 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-800 cursor-not-allowed opacity-60'
-                : matchmakingStatus === 'queued'
-                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400 shadow-lg shadow-orange-500/20 animate-pulse'
-                : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/20 shadow-md'
-            }`}
+            onClick={() => {
+              setShowGameSetup(true);
+              // Default to 'pvp' if online, else 'solo'
+              setSelectedTab(isOnline ? 'pvp' : 'solo');
+            }}
+            className="w-full relative group overflow-hidden bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-extrabold py-5 px-6 rounded-2xl transition-all duration-300 active:scale-[0.98] shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 flex flex-col items-center justify-center cursor-pointer border border-emerald-400"
+            id="start-game-wizard-button"
           >
-            <div className="flex items-center gap-2">
-              <Swords size={14} className={matchmakingStatus === 'queued' ? 'animate-bounce' : ''} />
-              <span>{matchmakingStatus === 'queued' ? 'Eşleşme Aranıyor...' : '1v1 Online Düello'}</span>
-            </div>
-            <span className="text-[10px] opacity-80 font-mono">
-              {!isOnline ? 'ÇEVRİMDIŞI' : matchmakingStatus === 'queued' ? 'BEKLENİYOR' : 'HEMEN OYNA'}
+            <div className="absolute inset-0 bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-500 opacity-0 group-hover:opacity-100 transition duration-500 blur-md -z-10" />
+            <span className="text-lg sm:text-xl font-black tracking-wider uppercase flex items-center gap-2.5 drop-shadow-md">
+              <Swords className="animate-pulse" size={20} /> OYUNA BAŞLA <Swords className="animate-pulse" size={20} />
+            </span>
+            <span className="text-[9.5px] text-emerald-100 font-mono tracking-wider mt-1 uppercase opacity-90">
+              Solo Pratik Yap, Düelloya Katıl veya Turnuvaya Gir!
             </span>
           </button>
 
-          {/* Solo Game - Made Primary */}
-          <button
-            onClick={onStartSoloGame}
-            className="w-full flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-850 hover:to-slate-950 dark:from-slate-750 dark:to-slate-850 dark:hover:from-slate-800 dark:hover:to-slate-900 text-white font-black py-3 px-5 rounded-xl border border-slate-750 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-150 active:scale-[0.98] text-xs uppercase tracking-widest cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <Play size={12} className="fill-white" />
-              <span>Tek Oyuncu Pratik</span>
-            </div>
-            <span className="text-[10px] text-gray-400 font-mono">SOLO OYNA</span>
-          </button>
-
-          {/* Group Race Tournament */}
-          {onStartGroupRace && (
-            <button
-              onClick={onStartGroupRace}
-              className="w-full flex items-center justify-between bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-500 hover:via-yellow-500 hover:to-amber-600 text-slate-950 font-black py-3 px-5 rounded-xl shadow-md hover:shadow-lg transition-all duration-150 active:scale-[0.98] text-xs uppercase tracking-widest cursor-pointer border border-yellow-300/40"
-            >
-              <div className="flex items-center gap-2">
-                <Trophy size={13} />
-                <span>Grup Yarışı (Turnuva)</span>
+          {/* Matchmaking Queue Status - Always visible when active even if setup closed */}
+          {matchmakingStatus === 'queued' && (
+            <div className="bg-amber-500/10 border border-amber-500/30 p-3 sm:p-3.5 rounded-xl flex items-center justify-between animate-fade-in" id="matchmaking-queue-status">
+              <div className="text-left">
+                <span className="text-[10px] sm:text-xs font-black text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-mono uppercase tracking-wide">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                  </span>
+                  Eşleşme Aranıyor...
+                </span>
+                <span className="text-[9.5px] text-gray-500 dark:text-gray-400 block mt-0.5">
+                  {wordLength} Harfli • {selectedMatchWords} Kelimelik Maç • Lobi bekletiliyor
+                </span>
               </div>
-              <span className="text-[10px] text-slate-900/75 font-mono">YENİ MOD</span>
-            </button>
+              <button
+                onClick={() => onStartMatchmaking(selectedMatchWords)}
+                className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[9.5px] uppercase tracking-wider rounded-lg transition duration-150 shadow-sm cursor-pointer"
+              >
+                Sıradan Çık
+              </button>
+            </div>
           )}
         </div>
-
-        {/* Matchmaking Queue Banner */}
-        {matchmakingStatus === 'queued' && (
-          <div className="bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/50 dark:border-amber-900/40 p-2.5 rounded-xl text-center space-y-1 animate-fade-in text-left">
-            <span className="text-xs font-bold text-amber-700 dark:text-amber-400 block font-mono">
-              Rakip Aranıyor... ({wordLength} Harf)
-            </span>
-            <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-normal">
-              Aynı sayıda harf seçen aktif bir rakip aranıyor. Lütfen ayrılmayın.
-            </p>
-          </div>
-        )}
 
         {/* Direct Challenge Notification on Main Screen */}
         {activeChallenges.length > 0 && (
-          <div className="bg-amber-500/10 border-2 border-dashed border-amber-500/30 p-3 rounded-xl space-y-2 animate-pulse text-left relative overflow-hidden mt-2">
+          <div className="bg-amber-500/10 border-2 border-dashed border-amber-500/30 p-3 rounded-xl space-y-2 animate-pulse text-left relative overflow-hidden mt-2" id="direct-challenge-container">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 font-mono flex items-center gap-1">
                 <Zap size={11} className="text-amber-500 fill-current animate-bounce" />
                 DÜELLO DAVETİ VAR!
               </span>
-              <button 
+              <button
                 onClick={() => setShowFriendsModal(true)}
                 className="text-[9px] font-bold text-amber-600 dark:text-amber-400 underline hover:text-amber-700 cursor-pointer"
               >

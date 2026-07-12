@@ -248,10 +248,28 @@ app.post('/api/validate-word', async (req, res) => {
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.5-flash',
-      contents: `Lütfen "${normalized}" kelimesinin Türkçe TDK sözlüğünde yer alan geçerli, anlamlı, 3, 4, 5, 6, 7 veya 8 harfli (${wordLength} harfli) bir kelime olup olmadığını kontrol et. 
-      Sadece isimler, sıfatlar, zarflar veya mastar halindeki fiiller (örn: "yapmak", "gelmek" değil, "yapma", "gelme" veya isim kökü) gibi kelimeler geçerli sayılmalıdır. 
-      Özel isimler, uydurma kelimeler veya anlamsız harf dizilimleri GEÇERSİZ sayılmalıdır.
-      Türkçe karakter uyumluluğuna dikkat et. Kelime ${wordLength} harfli olmalıdır.`,
+      contents: `Sen son derece katı bir Türkçe TDK Sözlük doğrulama motorusun.
+Görevin, "${normalized}" kelimesinin TDK (Türk Dil Kurumu) Güncel Türkçe Sözlük'te birebir yer alan, gerçek, anlamlı ve geçerli bir Türkçe kelime olup olmadığını kontrol etmektir.
+
+Kurallar:
+1. Sadece standart TDK sözlüğünde doğrudan madde başı olarak bulunan isimler, sıfatlar, zarflar veya isim-fiil/mastar kökenli kelimeler geçerli (valid: true) sayılmalıdır.
+2. Çekim ekleri veya şahıs/zaman ekleri (yönelme, bulunma, ayrılma, çoğul, dı/di geçmiş zaman, yor şimdiki zaman vb.) almış kelimeler, eğer TDK sözlüğünde müstakil bir madde başı olarak tanımlı değillerse GEÇERSİZ (valid: false) sayılmalıdır. Örnek: "kalemler" veya "eve" veya "koştu" geçersizdir; "kalem", "ev", "koşma" geçerlidir.
+3. Rastgele basılmış harfler (keyboard smash), uydurma kelimeler, anlamsız harf dizilimleri, Türkçe hece yapısına uymayan kelimeler KESİNLİKLE GEÇERSİZ (valid: false) sayılmalıdır.
+4. Özel isimler, şehir adları, şahıs adları, kısaltmalar TDK Güncel Türkçe Sözlük'te cins isim olarak yer almıyorsa geçersizdir.
+5. Kelime tam olarak ${wordLength} harfli olmalıdır. Türkçe karakter uyumluluğuna (ı, i, ş, ç, ğ, ü, ö) tam dikkat et.
+6. En ufak bir şüphen varsa, kelime uydurmaysa veya Türkçe sözlükte madde başı değilse kesinlikle 'valid': false olarak dönmelisin. Güvenli tarafta kalıp şüpheli veya uydurma/anlamsız kelimeleri kesinlikle reddet.
+
+Örnekler:
+- "kalem": valid = true (anlamlı sözlük kelimesi)
+- "asdas": valid = false (klavye tuşlaması/gibberish)
+- "kelim": valid = false (uydurma/anlamsız)
+- "kaleml": valid = false (uydurma/hatalı)
+- "qwerty": valid = false (klavye tuşlaması)
+- "blabla": valid = false (anlamsız kelime)
+- "harrf": valid = false (uydurma/hatalı harf tekrarı)
+- "sdffg": valid = false (klavye tuşlaması)
+- "yapacak": valid = false (çekimli fiil, sözlükte madde başı değildir)
+- "koştu": valid = false (çekimli fiil, sözlükte madde başı değildir)`,
       config: {
         responseMimeType: 'application/json',
         responseSchema: {
