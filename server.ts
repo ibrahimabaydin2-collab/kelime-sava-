@@ -233,17 +233,16 @@ app.post('/api/validate-word', async (req, res) => {
     // 2.5 Check cooldown for Gemini API (Fallback option if TDK API is down)
     if (Date.now() < geminiCooldownUntil) {
       return res.json({
-        valid: true,
-        definition: 'Yapay zeka şu an yoğun, kelimeniz otomatik kabul edildi.'
+        valid: false,
+        definition: 'Sözlük doğrulama sunucusu yoğun ve kelime listemizde bulunamadı!'
       });
     }
 
     // 3. Fallback to Gemini AI Validation
     if (!process.env.GEMINI_API_KEY) {
-      // If API key is missing, accept word as valid to not block gameplay, with a warning
       return res.json({
-        valid: true,
-        definition: 'Yapay zeka doğrulaması devre dışı (API Anahtarı eksik).'
+        valid: false,
+        definition: 'Sözlük doğrulama servisi geçici olarak aktif değil ve kelime listemizde bulunamadı!'
       });
     }
 
@@ -286,10 +285,10 @@ app.post('/api/validate-word', async (req, res) => {
     // Enter 5-minute cooldown quietly under high-demand/quota limits to prevent redundant calls
     geminiCooldownUntil = Date.now() + 5 * 60 * 1000;
 
-    // Fallback to allowing the word so we don't break the game
+    // Fallback to rejecting the word so we don't break dictionary rules
     res.json({
-      valid: true,
-      definition: 'Bağlantı hatası veya yoğunluk nedeniyle kelime otomatik kabul edildi.'
+      valid: false,
+      definition: 'Sözlük doğrulanamadı ve kelime listenizde bulunamadı!'
     });
   }
 });
