@@ -9,6 +9,7 @@ import {
 import { UserProfile, LobbyPlayer, Challenge } from '../types.js';
 import { getBaseUrl } from '../utils/api.js';
 import { validateUsername } from '../utils/usernameValidation.js';
+import { getDailyWordAndLength } from '../data/wordlist.js';
 
 interface WelcomeScreenProps {
   profile: UserProfile;
@@ -40,6 +41,8 @@ interface WelcomeScreenProps {
   onAcceptChallenge?: (challengeId: string) => void;
   onDeclineChallenge?: (challengeId: string) => void;
   onReconnect?: () => void;
+  onStartDailyPuzzle?: () => void;
+  isDailyPuzzleCompletedToday?: boolean;
 }
 
 export default function WelcomeScreen({
@@ -67,7 +70,9 @@ export default function WelcomeScreen({
   activeChallenges = [],
   onChallenge,
   onAcceptChallenge,
-  onDeclineChallenge
+  onDeclineChallenge,
+  onStartDailyPuzzle,
+  isDailyPuzzleCompletedToday = false
 }: WelcomeScreenProps) {
   const [showHowToPlay, setShowHowToPlay] = useState<boolean>(false);
   const [showMissions, setShowMissions] = useState<boolean>(false);
@@ -140,11 +145,60 @@ export default function WelcomeScreen({
 
   // Determine dynamic inclusive player title based on dailyScore
   const getWarriorTitle = (score: number) => {
-    if (score < 100) return '1. Seviye: Kelime Kaşifi 🔍';
-    if (score < 500) return '2. Seviye: Hece Gezgini 🗺️';
-    if (score < 1500) return '3. Seviye: Sözcük Mimarı 🧱';
-    if (score < 3000) return '4. Seviye: Dil Sanatçısı 🎨';
+    if (score < 25) return '1. Seviye: Kelime Kaşifi 🔍';
+    if (score < 75) return '2. Seviye: Hece Gezgini 🗺️';
+    if (score < 150) return '3. Seviye: Sözcük Mimarı 🧱';
+    if (score < 250) return '4. Seviye: Dil Sanatçısı 🎨';
     return '5. Seviye: Efsanevi Kelime Bilgesi 👑';
+  };
+
+  // Calculate detailed progress towards the next level
+  const getLevelProgress = (score: number) => {
+    let currentLevelScore = 0;
+    let nextLevelScore = 25;
+    let level = 1;
+    let title = 'Kelime Kaşifi 🔍';
+
+    if (score < 25) {
+      currentLevelScore = 0;
+      nextLevelScore = 25;
+      level = 1;
+      title = 'Kelime Kaşifi 🔍';
+    } else if (score < 75) {
+      currentLevelScore = 25;
+      nextLevelScore = 75;
+      level = 2;
+      title = 'Hece Gezgini 🗺️';
+    } else if (score < 150) {
+      currentLevelScore = 75;
+      nextLevelScore = 150;
+      level = 3;
+      title = 'Sözcük Mimarı 🧱';
+    } else if (score < 250) {
+      currentLevelScore = 150;
+      nextLevelScore = 250;
+      level = 4;
+      title = 'Dil Sanatçısı 🎨';
+    } else {
+      currentLevelScore = 250;
+      nextLevelScore = 250;
+      level = 5;
+      title = 'Efsanevi Kelime Bilgesi 👑';
+    }
+
+    const range = nextLevelScore - currentLevelScore;
+    const progressInLevel = score - currentLevelScore;
+    const percent = range > 0 ? Math.min(100, Math.max(0, (progressInLevel / range) * 100)) : 100;
+
+    return {
+      level,
+      title,
+      currentLevelScore,
+      nextLevelScore,
+      percent,
+      progressInLevel,
+      range
+    };
   };
 
   // Filter other online players
@@ -176,7 +230,7 @@ export default function WelcomeScreen({
 
   if (showGameSetup) {
     return (
-      <div className="w-full max-w-2xl mx-auto bg-[#2E3748] rounded-[2.5rem] border-2 border-[#3E485A] p-8 sm:p-10 md:p-12 shadow-2xl relative overflow-hidden text-white flex flex-col justify-center items-stretch gap-y-6 sm:gap-y-8 animate-scale-up" id="welcome-setup-page">
+      <div className="w-full max-w-2xl mx-auto card-theme rounded-[2.5rem] border-2 p-8 sm:p-10 md:p-12 shadow-2xl relative overflow-hidden flex flex-col justify-center items-stretch gap-y-6 sm:gap-y-8 animate-scale-up" id="welcome-setup-page">
         {/* Decorative ambient glowing background rings */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-52 h-52 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -506,7 +560,7 @@ export default function WelcomeScreen({
   }
 
   return isEditing ? (
-    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-5 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col justify-between gap-y-[3.5vh] sm:gap-5 min-h-[82vh] md:min-h-0 animate-scale-up" id="welcome-screen-root">
+    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border p-5 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between gap-y-[3.5vh] sm:gap-5 min-h-[82vh] md:min-h-0 animate-scale-up" id="welcome-screen-root">
       {/* Sparkles / Title */}
       <div className="flex justify-between items-center pb-2 border-b border-white/10">
         <span className="text-sm font-bold font-mono text-amber-200 uppercase tracking-widest flex items-center gap-1.5">
@@ -648,7 +702,7 @@ export default function WelcomeScreen({
       </div>
     </div>
   ) : (
-    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-5 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col justify-between gap-y-[3.5vh] sm:gap-6 min-h-[82vh] md:min-h-0" id="welcome-screen-root">
+    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border p-5 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between gap-y-[3.5vh] sm:gap-6 min-h-[82vh] md:min-h-0" id="welcome-screen-root">
       
       {/* Glowing 4-point star accent in bottom right */}
       <div className="absolute bottom-6 right-8 text-amber-100/30 animate-pulse select-none pointer-events-none">
@@ -728,8 +782,35 @@ export default function WelcomeScreen({
           </div>
         </div>
         
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center w-full max-w-xs">
           <span className="text-base font-serif tracking-widest text-amber-100/95 font-normal lowercase">{profile.name}</span>
+          
+          {/* Dynamic Premium Level Title */}
+          <span className="text-xs font-black text-amber-400 uppercase tracking-widest font-mono mt-1.5 flex items-center gap-1">
+            {getWarriorTitle(profile.dailyScore)}
+          </span>
+
+          {/* Level Progress Bar */}
+          {(() => {
+            const progress = getLevelProgress(profile.dailyScore);
+            return (
+              <div className="w-full mt-2 px-6">
+                <div className="flex justify-between text-[10px] font-bold text-gray-400 font-mono mb-1">
+                  <span>{progress.currentLevelScore} Puan</span>
+                  <span className="text-amber-300">
+                    {progress.level < 5 ? `${progress.progressInLevel}/${progress.range} Puan` : 'Efsanevi Maks Seviye!'}
+                  </span>
+                  <span>{progress.level < 5 ? `${progress.nextLevelScore} Puan` : '∞'}</span>
+                </div>
+                <div className="w-full bg-black/45 h-2 rounded-full overflow-hidden p-[2px] border border-white/5 shadow-inner">
+                  <div 
+                    style={{ width: `${progress.percent}%` }}
+                    className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-300 rounded-full transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(251,191,36,0.3)]"
+                  />
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -812,6 +893,59 @@ export default function WelcomeScreen({
         )}
       </div>
 
+      {/* Günün Bulmacası (Daily Puzzle) Card */}
+      <div className="w-full">
+        {isDailyPuzzleCompletedToday ? (
+          <div className="w-full bg-slate-800/40 border border-emerald-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg backdrop-blur-sm animate-fade-in">
+            <div className="flex items-center gap-3 text-left">
+              <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center border border-emerald-500/20 shadow-inner">
+                <CheckCircle2 size={24} className="animate-pulse" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-widest font-mono">Günün Bulmacası</h4>
+                <p className="text-sm font-black text-[#FAF6E9] mt-0.5">Harika! Bugünün kelimesini çözdün 🎯</p>
+                <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                  <Award size={12} className="text-emerald-400" />
+                  +100 Puan & 'Günlük Bilge' Rozeti Hesabına Eklendi!
+                </p>
+              </div>
+            </div>
+            <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-xl px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wide">
+              TAMAMLANDI
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => onStartDailyPuzzle?.()}
+            className="w-full relative group overflow-hidden bg-slate-800/40 hover:bg-slate-800/60 border border-amber-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-left transition-all duration-300 shadow-[0_4px_20px_rgba(245,158,11,0.15)] active:scale-[0.99] cursor-pointer"
+          >
+            <div className="flex items-center gap-3.5 text-left w-full sm:w-auto">
+              <div className="w-12 h-12 bg-amber-500/10 text-amber-400 rounded-xl flex items-center justify-center border border-amber-500/30 group-hover:scale-110 transition duration-300 shadow-md">
+                <Puzzle size={24} className="text-amber-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-extrabold bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono animate-pulse">AKTİF</span>
+                  <h4 className="text-xs font-black text-amber-400 uppercase tracking-widest font-mono">GÜNÜN BULMACASI</h4>
+                </div>
+                <p className="text-sm font-black text-[#FAF6E9] mt-1">Zihnini Zorla: <span className="text-amber-300">{getDailyWordAndLength().length} Harfli</span> Gizemli Kelime!</p>
+                <p className="text-[10px] text-gray-300 mt-1 flex items-center gap-1">
+                  <Sparkles size={11} className="text-amber-400 fill-amber-400/20" />
+                  Ödül: +100 Ekstra Puan & Özel 'Günlük Bilge' Rozeti!
+                </p>
+              </div>
+            </div>
+
+            <div className="w-full sm:w-auto flex justify-end shrink-0">
+              <div className="px-4 py-2 bg-amber-500 group-hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition shadow-md flex items-center gap-1.5">
+                <span>HEMEN ÇÖZ</span>
+                <Play size={12} className="fill-current" />
+              </div>
+            </div>
+          </button>
+        )}
+      </div>
+
       {/* Beautiful Cream Action Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 w-full">
         {/* Button 1: REKABET */}
@@ -857,7 +991,7 @@ export default function WelcomeScreen({
       {/* Rules Detail Popup Modal */}
       {showRulesModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2rem] p-6 w-full max-w-lg shadow-2xl space-y-4 animate-scale-up text-left text-white relative overflow-hidden">
+          <div className="card-theme rounded-[2rem] p-6 w-full max-w-lg shadow-2xl space-y-4 animate-scale-up text-left relative overflow-hidden">
             {/* Glowing 4-point star accent in bottom right */}
             <div className="absolute bottom-6 right-8 text-amber-100/15 animate-pulse select-none pointer-events-none">
               <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
@@ -996,7 +1130,7 @@ export default function WelcomeScreen({
       {/* Active Friends Modal (Aktif Arkadaşlar) */}
       {showFriendsModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2rem] p-6 w-full max-w-md shadow-2xl space-y-4 animate-scale-up text-left text-white relative overflow-hidden">
+          <div className="card-theme rounded-[2rem] p-6 w-full max-w-md shadow-2xl space-y-4 animate-scale-up text-left relative overflow-hidden">
             {/* Glowing 4-point star accent in bottom right */}
             <div className="absolute bottom-6 right-8 text-amber-100/15 animate-pulse select-none pointer-events-none">
               <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">

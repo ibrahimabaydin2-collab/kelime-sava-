@@ -20,8 +20,8 @@ import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import AuthScreen from './components/AuthScreen.js';
 import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore } from './lib/firebase.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge } from './types.js';
-import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info } from 'lucide-react';
-import { getRandomWord, isWordInCuratedList } from './data/wordlist.js';
+import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play } from 'lucide-react';
+import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/turkish.js';
 import { getApiUrl, getWsUrl } from './utils/api.js';
 
@@ -39,7 +39,8 @@ const DEFAULT_BADGES: Badge[] = [
   { id: 'lightning', title: 'Yıldırım Çözücü', description: '10 saniyeden fazla süre varken kelimeyi çöz', iconName: 'Award' },
   { id: 'flawless', title: 'Kusursuz', description: 'Kelimeyi ilk veya ikinci denemede doğru bil', iconName: 'Award' },
   { id: 'genius', title: 'Zeka Küpü', description: '8 harfli bir kelimeyi başarıyla tamamla', iconName: 'Award' },
-  { id: 'gladiator', title: 'Gladyatör', description: 'Gerçek zamanlı bir arkadaş meydan okumasını kazan', iconName: 'Award' }
+  { id: 'gladiator', title: 'Gladyatör', description: 'Gerçek zamanlı bir arkadaş meydan okumasını kazan', iconName: 'Award' },
+  { id: 'daily_puzzle_solver', title: 'Günlük Bilge', description: 'Günün bulmacasını başarıyla çöz', iconName: 'Calendar' }
 ];
 
 const DEFAULT_MISSIONS: DailyMission[] = [
@@ -331,7 +332,17 @@ export default function App() {
         const parsed = JSON.parse(saved);
         // Ensure missions and badges structures are complete and upgraded if old
         if (!parsed.missions || parsed.missions.length < 10) parsed.missions = DEFAULT_MISSIONS;
-        if (!parsed.badges) parsed.badges = DEFAULT_BADGES;
+        if (!parsed.badges) {
+          parsed.badges = DEFAULT_BADGES;
+        } else {
+          // Merge default badges to ensure any newly added badges are present
+          const existingIds = parsed.badges.map((b: any) => b.id);
+          DEFAULT_BADGES.forEach(badge => {
+            if (!existingIds.includes(badge.id)) {
+              parsed.badges.push(badge);
+            }
+          });
+        }
         // Backward-compatibility: if user has already entered the game before, assume name is set
         if (parsed.nameSet === undefined) {
           parsed.nameSet = true;
@@ -363,6 +374,7 @@ export default function App() {
 
   // Game Play State
   const [wordLength, setWordLength] = useState<number>(5);
+  const [isDailyPuzzle, setIsDailyPuzzle] = useState<boolean>(false);
   const [targetWord, setTargetWord] = useState<string>('');
   const [attempts, setAttempts] = useState<GameAttempt[]>([]);
   const [currentAttempt, setCurrentAttempt] = useState<string>('');
@@ -393,6 +405,93 @@ export default function App() {
   const [isGroupRaceActive, setIsGroupRaceActive] = useState<boolean>(false);
   const [groupRaceInitialMode, setGroupRaceInitialMode] = useState<'online' | 'offline' | undefined>(undefined);
 
+  // Settings state moved up to avoid block scope issues with notification effects
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    const saved = safeLocalStorage.getItem('kelimesavasi_settings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed parsing settings', e);
+      }
+    }
+    return {
+      boardTheme: 'classic',
+      bgTheme: 'default',
+      keyboardLayout: 'Q',
+      soundEnabled: true,
+      hapticEnabled: true,
+      fontFamily: 'poppins'
+    };
+  });
+
+  useEffect(() => {
+    safeLocalStorage.setItem('kelimesavasi_settings', JSON.stringify(settings));
+  }, [settings]);
+
+  // Retention notification state
+  const [retentionNotification, setRetentionNotification] = useState<{ message: string } | null>(null);
+
+  // Retention notification effect
+  useEffect(() => {
+    const isNotificationOn = settings.notificationEnabled !== false;
+    const lastActiveStr = safeLocalStorage.getItem('kelimesavasi_last_active_time');
+    const currentTime = Date.now();
+    
+    if (lastActiveStr && isNotificationOn) {
+      try {
+        const lastActiveTime = new Date(lastActiveStr).getTime();
+        const diffMs = currentTime - lastActiveTime;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        
+        if (diffDays >= 3) {
+          const RETENTION_MESSAGES = [
+            'Kelimeler seni özledi, günün bulmacasını kaçırma! 🧩',
+            'Zihnini çalıştırmaya ne dersin? Yeni bulmaca hazır! ⚡',
+            'Günün gizemli kelimesini çözüp "Günlük Bilge" rozetini kapmaya hazır mısın? 🎖️',
+            'Savaşçı! Kelime tahtası boş kaldı, bugün zekanı konuşturma zamanı! ⚔️',
+            'Zirvedeki yerini korumak için bugün de kelimeleri avla! 🏆'
+          ];
+          const randomMsg = RETENTION_MESSAGES[Math.floor(Math.random() * RETENTION_MESSAGES.length)];
+          setRetentionNotification({ message: randomMsg });
+          
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Kelime Savaşı', { body: randomMsg, icon: '/favicon.ico' });
+          } else if ('Notification' in window && Notification.permission !== 'denied') {
+            Notification.requestPermission().then(permission => {
+              if (permission === 'granted') {
+                new Notification('Kelime Savaşı', { body: randomMsg, icon: '/favicon.ico' });
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Failed checking retention inactivity', e);
+      }
+    }
+    
+    safeLocalStorage.setItem('kelimesavasi_last_active_time', new Date().toISOString());
+  }, [settings.notificationEnabled]);
+
+  // Expose retention notification simulator helper
+  useEffect(() => {
+    (window as any).__simulateRetentionNotification = () => {
+      const RETENTION_MESSAGES = [
+        'Kelimeler seni özledi, günün bulmacasını kaçırma! 🧩',
+        'Zihnini çalıştırmaya ne dersin? Yeni bulmaca hazır! ⚡',
+        'Günün gizemli kelimesini çözüp "Günlük Bilge" rozetini kapmaya hazır mısın? 🎖️',
+        'Savaşçı! Kelime tahtası boş kaldı, bugün zekanı konuşturma zamanı! ⚔️',
+        'Zirvedeki yerini korumak için bugün de kelimeleri avla! 🏆'
+      ];
+      const randomMsg = RETENTION_MESSAGES[Math.floor(Math.random() * RETENTION_MESSAGES.length)];
+      setRetentionNotification({ message: randomMsg });
+      showToast('3 Günlük Hareketsizlik Algılandı! Bildirim Simüle Edildi.', 'info');
+    };
+    return () => {
+      delete (window as any).__simulateRetentionNotification;
+    };
+  }, []);
+
   // UI Modals / Alerts
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'error' | 'success' } | null>(null);
   const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
@@ -420,28 +519,7 @@ export default function App() {
       onConfirm,
     });
   };
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = safeLocalStorage.getItem('kelimesavasi_settings');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed parsing settings', e);
-      }
-    }
-    return {
-      boardTheme: 'classic',
-      bgTheme: 'default',
-      keyboardLayout: 'Q',
-      soundEnabled: true,
-      hapticEnabled: true,
-      fontFamily: 'poppins'
-    };
-  });
 
-  useEffect(() => {
-    safeLocalStorage.setItem('kelimesavasi_settings', JSON.stringify(settings));
-  }, [settings]);
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [nameInput, setNameInput] = useState<string>(profile.name);
   const [avatarInput, setAvatarInput] = useState<string | undefined>(profile.avatarUrl);
@@ -947,7 +1025,7 @@ export default function App() {
   };
 
   // Start a new solo game
-  const startNewGame = async (length: number = wordLength) => {
+  const startNewGame = async (length: number = wordLength, isDaily: boolean = isDailyPuzzle) => {
     setIsValidating(true);
     setAttempts([]);
     setCurrentAttempt('');
@@ -959,26 +1037,33 @@ export default function App() {
     setActiveMatch(null); // Clear any active multiplayer match
 
     let picked = '';
-    try {
-      const response = await fetch(getApiUrl('/api/random-word'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ length })
-      });
-      const data = await response.json();
-      if (data.word) {
-        picked = turkishUpper(data.word);
-      } else {
+    if (isDaily) {
+      const dailyInfo = getDailyWordAndLength();
+      picked = dailyInfo.word;
+      length = dailyInfo.length;
+      setWordLength(length);
+    } else {
+      try {
+        const response = await fetch(getApiUrl('/api/random-word'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ length })
+        });
+        const data = await response.json();
+        if (data.word) {
+          picked = turkishUpper(data.word);
+        } else {
+          picked = getRandomWord(length);
+        }
+      } catch (e) {
+        console.warn('Could not retrieve random word from server, falling back to local wordlist:', e);
         picked = getRandomWord(length);
       }
-    } catch (e) {
-      console.warn('Could not retrieve random word from server, falling back to local wordlist:', e);
-      picked = getRandomWord(length);
-    } finally {
-      setTargetWord(picked);
-      setCurrentAttempt('');
-      setIsValidating(false);
     }
+
+    setTargetWord(picked);
+    setCurrentAttempt('');
+    setIsValidating(false);
   };
 
   // Clean up and reset game state when leaving the game screen
@@ -1244,7 +1329,19 @@ export default function App() {
 
       // Check if won
       const hasWon = feedback.every((f) => f === 'green');
-      const scoreAwarded = hasWon ? Math.max(100 + secondsLeft * 5 - updatedAttempts.length * 10, 50) : 0;
+      let scoreAwarded = 0;
+      if (hasWon) {
+        const attemptsCount = updatedAttempts.length;
+        if (attemptsCount === 1) scoreAwarded = 5;
+        else if (attemptsCount === 2) scoreAwarded = 4;
+        else if (attemptsCount === 3) scoreAwarded = 3;
+        else if (attemptsCount === 4) scoreAwarded = 2;
+        else scoreAwarded = 1;
+
+        if (isDailyPuzzle) {
+          scoreAwarded += 5;
+        }
+      }
 
       if (hasWon) {
         setGameStatus('won');
@@ -1253,7 +1350,11 @@ export default function App() {
         } else {
           setWordDefinition(definition || 'Kelime başarılı bir şekilde çözüldü.');
         }
-        showToast(`TEBRİKLER! Kelimeyi doğru bildiniz! +${scoreAwarded} Puan`, 'success');
+        if (isDailyPuzzle) {
+          showToast(`☀️ GÜNLÜK BULMACA TAMAMLANDI! +${scoreAwarded} Puan & 'Günlük Bilge' Rozeti!`, 'success');
+        } else {
+          showToast(`TEBRİKLER! Kelimeyi doğru bildiniz! +${scoreAwarded} Puan`, 'success');
+        }
         triggerVictoryCelebration(settings.soundEnabled);
         
         // Update user statistics & milestones
@@ -1311,6 +1412,12 @@ export default function App() {
     // Check badges
     unlockBadge('first_step');
     unlockBadge('champion');
+
+    if (isDailyPuzzle) {
+      const { dateStr } = getDailyWordAndLength();
+      safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
+      unlockBadge('daily_puzzle_solver');
+    }
     
     if (secondsLeft > 10) {
       unlockBadge('lightning');
@@ -1521,6 +1628,20 @@ export default function App() {
     }
   };
 
+  const todayDateStr = getDailyWordAndLength().dateStr;
+  const isDailyPuzzleCompletedToday = safeLocalStorage.getItem('kelimesavasi_daily_completed_date') === todayDateStr;
+
+  const handleStartDailyPuzzle = () => {
+    if (isDailyPuzzleCompletedToday) {
+      showToast('Bugünkü Günlük Bulmacayı zaten çözdünüz! Yarın yeni bir kelime için tekrar gelin.', 'info');
+      return;
+    }
+    setIsDailyPuzzle(true);
+    setHasEnteredGame(true);
+    const dailyInfo = getDailyWordAndLength();
+    startNewGame(dailyInfo.length, true);
+  };
+
   const handleUpdateProfile = async (name: string, avatarUrl?: string) => {
     const updated = {
       ...profile,
@@ -1537,16 +1658,16 @@ export default function App() {
   const getBgThemeClass = () => {
     switch (settings.bgTheme) {
       case 'sapphire':
-        return 'bg-[#1a2233] text-[#FAF6E9]';
+        return 'bg-app-sapphire text-theme-primary';
       case 'forest':
-        return 'bg-[#162923] text-[#FAF6E9]';
+        return 'bg-app-forest text-theme-primary';
       case 'amethyst':
-        return 'bg-[#221c2e] text-[#FAF6E9]';
+        return 'bg-app-amethyst text-theme-primary';
       case 'nord':
-        return 'bg-[#212733] text-[#FAF6E9]';
+        return 'bg-app-nord text-theme-primary';
       case 'default':
       default:
-        return 'bg-[#1F2633] text-[#FAF6E9]';
+        return 'bg-app-default text-theme-primary';
     }
   };
 
@@ -1664,6 +1785,8 @@ export default function App() {
               setGroupRaceInitialMode(mode);
               setIsGroupRaceActive(true);
             }}
+            onStartDailyPuzzle={handleStartDailyPuzzle}
+            isDailyPuzzleCompletedToday={isDailyPuzzleCompletedToday}
           />
         ) : (
           <>
@@ -1680,10 +1803,12 @@ export default function App() {
                           'Mevcut oyundan çıkıp giriş ekranına dönmek istiyor musunuz? İlerlemeniz sıfırlanacaktır.',
                           () => {
                             setHasEnteredGame(false);
+                            setIsDailyPuzzle(false);
                           }
                         );
                       } else {
                         setHasEnteredGame(false);
+                        setIsDailyPuzzle(false);
                       }
                     }}
                     className="flex items-center gap-1 px-3 py-2 text-[11px] font-black uppercase tracking-wider bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border border-[#EBE6D5] rounded-xl shadow-md transition duration-150 active:scale-[0.97] cursor-pointer"
@@ -1713,6 +1838,16 @@ export default function App() {
 
                     <button
                       onClick={() => {
+                        if (isDailyPuzzle) {
+                          showConfirm(
+                            'Yeniden Dene',
+                            'Günün Bulmacasını sıfırlayıp tekrar denemek istiyor musunuz?',
+                            () => {
+                              startNewGame(wordLength, true);
+                            }
+                          );
+                          return;
+                        }
                         if (gameStatus === 'playing' && attempts.length > 0) {
                           showConfirm(
                             'Oyunu Yeniden Başlat',
@@ -2340,6 +2475,45 @@ export default function App() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Retention / "Seni Özledik" Notification Modal */}
+      {retentionNotification && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-fadeIn">
+          <div className="w-full max-w-md bg-[#252D45] border-2 border-amber-500/50 rounded-2xl p-6 text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="w-16 h-16 bg-amber-500/10 text-amber-400 rounded-2xl flex items-center justify-center border border-amber-500/20 mx-auto mb-4.5 shadow-lg shadow-amber-500/5">
+              <Sparkles size={32} className="animate-pulse" />
+            </div>
+
+            <h3 className="text-xl font-black text-[#FAF6E9] tracking-tight">Seni Özledik! ☀️</h3>
+            
+            <p className="text-sm text-gray-300 mt-3 leading-relaxed">
+              {retentionNotification.message}
+            </p>
+
+            <div className="mt-6 flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  setRetentionNotification(null);
+                  handleStartDailyPuzzle();
+                }}
+                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 px-4 rounded-xl shadow-lg transition-all duration-150 active:scale-[0.98] uppercase tracking-wider text-xs flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Play size={14} className="fill-current" />
+                Günün Bulmacasını Çöz
+              </button>
+
+              <button
+                onClick={() => setRetentionNotification(null)}
+                className="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-bold py-2.5 px-4 rounded-xl text-xs transition duration-150 cursor-pointer"
+              >
+                Kapat
+              </button>
             </div>
           </div>
         </div>

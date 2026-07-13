@@ -11,8 +11,10 @@ import {
   onAuthStateChanged,
   User,
   FacebookAuthProvider,
+  GoogleAuthProvider,
   signInWithPopup,
-  signInWithCredential
+  signInWithCredential,
+  linkWithPopup
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -306,4 +308,31 @@ export async function signInWithInstagram(): Promise<{ user: User; credential?: 
   });
 }
 
-export { onAuthStateChanged, signInWithCredential, FacebookAuthProvider, linkWithCredential };
+/**
+ * Google Auth Provider Instance
+ */
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('email');
+googleProvider.addScope('profile');
+
+/**
+ * Links current guest account to Google
+ */
+export async function linkGuestWithGoogle(): Promise<User> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error('Aktif bir oturum bulunamadı.');
+  const result = await linkWithPopup(currentUser, googleProvider);
+  return result.user;
+}
+
+/**
+ * Links current guest account to Facebook
+ */
+export async function linkGuestWithFacebook(): Promise<User> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error('Aktif bir oturum bulunamadı.');
+  const result = await linkWithPopup(currentUser, facebookProvider);
+  return result.user;
+}
+
+export { onAuthStateChanged, signInWithCredential, FacebookAuthProvider, GoogleAuthProvider, linkWithCredential };

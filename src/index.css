@@ -64,3 +64,103 @@
 .animate-rotate-slow {
   animation: rotateSlow 12s infinite linear;
 }
+
+/* --- THEME SYSTEM FOR GECE / GÜNDÜZ --- */
+
+:root {
+  --transition-theme: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), 
+                      border-color 300ms cubic-bezier(0.4, 0, 0.2, 1), 
+                      color 300ms cubic-bezier(0.4, 0, 0.2, 1), 
+                      box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Light Mode (Gündüz) Color Palette */
+  --bg-app-default: #F8FAFC;
+  --bg-app-sapphire: #F1F5F9;
+  --bg-app-forest: #F0FDF4;
+  --bg-app-amethyst: #FAF5FF;
+  --bg-app-nord: #EFF6FF;
+
+  --bg-card: #FFFFFF;
+  --bg-card-secondary: #F1F5F9;
+  --bg-card-item: #E2E8F0;
+  --border-card: #E2E8F0;
+  
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-muted: #64748B;
+  
+  --input-bg: #FFFFFF;
+}
+
+html.dark {
+  /* Dark Mode (Gece) Color Palette */
+  --bg-app-default: #1F2633;
+  --bg-app-sapphire: #1a2233;
+  --bg-app-forest: #162923;
+  --bg-app-amethyst: #221c2e;
+  --bg-app-nord: #212733;
+
+  --bg-card: #2E3748;
+  --bg-card-secondary: #1E2532;
+  --bg-card-item: #3D4756;
+  --border-card: #3E485A;
+  
+  --text-primary: #FAF6E9;
+  --text-secondary: #FAF6E9;
+  --text-muted: #94A3B8;
+  
+  --input-bg: #242D4D;
+}
+
+/* Theme Utilities */
+.theme-transition {
+  transition: var(--transition-theme);
+}
+
+.card-theme {
+  background-color: var(--bg-card);
+  border-color: var(--border-card);
+  color: var(--text-primary);
+  transition: var(--transition-theme);
+}
+
+.inner-theme {
+  background-color: var(--bg-card-secondary);
+  border-color: var(--border-card);
+  color: var(--text-secondary);
+  transition: var(--transition-theme);
+}
+
+.item-theme {
+  background-color: var(--bg-card-item);
+  border-color: var(--border-card);
+  color: var(--text-primary);
+  transition: var(--transition-theme);
+}
+
+.input-theme {
+  background-color: var(--input-bg);
+  border-color: var(--border-card);
+  color: var(--text-primary);
+  transition: var(--transition-theme);
+}
+
+.text-theme-primary {
+  color: var(--text-primary);
+  transition: var(--transition-theme);
+}
+
+.text-theme-secondary {
+  color: var(--text-secondary);
+  transition: var(--transition-theme);
+}
+
+.text-theme-muted {
+  color: var(--text-muted);
+  transition: var(--transition-theme);
+}
+
+.border-theme {
+  border-color: var(--border-card);
+  transition: var(--transition-theme);
+}

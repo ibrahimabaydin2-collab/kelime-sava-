@@ -185,3 +185,32 @@ export function isWordInCuratedList(word: string, length: number): boolean {
   const list = CLEANED_TURKISH_WORDS[length] || [];
   return list.includes(normalized);
 }
+
+// Determines the daily word and length deterministically based on date
+export function getDailyWordAndLength(): { word: string; length: number; dateStr: string } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`; // e.g. "2026-07-13"
+
+  let hash = 0;
+  for (let i = 0; i < dateStr.length; i++) {
+    hash += dateStr.charCodeAt(i) * (i + 1);
+  }
+
+  // Length cycle: 3, 4, 5, 6 based on hash
+  // Using modulo 4 gives values 0..3, so adding 3 gives 3, 4, 5, 6
+  const length = 3 + (hash % 4);
+
+  // Get words of this length
+  const list = CLEANED_TURKISH_WORDS[length] || [];
+  let word = 'SAVAŞ';
+  if (list.length > 0) {
+    const wordIndex = hash % list.length;
+    word = list[wordIndex].toUpperCase();
+  }
+  
+  return { word: turkishUpper(word), length, dateStr };
+}
+

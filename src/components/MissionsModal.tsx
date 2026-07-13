@@ -86,7 +86,7 @@ export default function MissionsModal({
         {/* Global Progress Bar */}
         <div className="px-5 py-3 bg-[#3D4756]/20 border-b border-[#3E485A]">
           <div className="flex justify-between items-center text-xs font-semibold text-gray-300 mb-1.5">
-            <span>Savaş Seviyesi İlerlemesi</span>
+            <span>Savaş Görevleri İlerlemesi</span>
             <span className="text-amber-400 font-black">% {progressPct} Tamamlandı</span>
           </div>
           <div className="w-full bg-black/35 h-3 rounded-full overflow-hidden shadow-inner">
