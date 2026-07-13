@@ -606,7 +606,7 @@ export default function GroupRace({
       
       {/* 1. PHASE: LOBBY */}
       {phase === 'lobby' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-10 text-white shadow-2xl space-y-8 relative overflow-hidden" id="group-lobby-card">
+        <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-6 sm:p-10 text-white shadow-2xl space-y-8 relative overflow-hidden" id="group-lobby-card">
           <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
           
           <div className="text-center space-y-4">
@@ -622,14 +622,14 @@ export default function GroupRace({
           </div>
 
           {/* Countdown timer & launch button */}
-          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 text-center space-y-4 max-w-md mx-auto">
+          <div className="bg-[#1E2532]/65 border border-[#3E485A] rounded-2xl p-6 text-center space-y-4 max-w-md mx-auto">
             <div className="flex justify-center items-center gap-3">
               <Clock size={20} className="text-amber-500 animate-spin" />
-              <span className="text-sm font-bold text-slate-300">Geri Sayım Başladı:</span>
+              <span className="text-sm font-bold text-[#FAF6E9]/90">Geri Sayım Başladı:</span>
               <span className="text-2xl font-extrabold font-mono text-amber-500">{lobbyCountdown} saniye</span>
             </div>
             
-            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+            <div className="w-full bg-[#1A202C] h-2 rounded-full overflow-hidden">
               <div 
                 className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-1000"
                 style={{ width: `${(lobbyCountdown / 15) * 100}%` }}
@@ -639,7 +639,7 @@ export default function GroupRace({
             <div className="flex gap-3 justify-center pt-2">
               <button
                 onClick={onExit}
-                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-xl text-xs font-bold transition"
+                className="px-5 py-2.5 bg-[#3D4756] hover:bg-[#3D4756]/80 text-[#FAF6E9] rounded-xl text-xs font-bold transition"
               >
                 Vazgeç / Çık
               </button>
@@ -670,18 +670,18 @@ export default function GroupRace({
                   key={idx} 
                   className={`p-3 rounded-2xl border flex items-center gap-2.5 transition transform hover:scale-105 duration-150 ${
                     player.isUser 
-                      ? 'bg-emerald-500/10 border-emerald-500/30' 
-                      : 'bg-slate-950/40 border-slate-800/80'
+                      ? 'bg-[#3D4756] border-amber-300/65' 
+                      : 'bg-black/25 border-[#3E485A]/85'
                   }`}
                 >
-                  <span className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-xl shadow-inner shrink-0">
+                  <span className="w-9 h-9 rounded-full bg-[#3D4756] flex items-center justify-center text-xl shadow-inner shrink-0">
                     {player.avatar}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-extrabold truncate block text-slate-200">
+                    <span className="text-xs font-extrabold truncate block text-[#FAF6E9]">
                       {player.name}
                     </span>
-                    <span className={`text-[9px] font-bold block ${player.ready ? 'text-emerald-400' : 'text-slate-500 animate-pulse'}`}>
+                    <span className={`text-[9px] font-bold block ${player.ready ? 'text-emerald-400' : 'text-gray-400 animate-pulse'}`}>
                       {player.ready ? 'HAZIR ✔' : 'KATILIYOR...'}
                     </span>
                   </div>
@@ -690,7 +690,7 @@ export default function GroupRace({
 
               {/* Placeholder slots to show 20 size limit */}
               {Array.from({ length: Math.max(0, 20 - lobbyPlayers.length) }).map((_, idx) => (
-                <div key={`empty-${idx}`} className="border border-dashed border-slate-800 p-3 rounded-2xl flex items-center justify-center text-slate-700 min-h-[58px]">
+                <div key={`empty-${idx}`} className="border border-dashed border-[#3E485A] p-3 rounded-2xl flex items-center justify-center text-gray-400 min-h-[58px]">
                   <span className="text-[10px] font-mono tracking-wider">Açık Slot #{lobbyPlayers.length + idx + 1}</span>
                 </div>
               ))}
@@ -707,32 +707,32 @@ export default function GroupRace({
           <div className="lg:col-span-8 space-y-6">
             
             {/* Round info and Timer row */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-4 rounded-3xl shadow-lg flex justify-between items-center gap-4">
+            <div className="bg-[#2E3748] border border-[#3E485A] p-4 rounded-[2rem] shadow-lg flex justify-between items-center gap-4 text-white">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-gradient-to-tr from-amber-500 to-amber-600 rounded-2xl text-white shadow-md">
                   <Award size={20} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-extrabold text-slate-800 dark:text-white uppercase tracking-wider">
-                    TUR #{currentRound} <span className="text-amber-500 font-extrabold">({wordLength} Harf)</span>
+                  <h2 className="text-sm font-extrabold text-[#FAF6E9] uppercase tracking-wider">
+                    TUR #{currentRound} <span className="text-amber-400 font-extrabold">({wordLength} Harf)</span>
                   </h2>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase">
+                  <p className="text-[10px] text-gray-300 font-semibold uppercase">
                     Kalan Oyuncu Sayısı: {competitors.filter(c => !c.eliminated).length} / 20
                   </p>
                 </div>
               </div>
 
               {/* Timer wheel */}
-              <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-950 px-4 py-2 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+              <div className="flex items-center gap-2.5 bg-black/25 px-4 py-2 rounded-2xl border border-[#3E485A]">
                 <Clock size={16} className={`animate-pulse ${roundTimer < 15 ? 'text-rose-500' : 'text-emerald-500'}`} />
-                <span className={`font-mono text-lg font-extrabold ${roundTimer < 15 ? 'text-rose-500' : 'text-slate-800 dark:text-slate-100'}`}>
+                <span className={`font-mono text-lg font-extrabold ${roundTimer < 15 ? 'text-rose-500' : 'text-[#FAF6E9]'}`}>
                   00:{String(roundTimer).padStart(2, '0')}
                 </span>
               </div>
             </div>
 
             {/* Wordle Grid block */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-xl flex flex-col items-center justify-center space-y-5 relative">
+            <div className="bg-[#2E3748] border border-[#3E485A] p-6 rounded-[2rem] shadow-xl flex flex-col items-center justify-center space-y-5 relative text-white">
               {isUserEliminated && (
                 <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm rounded-3xl z-40 flex flex-col items-center justify-center p-6 text-center space-y-3">
                   <ShieldAlert size={48} className="text-rose-500" />
@@ -767,10 +767,10 @@ export default function GroupRace({
                         }
 
                         const status = feedback[colIdx];
-                        let bgClass = 'bg-slate-50/50 dark:bg-slate-900/40 border-slate-400 dark:border-slate-600 text-slate-900 dark:text-white';
+                        let bgClass = 'bg-[#222B3A]/45 border-[#3E485A] text-[#FAF6E9]';
                         if (status === 'green') bgClass = 'bg-emerald-500 border-emerald-600 text-white shadow-md shadow-emerald-500/10';
                         else if (status === 'orange') bgClass = 'bg-amber-500 border-amber-600 text-white shadow-md shadow-amber-500/10';
-                        else if (status === 'grey') bgClass = 'bg-slate-400 border-slate-500 text-white';
+                        else if (status === 'grey') bgClass = 'bg-slate-500 border-[#3E485A] text-white';
 
                         return (
                           <div
@@ -799,14 +799,14 @@ export default function GroupRace({
 
             {/* Virtual Keyboard */}
             {!isUserEliminated && (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-4 sm:p-5 rounded-3xl shadow-lg">
+              <div className="bg-[#2E3748] border border-[#3E485A] p-4 sm:p-5 rounded-[2rem] shadow-lg">
                 <div className="space-y-1.5 sm:space-y-2 max-w-2xl mx-auto">
                   {KEYBOARD_ROWS.map((row, rowIdx) => (
                     <div key={rowIdx} className="flex gap-1 sm:gap-1.5 justify-center">
                       {rowIdx === 2 && (
                         <button
                           onClick={() => handleKeyPress('ENTER')}
-                          className="flex-1 sm:flex-none px-3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 font-bold text-[10px] sm:text-xs transition active:scale-95"
+                          className="flex-1 sm:flex-none px-3 py-3 rounded-xl bg-[#3D4756] hover:bg-[#3D4756]/80 text-[#FAF6E9] font-bold text-[10px] sm:text-xs transition active:scale-95 border border-[#3E485A] cursor-pointer"
                         >
                           GİRİŞ
                         </button>
@@ -814,10 +814,10 @@ export default function GroupRace({
                       
                       {row.map((char) => {
                         const status = letterStatuses[char];
-                        let bgClass = 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200';
-                        if (status === 'green') bgClass = 'bg-emerald-500 text-white shadow-sm';
-                        else if (status === 'orange') bgClass = 'bg-amber-500 text-white shadow-sm';
-                        else if (status === 'grey') bgClass = 'bg-slate-400 text-slate-100';
+                        let bgClass = 'bg-[#3D4756] hover:bg-[#3D4756]/80 text-[#FAF6E9] border border-[#3E485A] cursor-pointer';
+                        if (status === 'green') bgClass = 'bg-emerald-500 text-white shadow-sm cursor-pointer';
+                        else if (status === 'orange') bgClass = 'bg-amber-500 text-white shadow-sm cursor-pointer';
+                        else if (status === 'grey') bgClass = 'bg-[#1E2532] text-gray-500 border border-[#3E485A]/50 cursor-pointer';
 
                         return (
                           <button
@@ -833,7 +833,7 @@ export default function GroupRace({
                       {rowIdx === 2 && (
                         <button
                           onClick={() => handleKeyPress('BACK')}
-                          className="flex-1 sm:flex-none px-3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 font-bold text-[10px] sm:text-xs transition active:scale-95"
+                          className="flex-1 sm:flex-none px-3 py-3 rounded-xl bg-[#3D4756] hover:bg-[#3D4756]/80 text-[#FAF6E9] font-bold text-[10px] sm:text-xs transition active:scale-95 border border-[#3E485A] cursor-pointer"
                         >
                           SİL
                         </button>
@@ -849,13 +849,13 @@ export default function GroupRace({
           <div className="lg:col-span-4 space-y-6">
             
             {/* Live Competition stand */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-5 rounded-3xl shadow-xl space-y-4 flex flex-col max-h-[440px]">
-              <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+            <div className="bg-[#2E3748] border border-[#3E485A] p-5 rounded-[2rem] shadow-xl space-y-4 flex flex-col max-h-[440px] text-[#FAF6E9]">
+              <div className="flex justify-between items-center pb-2 border-b border-[#3E485A]">
+                <span className="text-xs font-bold text-[#FAF6E9] uppercase tracking-wider flex items-center gap-1.5">
                   <Users size={14} />
                   Sıralama ({competitors.filter(c => !c.eliminated).length} Oyuncu)
                 </span>
-                <span className="text-[9px] font-extrabold bg-amber-500/10 text-amber-500 px-2.5 py-0.5 rounded-full uppercase">
+                <span className="text-[9px] font-extrabold bg-amber-500/10 text-amber-400 px-2.5 py-0.5 rounded-full uppercase">
                   {currentRound === 1 ? 'TOP 10 TUR ATLAR' : currentRound === 2 ? 'TOP 5 TUR ATLAR' : currentRound === 3 ? 'TOP 2 TUR ATLAR' : 'ŞAMPİYONLUK MAÇI'}
                 </span>
               </div>
@@ -868,18 +868,18 @@ export default function GroupRace({
                       key={c.id} 
                       className={`p-2 rounded-xl border flex items-center justify-between gap-2.5 transition duration-150 ${
                         c.isUser 
-                          ? 'bg-emerald-500/10 border-emerald-500/20 shadow-sm' 
+                          ? 'bg-[#3D4756] border-emerald-500/40 shadow-sm' 
                           : c.eliminated 
-                          ? 'bg-slate-50 dark:bg-slate-950/20 border-slate-100 dark:border-slate-850 opacity-40' 
-                          : 'bg-slate-50/50 dark:bg-slate-950/30 border-slate-100 dark:border-slate-850/45'
+                          ? 'bg-black/20 border-[#3E485A]/55 opacity-40' 
+                          : 'bg-black/15 border-[#3E485A]/45'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-sm shadow-inner shrink-0">
+                        <span className="w-7 h-7 rounded-full bg-[#3D4756] border border-[#3E485A] flex items-center justify-center text-sm shadow-inner shrink-0">
                           {c.avatar}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <span className={`text-xs font-extrabold truncate block ${c.isUser ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                          <span className={`text-xs font-extrabold truncate block ${c.isUser ? 'text-emerald-400' : 'text-[#FAF6E9]'}`}>
                             {c.name} {c.isUser && '(SİZ)'}
                           </span>
                           
@@ -896,7 +896,7 @@ export default function GroupRace({
                                       ? 'bg-emerald-500 shadow-sm shadow-emerald-500/10' 
                                       : attempted 
                                       ? 'bg-amber-500' 
-                                      : 'bg-slate-200 dark:bg-slate-800'
+                                      : 'bg-[#1E2532]'
                                   }`}
                                 ></div>
                               );
@@ -907,15 +907,15 @@ export default function GroupRace({
 
                       <div className="text-right shrink-0">
                         {c.solved ? (
-                          <span className="text-[10px] font-extrabold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
                             Çözdü ✔
                           </span>
                         ) : c.eliminated ? (
-                          <span className="text-[10px] font-semibold text-rose-500">
+                          <span className="text-[10px] font-semibold text-rose-400">
                             Elendi
                           </span>
                         ) : (
-                          <span className="text-[10px] font-mono font-bold text-slate-400">
+                          <span className="text-[10px] font-mono font-bold text-gray-400">
                             {c.currentAttempt}/6 Tahmin
                           </span>
                         )}
@@ -950,24 +950,24 @@ export default function GroupRace({
 
       {/* 3. PHASE: ELIMINATION SUMMARY */}
       {phase === 'elimination' && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-6 text-center" id="elimination-results">
+        <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-6 sm:p-10 shadow-2xl space-y-6 text-center text-white" id="elimination-results">
           <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#FAF6E9] tracking-tight">
               Tur #{currentRound} <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Tur Raporu</span>
             </h1>
-            <p className="text-xs text-slate-400 font-semibold uppercase">
-              Gizli Kelime: <span className="text-emerald-500 font-extrabold underline">{targetWord}</span>
+            <p className="text-xs text-gray-300 font-semibold uppercase">
+              Gizli Kelime: <span className="text-emerald-400 font-extrabold underline">{targetWord}</span>
             </p>
           </div>
 
           {/* Results dashboard list */}
-          <div className="max-w-2xl mx-auto border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-            <div className="bg-slate-50 dark:bg-slate-950 px-4 py-2 text-left border-b border-slate-100 dark:border-slate-800 flex justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <div className="max-w-2xl mx-auto border border-[#3E485A] rounded-2xl overflow-hidden shadow-sm text-left">
+            <div className="bg-black/25 px-4 py-2 text-left border-b border-[#3E485A] flex justify-between text-xs font-bold text-gray-300 uppercase tracking-wider">
               <span>Oyuncu Adı</span>
               <span>Tur Skoru / Durumu</span>
             </div>
 
-            <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-80 overflow-y-auto">
+            <div className="divide-y divide-[#3E485A]/40 max-h-80 overflow-y-auto">
               {[...competitors].sort((a, b) => {
                 // Survivors first, then elminated
                 if (!a.eliminated && b.eliminated) return -1;
@@ -987,16 +987,16 @@ export default function GroupRace({
                   <div 
                     key={c.id} 
                     className={`px-4 py-3 flex justify-between items-center text-left ${
-                      c.isUser ? 'bg-emerald-500/5 dark:bg-emerald-500/10' : ''
+                      c.isUser ? 'bg-emerald-500/10' : ''
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-lg">{c.avatar}</span>
                       <div>
-                        <span className={`text-xs font-extrabold block ${c.isUser ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                        <span className={`text-xs font-extrabold block ${c.isUser ? 'text-emerald-400' : 'text-[#FAF6E9]'}`}>
                           {c.name} {c.isUser && '(SİZ)'}
                         </span>
-                        <span className="text-[10px] text-slate-400 block font-medium">
+                        <span className="text-[10px] text-gray-300 block font-medium">
                           {c.solved ? `${c.solvedRound}. denemede çözdü` : 'Çözemedi'}
                         </span>
                       </div>
@@ -1068,7 +1068,7 @@ export default function GroupRace({
 
       {/* 4. PHASE: END OF TOURNAMENT */}
       {phase === 'ended' && (
-        <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-10 text-white shadow-2xl space-y-8 text-center relative overflow-hidden animate-fade-in" id="tournament-champion-board">
+        <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-6 sm:p-10 text-white shadow-2xl space-y-8 text-center relative overflow-hidden animate-fade-in" id="tournament-champion-board">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
           {/* Winner announcement */}
@@ -1084,13 +1084,13 @@ export default function GroupRace({
               if (isUserChampion) {
                 return (
                   <div className="space-y-2">
-                    <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/15 uppercase tracking-widest">
+                    <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-[#3E485A]/50 uppercase tracking-widest">
                       🏆 TURNUVA ŞAMPİYONU 🏆
                     </span>
-                    <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                    <h1 className="text-3xl sm:text-4xl font-extrabold text-[#FAF6E9] tracking-tight">
                       Büyük Zafer!
                     </h1>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-gray-350">
                       Tüm rakiplerinizi elenerek geride bıraktınız ve kupayı kaldırdınız! <strong>+100 Savaş Puanı</strong> hanenize eklendi.
                     </p>
                   </div>
@@ -1098,13 +1098,13 @@ export default function GroupRace({
               } else {
                 return (
                   <div className="space-y-2">
-                    <span className="text-xs font-bold text-slate-400 bg-slate-800/60 px-3 py-1 rounded-full border border-slate-700/50 uppercase tracking-widest">
+                    <span className="text-xs font-bold text-gray-400 bg-[#3D4756] px-3 py-1 rounded-full border border-[#3E485A]/50 uppercase tracking-widest">
                       TURNUVA SONA ERDİ
                     </span>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-[#FAF6E9] tracking-tight">
                       Şampiyon: {champion?.name || 'Bilinmiyor'}
                     </h1>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-gray-400 font-medium">
                       Turnuva finalinde rakibiniz zafere ulaştı. Antrenman yapıp bir dahaki sefere kupayı siz kazanın!
                     </p>
                   </div>
@@ -1114,20 +1114,20 @@ export default function GroupRace({
           </div>
 
           {/* Tournament Summary Grid */}
-          <div className="max-w-xl mx-auto bg-slate-900 border border-slate-850 p-4 rounded-2xl text-left space-y-3">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Yarış Sonuç Özet Raporu</span>
+          <div className="max-w-xl mx-auto bg-[#1E2532] border border-[#3E485A] p-4 rounded-2xl text-left space-y-3">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Yarış Sonuç Özet Raporu</span>
             
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-xs py-1 border-b border-slate-800">
-                <span className="text-slate-400">Toplam Oyuncu Limiti</span>
-                <span className="font-bold text-slate-100">20 Kişi</span>
+            <div className="space-y-2 text-[#FAF6E9]">
+              <div className="flex justify-between items-center text-xs py-1 border-b border-[#3E485A]/30">
+                <span className="text-gray-400">Toplam Oyuncu Limiti</span>
+                <span className="font-bold text-[#FAF6E9]">20 Kişi</span>
               </div>
-              <div className="flex justify-between items-center text-xs py-1 border-b border-slate-800">
-                <span className="text-slate-400">Elenme Turları</span>
-                <span className="font-bold text-slate-100">4 Eleme Aşaması</span>
+              <div className="flex justify-between items-center text-xs py-1 border-b border-[#3E485A]/30">
+                <span className="text-gray-400">Elenme Turları</span>
+                <span className="font-bold text-[#FAF6E9]">4 Eleme Aşaması</span>
               </div>
               <div className="flex justify-between items-center text-xs py-1">
-                <span className="text-slate-400">Sizin Ulaştığınız Aşama</span>
+                <span className="text-gray-400">Sizin Ulaştığınız Aşama</span>
                 <span className="font-extrabold text-emerald-400 uppercase">
                   {isUserEliminated ? `Tur ${currentRound} (Elenildi)` : 'ŞAMPİYONLUK (KAZANDINIZ)'}
                 </span>

@@ -48,29 +48,36 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh] transition-colors duration-200">
+      <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2.2rem] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh] transition-colors duration-200 text-white relative">
+        {/* Glowing star */}
+        <div className="absolute bottom-4 right-4 text-amber-100/10 animate-pulse select-none pointer-events-none">
+          <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c.5 6.5 5.5 11.5 12 12-.5 6.5-5.5 11.5-12 12-.5-6.5-5.5-11.5-12-12 .5-6.5 5.5-11.5 12-12z" />
+          </svg>
+        </div>
+
         {/* Header */}
-        <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-950/40">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <BarChart2 className="text-emerald-500" size={20} />
+        <div className="p-5 border-b border-[#3E485A] flex justify-between items-center bg-[#3D4756]/45">
+          <h2 className="text-lg font-bold text-[#FAF6E9] flex items-center gap-2">
+            <BarChart2 className="text-amber-400" size={20} />
             Kişisel Profil & İlerleme
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Tab Controls */}
-        <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50/55 dark:bg-gray-950/20">
+        <div className="flex border-b border-[#3E485A] bg-[#3D4756]/20">
           <button
             onClick={() => setActiveTab('stats')}
-            className={`flex-1 py-3 text-sm font-semibold border-b-2 transition flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-3 text-sm font-semibold border-b-2 transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'stats'
-                ? 'border-emerald-500 text-emerald-500 bg-white dark:bg-gray-900/40'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'border-amber-400 text-amber-400 bg-[#3D4756]/40'
+                : 'border-transparent text-gray-400 hover:text-white hover:bg-[#3D4756]/10'
             }`}
           >
             <BarChart2 size={16} />
@@ -78,10 +85,10 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
           </button>
           <button
             onClick={() => setActiveTab('missions')}
-            className={`flex-1 py-3 text-sm font-semibold border-b-2 transition flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-3 text-sm font-semibold border-b-2 transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'missions'
-                ? 'border-emerald-500 text-emerald-500 bg-white dark:bg-gray-900/40'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'border-amber-400 text-amber-400 bg-[#3D4756]/40'
+                : 'border-transparent text-gray-400 hover:text-white hover:bg-[#3D4756]/10'
             }`}
           >
             <CheckCircle size={16} />
@@ -89,10 +96,10 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
           </button>
           <button
             onClick={() => setActiveTab('badges')}
-            className={`flex-1 py-3 text-sm font-semibold border-b-2 transition flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-3 text-sm font-semibold border-b-2 transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'badges'
-                ? 'border-emerald-500 text-emerald-500 bg-white dark:bg-gray-900/40'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'border-amber-400 text-amber-400 bg-[#3D4756]/40'
+                : 'border-transparent text-gray-400 hover:text-white hover:bg-[#3D4756]/10'
             }`}
           >
             <Award size={16} />
@@ -101,27 +108,27 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-5 relative z-10">
           {/* STATS TAB */}
           {activeTab === 'stats' && (
             <div className="space-y-6">
               {/* Summary Cards */}
               <div className="grid grid-cols-4 gap-2 text-center">
-                <div className="bg-gray-50 dark:bg-gray-950/40 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
-                  <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{stats.gamesPlayed}</span>
-                  <span className="block text-[9px] sm:text-xs text-gray-400 uppercase font-mono mt-1">Oyun</span>
+                <div className="bg-[#3D4756]/30 p-3 rounded-2xl border border-white/5">
+                  <span className="text-xl sm:text-2xl font-bold text-[#FAF6E9]">{stats.gamesPlayed}</span>
+                  <span className="block text-[9px] sm:text-xs text-gray-400 uppercase font-mono mt-1 font-bold">Oyun</span>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-950/40 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
-                  <span className="text-xl sm:text-2xl font-bold text-emerald-500">{winRate}%</span>
-                  <span className="block text-[9px] sm:text-xs text-gray-400 uppercase font-mono mt-1">Galibiyet</span>
+                <div className="bg-[#3D4756]/30 p-3 rounded-2xl border border-white/5">
+                  <span className="text-xl sm:text-2xl font-bold text-amber-400">{winRate}%</span>
+                  <span className="block text-[9px] sm:text-xs text-gray-400 uppercase font-mono mt-1 font-bold">Galibiyet</span>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-950/40 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
-                  <span className="text-xl sm:text-2xl font-bold text-amber-500">{stats.currentStreak}</span>
-                  <span className="block text-[9px] sm:text-xs text-gray-400 uppercase font-mono mt-1">Seri</span>
+                <div className="bg-[#3D4756]/30 p-3 rounded-2xl border border-white/5">
+                  <span className="text-xl sm:text-2xl font-bold text-amber-300">{stats.currentStreak}</span>
+                  <span className="block text-[9px] sm:text-xs text-gray-400 uppercase font-mono mt-1 font-bold">Seri</span>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-950/40 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
-                  <span className="text-xl sm:text-2xl font-bold text-blue-500">{stats.maxStreak}</span>
-                  <span className="block text-[9px] sm:text-xs text-gray-400 uppercase font-mono mt-1">En İyi Seri</span>
+                <div className="bg-[#3D4756]/30 p-3 rounded-2xl border border-white/5">
+                  <span className="text-xl sm:text-2xl font-bold text-amber-200">{stats.maxStreak}</span>
+                  <span className="block text-[9px] sm:text-xs text-gray-400 uppercase font-mono mt-1 font-bold">En İyi Seri</span>
                 </div>
               </div>
 
@@ -133,15 +140,15 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
                     const pct = Math.max((count / maxDistribution) * 100, 5);
                     return (
                       <div key={index} className="flex items-center gap-3">
-                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 w-3">{index + 1}</span>
-                        <div className="flex-1 bg-gray-100 dark:bg-gray-800 h-6 rounded-lg overflow-hidden">
+                        <span className="text-xs font-semibold text-gray-400 w-3">{index + 1}</span>
+                        <div className="flex-1 bg-black/25 h-6 rounded-lg overflow-hidden">
                           <div
                             style={{ width: `${pct}%` }}
-                            className={`h-full flex items-center justify-end pr-2 rounded-lg text-xs font-bold text-white transition-all duration-500 ${
-                              count > 0 ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'
+                            className={`h-full flex items-center justify-end pr-2 rounded-lg text-xs font-black text-slate-950 transition-all duration-500 ${
+                              count > 0 ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-[#3D4756]/20 text-gray-500'
                             }`}
                           >
-                            {count}
+                            {count > 0 ? count : ''}
                           </div>
                         </div>
                       </div>
@@ -154,7 +161,7 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
               <div className="flex flex-col sm:flex-row gap-2 pt-4">
                 <button
                   onClick={handleShare}
-                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 transition duration-150"
+                  className="flex-1 bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] font-black py-3 px-4 rounded-xl shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] border border-[#EBE6D5] flex items-center justify-center gap-2 transition duration-150 cursor-pointer"
                 >
                   {copied ? <Check size={18} /> : <Share2 size={18} />}
                   {copied ? 'Kopyalandı!' : 'Skorunu Paylaş'}
@@ -162,7 +169,7 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
                 {onResetStats && (
                   <button
                     onClick={onResetStats}
-                    className="py-3 px-4 rounded-xl text-xs text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-semibold border border-transparent hover:border-rose-200 transition"
+                    className="py-3 px-4 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 font-bold border border-transparent transition cursor-pointer"
                   >
                     Verileri Sıfırla
                   </button>
@@ -174,7 +181,7 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
           {/* MISSIONS TAB */}
           {activeTab === 'missions' && (
             <div className="space-y-3">
-              <p className="text-xs text-gray-500 dark:text-gray-400 italic mb-2">
+              <p className="text-xs text-gray-400 italic mb-2">
                 Günlük görevleri tamamlayarak ekstra rozetler ve puanlar kazanın. Her gün sıfırlanır!
               </p>
               {profile.missions.map((mission) => {
@@ -182,34 +189,34 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
                 return (
                   <div
                     key={mission.id}
-                    className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left ${
                       mission.completed
-                        ? 'bg-emerald-50/50 dark:bg-emerald-950/10 border-emerald-200 dark:border-emerald-900/50'
-                        : 'bg-gray-50 dark:bg-gray-950/40 border-gray-100 dark:border-gray-800'
+                        ? 'bg-[#3D4756]/60 border-amber-400/30 text-white'
+                        : 'bg-[#3D4756]/20 border-white/5'
                     }`}
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className={`font-semibold text-sm ${mission.completed ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-900 dark:text-white'}`}>
+                        <span className={`font-bold text-sm ${mission.completed ? 'text-amber-400' : 'text-[#FAF6E9]'}`}>
                           {mission.title}
                         </span>
                         {mission.completed && (
-                          <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold px-1.5 py-0.5 rounded">
+                          <span className="text-[9px] bg-amber-500/10 text-amber-400 font-extrabold px-1.5 py-0.5 rounded border border-amber-400/30 uppercase tracking-wide">
                             Tamamlandı
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{mission.description}</p>
+                      <p className="text-xs text-gray-400">{mission.description}</p>
                     </div>
 
-                    <div className="sm:text-right flex sm:flex-col items-center sm:items-end justify-between gap-2 sm:gap-0">
-                      <span className="text-xs font-mono font-bold text-gray-600 dark:text-gray-400">
+                    <div className="sm:text-right flex sm:flex-col items-center sm:items-end justify-between gap-2 sm:gap-0 shrink-0">
+                      <span className="text-xs font-mono font-bold text-gray-300">
                         {mission.current} / {mission.target}
                       </span>
-                      <div className="w-24 bg-gray-200 dark:bg-gray-800 h-2 rounded-full overflow-hidden mt-1">
+                      <div className="w-24 bg-black/30 h-2 rounded-full overflow-hidden mt-1">
                         <div
                           style={{ width: `${progressPct}%` }}
-                          className={`h-full rounded-full ${mission.completed ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                          className={`h-full rounded-full ${mission.completed ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gray-500'}`}
                         />
                       </div>
                     </div>
@@ -227,28 +234,28 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
                 return (
                   <div
                     key={badge.id}
-                    className={`p-3 rounded-xl border flex flex-col items-center text-center space-y-2 transition duration-200 ${
+                    className={`p-3 rounded-2xl border flex flex-col items-center text-center space-y-2 transition duration-200 ${
                       isUnlocked
-                        ? 'bg-amber-50/40 dark:bg-amber-950/10 border-amber-200 dark:border-amber-900/50 scale-100'
-                        : 'bg-gray-50/55 dark:bg-gray-950/20 border-gray-100 dark:border-gray-800 opacity-60 filter grayscale'
+                        ? 'bg-[#3D4756]/50 border-amber-400/40 text-white'
+                        : 'bg-[#3D4756]/10 border-white/5 opacity-40 filter grayscale'
                     }`}
                   >
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
                       isUnlocked
-                        ? 'bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-300'
-                        : 'bg-gray-200 dark:bg-gray-800 text-gray-400'
+                        ? 'bg-[#3D4756] text-amber-400 border border-amber-400/50'
+                        : 'bg-black/20 text-gray-500'
                     }`}>
-                      <Award size={24} className={isUnlocked ? 'animate-pulse' : ''} />
+                      <Award size={24} className={isUnlocked ? 'animate-pulse text-amber-400' : ''} />
                     </div>
                     <div>
-                      <h4 className={`font-bold text-sm ${isUnlocked ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-gray-400'}`}>
+                      <h4 className={`font-bold text-sm ${isUnlocked ? 'text-amber-300' : 'text-gray-500'}`}>
                         {badge.title}
                       </h4>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-tight">
+                      <p className="text-[11px] text-gray-400 mt-1 leading-tight">
                         {badge.description}
                       </p>
                       {isUnlocked && badge.unlockedAt && (
-                        <span className="block text-[9px] text-amber-500 font-mono mt-1.5">
+                        <span className="block text-[9px] text-amber-400 font-mono mt-1.5 font-bold">
                           Kazanıldı: {new Date(badge.unlockedAt).toLocaleDateString('tr-TR')}
                         </span>
                       )}

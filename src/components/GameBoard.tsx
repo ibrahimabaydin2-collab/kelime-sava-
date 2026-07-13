@@ -37,21 +37,21 @@ export default function GameBoard({
   // Determine dynamic cell sizing based on word length to scale perfectly on mobile devices
   const getCellSizeClass = () => {
     if (wordLength === 3) {
-      return 'w-[clamp(3rem,min(16vw,9.5vh),6.5rem)] h-[clamp(3rem,min(16vw,9.5vh),6.5rem)] text-3xl sm:text-4xl md:text-5xl border-[3.5px] rounded-2xl';
+      return 'w-[clamp(2.6rem,min(14vw,8.5vh),5rem)] h-[clamp(2.6rem,min(14vw,8.5vh),5rem)] text-2xl sm:text-3xl md:text-4xl border-[3px] rounded-xl';
     }
     if (wordLength === 4) {
-      return 'w-[clamp(2.6rem,min(14vw,9vh),6rem)] h-[clamp(2.6rem,min(14vw,9vh),6rem)] text-2xl sm:text-3xl md:text-4xl border-[3.5px] rounded-2xl';
+      return 'w-[clamp(2.3rem,min(12vw,8vh),4.5rem)] h-[clamp(2.3rem,min(12vw,8vh),4.5rem)] text-xl sm:text-2xl md:text-3xl border-[3px] rounded-xl';
     }
     if (wordLength === 5) {
-      return 'w-[clamp(2.2rem,min(11vw,8.5vh),5.5rem)] h-[clamp(2.2rem,min(11vw,8.5vh),5.5rem)] text-2xl sm:text-3xl md:text-4xl border-[3px] rounded-2xl';
+      return 'w-[clamp(2rem,min(10vw,7.5vh),4rem)] h-[clamp(2rem,min(10vw,7.5vh),4rem)] text-lg sm:text-xl md:text-2xl border-[2.5px] rounded-xl';
     }
     if (wordLength === 6) {
-      return 'w-[clamp(2rem,min(9.5vw,8vh),4.75rem)] h-[clamp(2rem,min(9.5vw,8vh),4.75rem)] text-xl sm:text-2xl md:text-3xl border-[2.5px] sm:border-[3px] rounded-xl';
+      return 'w-[clamp(1.8rem,min(8.5vw,7vh),3.5rem)] h-[clamp(1.8rem,min(8.5vw,7vh),3.5rem)] text-base sm:text-lg md:text-xl border-[2px] sm:border-[2.5px] rounded-lg';
     }
     if (wordLength === 7) {
-      return 'w-[clamp(1.9rem,min(8.2vw,7.5vh),4.25rem)] h-[clamp(1.9rem,min(8.2vw,7.5vh),4.25rem)] text-base sm:text-xl md:text-2xl border-[2px] sm:border-[3px] rounded-lg sm:rounded-xl';
+      return 'w-[clamp(1.6rem,min(7.5vw,6.5vh),3.1rem)] h-[clamp(1.6rem,min(7.5vw,6.5vh),3.1rem)] text-sm sm:text-base md:text-lg border-[1.5px] sm:border-[2px] rounded-md sm:rounded-lg';
     }
-    return 'w-[clamp(1.8rem,min(7.2vw,7vh),3.85rem)] h-[clamp(1.8rem,min(7.2vw,7vh),3.85rem)] text-sm sm:text-lg md:text-xl border-[2px] sm:border-[3px] rounded-lg sm:rounded-xl';
+    return 'w-[clamp(1.5rem,min(6.5vw,6vh),2.8rem)] h-[clamp(1.5rem,min(6.5vw,6vh),2.8rem)] text-xs sm:text-sm md:text-base border-[1.5px] sm:border-[2px] rounded-md sm:rounded-lg';
   };
 
   // Determine cell classes based on status
@@ -61,32 +61,32 @@ export default function GameBoard({
     
     if (!isSubmitted) {
       if (char && char !== ' ') {
-        return `${base} border-slate-500 dark:border-slate-400 text-slate-900 dark:text-white bg-white dark:bg-slate-800 scale-105 shadow-sm`;
+        return `${base} border-amber-300/60 text-[#FAF6E9] bg-[#3D4756] scale-105 shadow-sm`;
       }
-      return `${base} border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 text-slate-400`;
+      return `${base} border-[#3E485A] bg-[#222B3A]/45 text-[#FAF6E9]/30`;
     }
 
     // Dynamic colors based on boardTheme
     let greenStyle = 'border-emerald-400 bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-lg shadow-emerald-500/20';
     let orangeStyle = 'border-amber-400 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-500/20';
-    let greyStyle = 'border-slate-300 dark:border-slate-700 bg-gradient-to-br from-slate-400 to-slate-500 dark:from-slate-700 dark:to-slate-800 text-slate-100 dark:text-slate-300 shadow-sm';
+    let greyStyle = 'border-[#3E485A] bg-gradient-to-br from-slate-500 to-slate-600 text-slate-100 shadow-sm';
 
     if (boardTheme === 'ocean') {
       greenStyle = 'border-blue-500 bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20';
       orangeStyle = 'border-sky-400 bg-gradient-to-br from-sky-400 to-cyan-500 text-white shadow-lg shadow-sky-400/20';
-      greyStyle = 'border-slate-300 dark:border-slate-800 bg-gradient-to-br from-slate-400 to-slate-500 dark:from-slate-800 dark:to-slate-900 text-slate-100 dark:text-slate-400 shadow-sm';
+      greyStyle = 'border-[#3E485A] bg-gradient-to-br from-slate-500 to-slate-600 text-slate-100 shadow-sm';
     } else if (boardTheme === 'neon') {
       greenStyle = 'border-fuchsia-500 bg-gradient-to-br from-fuchsia-500 to-pink-600 text-white shadow-lg shadow-fuchsia-500/30';
       orangeStyle = 'border-cyan-400 bg-gradient-to-br from-cyan-400 to-teal-400 text-slate-950 shadow-lg shadow-cyan-400/30';
-      greyStyle = 'border-zinc-600 dark:border-zinc-800 bg-gradient-to-br from-zinc-600 to-zinc-700 dark:from-zinc-800 dark:to-zinc-900 text-zinc-100 dark:text-zinc-400 shadow-sm';
+      greyStyle = 'border-[#3E485A] bg-gradient-to-br from-zinc-600 to-zinc-700 text-zinc-100 shadow-sm';
     } else if (boardTheme === 'autumn') {
       greenStyle = 'border-orange-500 bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/20';
       orangeStyle = 'border-amber-500 bg-gradient-to-br from-amber-500 to-yellow-500 text-white shadow-lg shadow-amber-500/20';
-      greyStyle = 'border-stone-400 dark:border-stone-800 bg-gradient-to-br from-stone-500 to-stone-600 dark:from-stone-800 dark:to-stone-900 text-stone-100 dark:text-stone-300 shadow-sm';
+      greyStyle = 'border-[#3E485A] bg-gradient-to-br from-stone-550 to-stone-650 text-stone-100 shadow-sm';
     } else if (boardTheme === 'pastel') {
       greenStyle = 'border-teal-300 bg-gradient-to-br from-teal-200 to-emerald-300 text-teal-950 shadow-md shadow-teal-300/20';
       orangeStyle = 'border-rose-300 bg-gradient-to-br from-rose-200 to-orange-300 text-rose-950 shadow-md shadow-rose-300/20';
-      greyStyle = 'border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-800 dark:to-slate-900 text-slate-600 dark:text-slate-300 shadow-sm';
+      greyStyle = 'border-[#3E485A] bg-gradient-to-br from-slate-300 to-slate-400 text-slate-700 shadow-sm';
     }
 
     switch (feedback) {
@@ -97,7 +97,7 @@ export default function GameBoard({
       case 'grey':
         return `${base} ${greyStyle}`;
       default:
-        return `${base} border-slate-400 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-900/40 text-slate-800 dark:text-slate-200`;
+        return `${base} border-[#3E485A] bg-[#222B3A]/45 text-[#FAF6E9]`;
     }
   };
 

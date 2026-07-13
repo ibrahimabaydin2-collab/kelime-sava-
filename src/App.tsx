@@ -1394,16 +1394,16 @@ export default function App() {
   const getBgThemeClass = () => {
     switch (settings.bgTheme) {
       case 'sapphire':
-        return 'bg-gradient-to-tr from-slate-900 via-blue-950 to-slate-900 text-white';
+        return 'bg-[#1a2233] text-[#FAF6E9]';
       case 'forest':
-        return 'bg-gradient-to-tr from-slate-900 via-emerald-950 to-slate-950 text-white';
+        return 'bg-[#162923] text-[#FAF6E9]';
       case 'amethyst':
-        return 'bg-gradient-to-tr from-slate-950 via-purple-950 to-slate-900 text-white';
+        return 'bg-[#221c2e] text-[#FAF6E9]';
       case 'nord':
-        return 'bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-850 text-slate-900 dark:text-slate-100';
+        return 'bg-[#212733] text-[#FAF6E9]';
       case 'default':
       default:
-        return 'bg-gray-50 dark:bg-gray-950 text-gray-950 dark:text-gray-100';
+        return 'bg-[#1F2633] text-[#FAF6E9]';
     }
   };
 
@@ -1492,210 +1492,181 @@ export default function App() {
           />
         ) : (
           <>
-            {/* Back to entry screen header */}
+            {/* Back to welcome & Compact control panel block */}
             {!activeMatch && (
-              <div className="w-full max-w-3xl lg:max-w-4xl flex justify-between items-center mb-3">
-                <button
-                  onClick={() => {
-                    if (gameStatus === 'playing' && attempts.length > 0) {
-                      showConfirm(
-                        'Oyundan Çık',
-                        'Mevcut oyundan çıkıp giriş ekranına dönmek istiyor musunuz? İlerlemeniz sıfırlanacaktır.',
-                        () => {
-                          setHasEnteredGame(false);
-                        }
-                      );
-                    } else {
-                      setHasEnteredGame(false);
-                    }
-                  }}
-                  className="flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-gray-600 dark:text-gray-300 hover:text-emerald-500 dark:hover:text-emerald-400 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border border-gray-200/80 dark:border-gray-800/80 rounded-xl shadow-sm hover:shadow-md transition duration-150 active:scale-[0.97] cursor-pointer"
-                >
-                  <ArrowLeft size={16} className="stroke-[2.5]" />
-                  <span>Giriş Ekranına Dön</span>
-                </button>
+              <div className="w-full max-w-md flex flex-col gap-2 mb-2 animate-fadeIn">
+                {/* Row 1: Back to entry screen, Pes Et & Yenile */}
+                <div className="flex justify-between items-center w-full">
+                  <button
+                    onClick={() => {
+                      if (gameStatus === 'playing' && attempts.length > 0) {
+                        showConfirm(
+                          'Oyundan Çık',
+                          'Mevcut oyundan çıkıp giriş ekranına dönmek istiyor musunuz? İlerlemeniz sıfırlanacaktır.',
+                          () => {
+                            setHasEnteredGame(false);
+                          }
+                        );
+                      } else {
+                        setHasEnteredGame(false);
+                      }
+                    }}
+                    className="flex items-center gap-1 px-3 py-2 text-[11px] font-black uppercase tracking-wider bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border border-[#EBE6D5] rounded-xl shadow-md transition duration-150 active:scale-[0.97] cursor-pointer"
+                  >
+                    <span>Giriş Ekranı</span>
+                  </button>
 
-                <div className="text-xs font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1.5 bg-gray-100/70 dark:bg-gray-800/60 px-3 py-2 rounded-xl border border-gray-200/40 dark:border-gray-850">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-                  <span>{gameMode === 'timed' ? 'Süreli Oyun' : 'Süresiz Oyun'}</span>
+                  <div className="flex items-center gap-1.5">
+                    {gameStatus === 'playing' && (
+                      <button
+                        onClick={() => {
+                          showConfirm(
+                            'Pes Et',
+                            'Pes etmek ve doğru kelimeyi görmek istediğinize emin misiniz?',
+                            () => {
+                              handleGameLoss('Pes Ettiniz');
+                            }
+                          );
+                        }}
+                        className="px-2.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 border border-rose-500/20 transition duration-150 flex items-center gap-1 text-[11px] font-black uppercase tracking-wider font-mono cursor-pointer shrink-0"
+                        title="Pes Et ve Kelimeyi Gör"
+                      >
+                        <AlertCircle size={12} className="stroke-[2.5]" />
+                        Pes Et
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        if (gameStatus === 'playing' && attempts.length > 0) {
+                          showConfirm(
+                            'Oyunu Yeniden Başlat',
+                            'Oyunu yeniden başlatmak istiyor musunuz? Mevcut ilerleme sıfırlanacaktır.',
+                            () => {
+                              startNewGame(wordLength);
+                            }
+                          );
+                        } else {
+                          startNewGame(wordLength);
+                        }
+                      }}
+                      className="px-2.5 py-2 rounded-xl bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border border-[#EBE6D5] font-black transition duration-150 flex items-center gap-1 text-[11px] uppercase tracking-wider font-mono cursor-pointer shrink-0"
+                      title="Yeni Kelime Al"
+                    >
+                      <RotateCcw size={12} className="stroke-[2.5]" />
+                      Yenile
+                    </button>
+                  </div>
+                </div>
+
+                {/* Row 2: Harf Sayısı Selector & Mode tag */}
+                <div className="flex justify-between items-center w-full bg-[#3D4756]/85 backdrop-blur-md border border-[#3E485A] rounded-xl px-2.5 py-1.5 shadow-sm text-white">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider font-mono">Harf:</span>
+                    <div className="flex gap-0.5 bg-black/30 p-0.5 rounded-lg">
+                      {[3, 4, 5, 6, 7, 8].map((len) => (
+                        <button
+                          key={len}
+                          onClick={() => {
+                            if (gameStatus === 'playing' && attempts.length > 0) {
+                              showConfirm(
+                                'Harf Sayısını Değiştir',
+                                'Mevcut oyunu sıfırlayıp harf sayısını değiştirmek istediğinize emin misiniz?',
+                                () => {
+                                  setWordLength(len);
+                                }
+                              );
+                            } else {
+                              setWordLength(len);
+                            }
+                          }}
+                          className={`w-6.5 h-6.5 rounded-md text-[10px] font-black transition-all duration-150 flex items-center justify-center cursor-pointer ${
+                            wordLength === len
+                              ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 shadow-xs scale-105'
+                              : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                          }`}
+                        >
+                          {len}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] font-bold text-gray-300 flex items-center gap-1 font-mono uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                    <span>{gameMode === 'timed' ? 'Süreli' : 'Süresiz'}</span>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Real-time Match Split View Banner */}
         {activeMatch && (
-          <div className="w-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-4 mb-4 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <Swords size={24} className="text-emerald-500 shrink-0" />
+          <div className="w-full max-w-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-2.5 mb-2.5 flex flex-col sm:flex-row justify-between items-center gap-3 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <Swords size={20} className="text-emerald-500 shrink-0" />
               <div className="text-left">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="font-bold text-sm text-gray-800 dark:text-white">Kelime Savaşı Sürüyor!</h4>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className="font-bold text-xs text-gray-800 dark:text-white">Kelime Savaşı Sürüyor!</h4>
                   {activeMatch.matchWordsCount && (
-                    <span className="text-[10px] font-black font-mono bg-emerald-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
-                      Tur {activeMatch.currentRound} / {activeMatch.matchWordsCount}
+                    <span className="text-[9px] font-black font-mono bg-emerald-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                      Tur {activeMatch.currentRound}/{activeMatch.matchWordsCount}
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Aynı {wordLength} harfli kelimeyi çözüyorsunuz. {activeMatch.matchWordsCount && `${activeMatch.matchWordsCount} turda en fazla turu kazanan maçı alır!`}
-                </p>
                 {activeMatch.roundsWon && (
-                  <div className="flex gap-4 mt-2 text-xs font-bold font-mono">
-                    <span className="text-emerald-600 dark:text-emerald-400">SEN: {activeMatch.roundsWon[profile.id] || 0} Galibiyet</span>
-                    <span className="text-gray-400 dark:text-gray-600">|</span>
-                    <span className="text-amber-500">RAKİP: {activeMatch.roundsWon[opponent?.id || ''] || 0} Galibiyet</span>
+                  <div className="flex gap-2.5 mt-0.5 text-[10px] font-bold font-mono">
+                    <span className="text-emerald-600 dark:text-emerald-400">SEN: {activeMatch.roundsWon[profile.id] || 0}</span>
+                    <span className="text-gray-400">|</span>
+                    <span className="text-amber-500">RAKİP: {activeMatch.roundsWon[opponent?.id || ''] || 0}</span>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Scoreboard Split */}
-            <div className="flex gap-4 items-center">
-              <div className="flex items-center gap-2.5 bg-white dark:bg-gray-900 px-3 py-1.5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
-                {profile.avatarUrl ? (
-                  <span className="w-8 h-8 rounded-full overflow-hidden border border-emerald-500 flex items-center justify-center bg-gray-200 dark:bg-gray-700 font-bold shrink-0">
-                    {profile.avatarUrl.length < 4 ? (
-                      <span className="text-base leading-none">{profile.avatarUrl}</span>
-                    ) : (
-                      <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    )}
-                  </span>
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-emerald-500 text-white font-bold flex items-center justify-center text-xs shrink-0">
-                    {profile.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
+            <div className="flex gap-2 items-center">
+              <div className="flex items-center gap-1.5 bg-white dark:bg-gray-900 px-2 py-1 rounded-lg shadow-xs border border-gray-100 dark:border-gray-800">
                 <div className="text-left">
-                  <span className="text-[10px] text-gray-400 font-bold block">SEN</span>
-                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{attempts.length} Deneme</span>
+                  <span className="text-[9px] text-gray-400 font-bold block leading-none">SEN</span>
+                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{attempts.length} Dn</span>
                 </div>
               </div>
 
-              <div className="text-lg font-bold text-gray-300 font-sans">VS</div>
+              <div className="text-xs font-bold text-gray-300 font-mono">VS</div>
 
-              <div className="flex items-center gap-2.5 bg-white dark:bg-gray-900 px-3 py-1.5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
-                {opponent?.avatarUrl ? (
-                  <span className="w-8 h-8 rounded-full overflow-hidden border border-emerald-500 flex items-center justify-center bg-gray-200 dark:bg-gray-700 font-bold shrink-0">
-                    {opponent.avatarUrl.length < 4 ? (
-                      <span className="text-base leading-none">{opponent.avatarUrl}</span>
-                    ) : (
-                      <img src={opponent.avatarUrl} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    )}
-                  </span>
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-amber-500 text-white font-bold flex items-center justify-center text-xs shrink-0">
-                    {opponent?.name ? opponent.name.charAt(0).toUpperCase() : 'R'}
-                  </div>
-                )}
+              <div className="flex items-center gap-1.5 bg-white dark:bg-gray-900 px-2 py-1 rounded-lg shadow-xs border border-gray-100 dark:border-gray-800">
                 <div className="text-left">
-                  <span className="text-[10px] text-gray-400 font-bold block truncate max-w-[80px]">{opponent?.name?.toUpperCase() || 'RAKİP'}</span>
-                  <span className="text-sm font-bold text-amber-500">
-                    {opponent?.attempts?.length || 0} Deneme
+                  <span className="text-[9px] text-gray-400 font-bold block truncate max-w-[50px] leading-none">{opponent?.name?.toUpperCase() || 'RAKİP'}</span>
+                  <span className="text-[11px] font-bold text-amber-500">
+                    {opponent?.attempts?.length || 0} Dn
                   </span>
                 </div>
               </div>
 
               <button
                 onClick={handleLeaveMatch}
-                className="text-xs bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-2 rounded-xl"
+                className="text-[10px] bg-rose-500 hover:bg-rose-600 text-white font-extrabold px-2 py-1 rounded-lg cursor-pointer"
               >
-                Maçtan Çık
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Game State Control Panel (Length selector / Reset) */}
-        {!activeMatch && (
-          <div className="w-full max-w-3xl lg:max-w-4xl flex flex-col sm:flex-row gap-3 justify-between items-center bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border border-gray-150 dark:border-gray-800 rounded-2xl p-3 shadow-md mb-4 animate-fadeIn">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider font-mono">Harf Sayısı:</span>
-              <div className="flex gap-1 bg-gray-150/60 dark:bg-gray-950 p-1 rounded-xl">
-                {[3, 4, 5, 6, 7, 8].map((len) => (
-                  <button
-                    key={len}
-                    onClick={() => {
-                      if (gameStatus === 'playing' && attempts.length > 0) {
-                        showConfirm(
-                          'Harf Sayısını Değiştir',
-                          'Mevcut oyunu sıfırlayıp harf sayısını değiştirmek istediğinize emin misiniz?',
-                          () => {
-                            setWordLength(len);
-                          }
-                        );
-                      } else {
-                        setWordLength(len);
-                      }
-                    }}
-                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs font-black transition-all duration-150 flex items-center justify-center cursor-pointer ${
-                      wordLength === len
-                        ? 'bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-md shadow-emerald-500/20 scale-105'
-                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-850 hover:text-gray-800 dark:hover:text-white'
-                    }`}
-                  >
-                    {len}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {gameStatus === 'playing' && (
-                <button
-                  onClick={() => {
-                    showConfirm(
-                      'Pes Et',
-                      'Pes etmek ve doğru kelimeyi görmek istediğinize emin misiniz?',
-                      () => {
-                        handleGameLoss('Pes Ettiniz');
-                      }
-                    );
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100/50 dark:bg-red-950/20 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 transition duration-150 flex items-center gap-1.5 text-xs font-black uppercase tracking-wider font-mono cursor-pointer"
-                  title="Oyunu Sonlandır ve Kelimeyi Gör"
-                >
-                  <AlertCircle size={13} className="stroke-[2.5]" />
-                  Pes Et
-                </button>
-              )}
-
-              <button
-                onClick={() => {
-                  if (gameStatus === 'playing' && attempts.length > 0) {
-                    showConfirm(
-                      'Oyunu Yeniden Başlat',
-                      'Oyunu yeniden başlatmak istiyor musunuz? Mevcut ilerleme sıfırlanacaktır.',
-                      () => {
-                        startNewGame(wordLength);
-                      }
-                    );
-                  } else {
-                    startNewGame(wordLength);
-                  }
-                }}
-                className="px-3.5 py-1.5 rounded-xl bg-gray-50 hover:bg-emerald-50/50 dark:bg-gray-950 dark:hover:bg-emerald-950/20 text-gray-500 hover:text-emerald-500 dark:text-gray-400 dark:hover:text-emerald-400 border border-gray-200 dark:border-gray-800 hover:border-emerald-200 dark:hover:border-emerald-900 transition duration-150 flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider font-mono cursor-pointer"
-                title="Yeni Kelime Al"
-              >
-                <RotateCcw size={13} className="stroke-[2.5]" />
-                Yenile
+                Çık
               </button>
             </div>
           </div>
         )}
 
         {/* Game Area Card */}
-        <div className="w-full max-w-3xl lg:max-w-4xl bg-white/85 dark:bg-gray-900/85 backdrop-blur-md border border-gray-100 dark:border-gray-800 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden">
+        <div className="w-full max-w-md bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-5 sm:p-6 shadow-2xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
-          <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 dark:bg-emerald-500/3 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 dark:bg-teal-500/3 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
 
           {/* Top Timer & Attempts Tracker */}
-          <div className="w-full flex justify-between items-center mb-4 px-2 border-b border-gray-100 dark:border-gray-800 pb-3 relative z-10">
+          <div className="w-full flex justify-between items-center mb-4 px-2 border-b border-[#3E485A] pb-3 relative z-10">
             {gameStatus === 'playing' ? (
               <>
                 <div className="flex items-center gap-2">
                   <Trophy size={16} className="text-amber-500" />
-                  <span className="text-xs font-bold text-gray-600 dark:text-gray-400 font-mono">
+                  <span className="text-xs font-bold text-gray-300 font-mono">
                     Deneme: {attempts.length}/6
                   </span>
                 </div>
@@ -1704,10 +1675,10 @@ export default function App() {
                   {(gameMode === 'timed' || activeMatch) ? (
                     <>
                       <Hourglass size={16} className={`animate-spin ${secondsLeft <= 5 ? 'text-rose-500' : 'text-emerald-500'}`} />
-                      <div className={`text-sm font-bold font-mono px-2.5 py-1 rounded-lg border ${
+                      <div className={`text-sm font-bold font-mono px-2 py-0.5 rounded-lg border ${
                         secondsLeft <= 5
-                          ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/30 dark:border-rose-900 dark:text-rose-400 animate-pulse'
-                          : 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950/30 dark:border-emerald-900 dark:text-emerald-400'
+                          ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 animate-pulse'
+                          : 'bg-black/25 border-[#3E485A] text-emerald-400'
                       }`}>
                         {secondsLeft} sn
                       </div>
@@ -1715,7 +1686,7 @@ export default function App() {
                   ) : (
                     <>
                       <Hourglass size={16} className="text-emerald-500 animate-pulse" />
-                      <div className="text-xs font-extrabold font-mono px-2.5 py-1 rounded-lg border bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950/30 dark:border-emerald-900 dark:text-emerald-400">
+                      <div className="text-xs font-extrabold font-mono px-2 py-0.5 rounded-lg border bg-black/25 border-[#3E485A] text-emerald-400">
                         Süresiz ♾️
                       </div>
                     </>
@@ -1724,12 +1695,12 @@ export default function App() {
               </>
             ) : (
               <div className="w-full flex justify-center py-0.5 animate-scale-up">
-                <span className={`text-xs font-extrabold uppercase tracking-wider px-3.5 py-1.5 rounded-full border ${
+                <span className={`text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-full border ${
                   gameStatus === 'won'
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950/20 dark:border-emerald-900 dark:text-emerald-400'
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
                     : gameStatus === 'lost'
-                    ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400'
-                    : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-805'
+                    ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
+                    : 'bg-[#3D4756] border-[#3E485A] text-gray-300'
                 }`}>
                   {gameStatus === 'won' ? '🎉 TEBRİKLER! KAZANDINIZ' : gameStatus === 'lost' ? '💥 SÜRE BİTTİ / ELENDİNİZ' : 'HAZIR'}
                 </span>
@@ -1739,9 +1710,9 @@ export default function App() {
 
           {/* Game Hint or Mode Banner */}
           {gameMode === 'timed' && gameStatus === 'playing' && !activeMatch && targetWord && (
-            <div className="w-full max-w-md mb-4 px-3.5 py-2.5 bg-gradient-to-r from-emerald-50/70 to-teal-50/70 dark:from-emerald-950/20 dark:to-teal-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-xl text-xs font-black text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2 font-mono animate-fade-in shadow-xs">
+            <div className="w-full max-w-md mb-2 px-3 py-1.5 bg-gradient-to-r from-emerald-50/70 to-teal-50/70 dark:from-emerald-950/20 dark:to-teal-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-xl text-xs font-black text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2 font-mono animate-fade-in shadow-xs">
               <Sparkles size={14} className="animate-pulse text-yellow-500" />
-              <span>İPUCU: Kelime <span className="bg-emerald-500 text-white px-2 py-0.5 rounded text-sm font-black mx-1 inline-block shadow-sm shadow-emerald-500/20">{targetWord[0]}</span> harfi ile başlıyor!</span>
+              <span>İPUCU: Kelime <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded text-xs font-black mx-1 inline-block shadow-sm shadow-emerald-500/20">{targetWord[0]}</span> harfi ile başlıyor!</span>
             </div>
           )}
 
@@ -1755,7 +1726,7 @@ export default function App() {
 
           {/* Victory Celebration Showcase (Zafer Gösterisi) */}
           {gameStatus === 'won' && (
-            <div className="w-full max-w-lg mt-4 bg-gradient-to-b from-emerald-500/10 to-teal-500/5 dark:from-emerald-950/20 dark:to-teal-950/5 border border-emerald-500/20 dark:border-emerald-500/10 rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden animate-scale-up" id="victory-celebration-container">
+            <div className="w-full max-w-lg mt-2 bg-gradient-to-b from-emerald-500/10 to-teal-500/5 dark:from-emerald-950/20 dark:to-teal-950/5 border border-emerald-500/20 dark:border-emerald-500/10 rounded-3xl p-3 sm:p-4 shadow-xl relative overflow-hidden animate-scale-up" id="victory-celebration-container">
               {/* Spinning background fireworks glow */}
               <div className="absolute inset-0 pointer-events-none opacity-10 dark:opacity-20 flex items-center justify-center">
                 <div className="w-72 h-72 rounded-full border-4 border-dashed border-emerald-400 animate-rotate-slow" />
@@ -1766,64 +1737,64 @@ export default function App() {
               <div className="flex justify-between items-center gap-4 relative z-10">
                 {/* Left Torch */}
                 <div className="hidden sm:block shrink-0 animate-bounce" style={{ animationDuration: '3s' }}>
-                  <div className="relative w-12 h-24 flex flex-col items-center">
+                  <div className="relative w-12 h-20 flex flex-col items-center">
                     {/* Rising Sparks */}
-                    <div className="absolute -top-10 w-8 h-10 overflow-hidden pointer-events-none">
-                      <div className="absolute bottom-0 left-1/4 w-1 h-1 bg-amber-400 rounded-full animate-float-up-slow" style={{ animationDelay: '0s' }} />
+                    <div className="absolute -top-8 w-8 h-8 overflow-hidden pointer-events-none">
+                      <div className="absolute bottom-0 left-1/4 w-1 bg-amber-400 rounded-full animate-float-up-slow" style={{ animationDelay: '0s' }} />
                       <div className="absolute bottom-1 left-1/2 w-1.5 h-1.5 bg-orange-400 rounded-full animate-float-up-slow" style={{ animationDelay: '0.4s' }} />
                       <div className="absolute bottom-0 left-2/3 w-1 h-1 bg-yellow-400 rounded-full animate-float-up-slow" style={{ animationDelay: '0.8s' }} />
                     </div>
                     {/* Multilayered Fire */}
-                    <div className="relative w-7 h-9 -mb-1 animate-pulse-glow">
-                      <div className="absolute inset-x-0 bottom-0 mx-auto w-7 h-9 bg-gradient-to-t from-red-600 via-orange-500 to-transparent rounded-b-full rounded-t-2xl opacity-50 blur-[2px] animate-flicker" />
-                      <div className="absolute inset-x-0.5 bottom-0 mx-auto w-5 h-7 bg-gradient-to-t from-red-500 via-amber-400 to-transparent rounded-b-full rounded-t-xl opacity-90 animate-flicker" style={{ animationDuration: '0.14s' }} />
-                      <div className="absolute inset-x-1.5 bottom-0.5 mx-auto w-2.5 h-4 bg-gradient-to-t from-yellow-300 to-white rounded-b-full rounded-t-md opacity-100 animate-flicker" style={{ animationDuration: '0.09s' }} />
+                    <div className="relative w-6 h-8 -mb-1 animate-pulse-glow">
+                      <div className="absolute inset-x-0 bottom-0 mx-auto w-6 h-8 bg-gradient-to-t from-red-600 via-orange-500 to-transparent rounded-b-full rounded-t-2xl opacity-50 blur-[2px] animate-flicker" />
+                      <div className="absolute inset-x-0.5 bottom-0 mx-auto w-4.5 h-6.5 bg-gradient-to-t from-red-500 via-amber-400 to-transparent rounded-b-full rounded-t-xl opacity-90 animate-flicker" style={{ animationDuration: '0.14s' }} />
+                      <div className="absolute inset-x-1.5 bottom-0.5 mx-auto.5 w-2 h-3.5 bg-gradient-to-t from-yellow-300 to-white rounded-b-full rounded-t-md opacity-100 animate-flicker" style={{ animationDuration: '0.09s' }} />
                     </div>
                     {/* Torch Top Cup */}
-                    <div className="w-5 h-4 bg-gradient-to-r from-amber-600 via-yellow-400 to-amber-700 rounded-t-xs rounded-b-md shadow-md border-t border-yellow-300" />
+                    <div className="w-4.5 h-3.5 bg-gradient-to-r from-amber-600 via-yellow-400 to-amber-700 rounded-t-xs rounded-b-md shadow-md border-t border-yellow-300" />
                     {/* Handle */}
-                    <div className="w-1.5 h-10 bg-gradient-to-r from-gray-500 via-gray-400 to-gray-600 rounded-b-full shadow" />
+                    <div className="w-1 h-8 bg-gradient-to-r from-gray-500 via-gray-400 to-gray-600 rounded-b-full shadow" />
                   </div>
                 </div>
 
                 {/* Main Content */}
-                <div className="flex-1 text-center space-y-4">
-                  <div className="space-y-1.5">
+                <div className="flex-1 text-center space-y-2">
+                  <div className="space-y-1">
                     <div className="flex justify-center items-center gap-1.5 text-emerald-500">
-                      <Sparkles className="animate-spin text-yellow-500" size={18} style={{ animationDuration: '4s' }} />
-                      <span className="text-xs font-black uppercase tracking-widest font-mono text-emerald-600 dark:text-emerald-400">ZAFER KAZANILDI</span>
-                      <Sparkles className="animate-bounce text-yellow-500" size={18} />
+                      <Sparkles className="animate-spin text-yellow-500" size={16} style={{ animationDuration: '4s' }} />
+                      <span className="text-[10px] font-black uppercase tracking-widest font-mono text-emerald-600 dark:text-emerald-400">ZAFER KAZANILDI</span>
+                      <Sparkles className="animate-bounce text-yellow-500" size={16} />
                     </div>
-                    <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight drop-shadow-sm">
+                    <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight drop-shadow-sm">
                       Kelimelerin Efendisi! 🎉
                     </h3>
                   </div>
 
-                  <div className="py-2.5 px-4 bg-white/70 dark:bg-gray-950/40 rounded-2xl border border-emerald-500/10 shadow-inner inline-block mx-auto">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mb-1">Bulunan Kelime</p>
-                    <span className="text-2xl sm:text-3xl font-extrabold tracking-widest uppercase bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 bg-clip-text text-transparent drop-shadow-sm filter drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]">
+                  <div className="py-1.5 px-3 bg-white/70 dark:bg-gray-950/40 rounded-xl border border-emerald-500/10 shadow-inner inline-block mx-auto">
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-mono mb-0.5 leading-none">Bulunan Kelime</p>
+                    <span className="text-xl sm:text-2xl font-extrabold tracking-widest uppercase bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 bg-clip-text text-transparent drop-shadow-sm filter drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]">
                       {targetWord}
                     </span>
                   </div>
 
                   {wordDefinition && (
-                    <div className="bg-white/50 dark:bg-gray-950/20 rounded-xl p-3.5 border border-emerald-500/5 text-left max-w-sm mx-auto">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-mono block mb-1">
+                    <div className="bg-white/50 dark:bg-gray-950/20 rounded-lg p-2.5 border border-emerald-500/5 text-left max-w-sm mx-auto">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-mono block mb-0.5">
                         TDK SÖZLÜK ANLAMI
                       </span>
-                      <p className="text-xs text-gray-600 dark:text-gray-300 italic font-sans leading-relaxed">
+                      <p className="text-[11px] text-gray-600 dark:text-gray-300 italic font-sans leading-snug">
                         "{wordDefinition}"
                       </p>
                     </div>
                   )}
 
-                  <div className="pt-2 flex flex-col sm:flex-row justify-center items-center gap-2.5">
+                  <div className="pt-1 flex flex-col sm:flex-row justify-center items-center gap-2">
                     <button
                       onClick={() => startNewGame(wordLength)}
-                      className="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs sm:text-sm py-3 px-6 rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/35 transition active:scale-95 flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-[11px] py-2 px-4 rounded-lg shadow-md shadow-emerald-500/15 hover:shadow-emerald-500/25 transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
                       id="victory-retry-button"
                     >
-                      <RotateCcw size={15} />
+                      <RotateCcw size={14} />
                       <span>YENİ SAVAŞA BAŞLA</span>
                     </button>
                   </div>
@@ -1831,23 +1802,23 @@ export default function App() {
 
                 {/* Right Torch */}
                 <div className="hidden sm:block shrink-0 animate-bounce animate-delay-150" style={{ animationDuration: '3s', animationDelay: '0.3s' }}>
-                  <div className="relative w-12 h-24 flex flex-col items-center">
+                  <div className="relative w-12 h-20 flex flex-col items-center">
                     {/* Rising Sparks */}
-                    <div className="absolute -top-10 w-8 h-10 overflow-hidden pointer-events-none">
+                    <div className="absolute -top-8 w-8 h-8 overflow-hidden pointer-events-none">
                       <div className="absolute bottom-0 left-1/4 w-1.5 h-1.5 bg-amber-400 rounded-full animate-float-up-slow" style={{ animationDelay: '0.2s' }} />
                       <div className="absolute bottom-1 left-1/2 w-1 h-1 bg-orange-400 rounded-full animate-float-up-slow" style={{ animationDelay: '0.6s' }} />
                       <div className="absolute bottom-0 left-2/3 w-1.5 h-1.5 bg-yellow-400 rounded-full animate-float-up-slow" style={{ animationDelay: '1s' }} />
                     </div>
                     {/* Multilayered Fire */}
-                    <div className="relative w-7 h-9 -mb-1 animate-pulse-glow">
-                      <div className="absolute inset-x-0 bottom-0 mx-auto w-7 h-9 bg-gradient-to-t from-red-600 via-orange-500 to-transparent rounded-b-full rounded-t-2xl opacity-50 blur-[2px] animate-flicker" style={{ animationDelay: '0.05s' }} />
-                      <div className="absolute inset-x-0.5 bottom-0 mx-auto w-5 h-7 bg-gradient-to-t from-red-500 via-amber-400 to-transparent rounded-b-full rounded-t-xl opacity-90 animate-flicker" style={{ animationDuration: '0.14s', animationDelay: '0.05s' }} />
-                      <div className="absolute inset-x-1.5 bottom-0.5 mx-auto w-2.5 h-4 bg-gradient-to-t from-yellow-300 to-white rounded-b-full rounded-t-md opacity-100 animate-flicker" style={{ animationDuration: '0.09s', animationDelay: '0.05s' }} />
+                    <div className="relative w-6 h-8 -mb-1 animate-pulse-glow">
+                      <div className="absolute inset-x-0 bottom-0 mx-auto w-6 h-8 bg-gradient-to-t from-red-600 via-orange-500 to-transparent rounded-b-full rounded-t-2xl opacity-50 blur-[2px] animate-flicker" style={{ animationDelay: '0.05s' }} />
+                      <div className="absolute inset-x-0.5 bottom-0 mx-auto w-4.5 h-6.5 bg-gradient-to-t from-red-500 via-amber-400 to-transparent rounded-b-full rounded-t-xl opacity-90 animate-flicker" style={{ animationDuration: '0.14s', animationDelay: '0.05s' }} />
+                      <div className="absolute inset-x-1.5 bottom-0.5 mx-auto.5 w-2 h-3.5 bg-gradient-to-t from-yellow-300 to-white rounded-b-full rounded-t-md opacity-100 animate-flicker" style={{ animationDuration: '0.09s', animationDelay: '0.05s' }} />
                     </div>
                     {/* Torch Top Cup */}
-                    <div className="w-5 h-4 bg-gradient-to-r from-amber-600 via-yellow-400 to-amber-700 rounded-t-xs rounded-b-md shadow-md border-t border-yellow-300" />
+                    <div className="w-4.5 h-3.5 bg-gradient-to-r from-amber-600 via-yellow-400 to-amber-700 rounded-t-xs rounded-b-md shadow-md border-t border-yellow-300" />
                     {/* Handle */}
-                    <div className="w-1.5 h-10 bg-gradient-to-r from-gray-500 via-gray-400 to-gray-600 rounded-b-full shadow" />
+                    <div className="w-1 h-8 bg-gradient-to-r from-gray-500 via-gray-400 to-gray-600 rounded-b-full shadow" />
                   </div>
                 </div>
               </div>
@@ -1856,19 +1827,19 @@ export default function App() {
 
           {/* Standard Game Over (Loss) Screen */}
           {gameStatus === 'lost' && (
-            <div className="w-full text-center py-6 space-y-4 max-w-sm animate-scale-up" id="game-over-loss-container">
-              <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900 rounded-2xl space-y-2">
-                <p className="text-xs font-bold text-rose-500 uppercase tracking-widest font-mono">DENEME HAKKI VEYA SÜRE BİTTİ</p>
-                <h4 className="text-lg font-bold text-gray-900 dark:text-white">Aradığınız kelime şuydu:</h4>
-                <strong className="text-2xl text-rose-500 tracking-wider font-extrabold block uppercase">{targetWord}</strong>
+            <div className="w-full text-center py-2 space-y-2.5 max-w-sm animate-scale-up" id="game-over-loss-container">
+              <div className="p-2.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900 rounded-xl space-y-1">
+                <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest font-mono">DENEME HAKKI VEYA SÜRE BİTTİ</p>
+                <h4 className="text-xs font-bold text-gray-900 dark:text-white">Aradığınız kelime şuydu:</h4>
+                <strong className="text-xl text-rose-500 tracking-wider font-extrabold block uppercase leading-none">{targetWord}</strong>
               </div>
 
               {wordDefinition && (
-                <div className="p-4 bg-white/70 dark:bg-gray-950/40 rounded-2xl border border-rose-500/15 shadow-inner text-left animate-fade-in">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 font-mono block mb-1">
+                <div className="p-2.5 bg-white/70 dark:bg-gray-950/40 rounded-xl border border-rose-500/15 shadow-inner text-left animate-fade-in">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 font-mono block mb-0.5">
                     TDK SÖZLÜK ANLAMI
                   </span>
-                  <p className="text-xs text-gray-600 dark:text-gray-300 italic font-sans leading-relaxed">
+                  <p className="text-[11px] text-gray-600 dark:text-gray-300 italic font-sans leading-snug">
                     "{wordDefinition}"
                   </p>
                 </div>
@@ -1876,7 +1847,7 @@ export default function App() {
 
               <button
                 onClick={() => startNewGame(wordLength)}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-emerald-500/20 text-xs sm:text-sm active:scale-95 transition"
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-black py-2 px-6 rounded-lg shadow-md shadow-emerald-500/15 text-[11px] uppercase tracking-wider active:scale-95 transition cursor-pointer"
                 id="loss-retry-button"
               >
                 Yeni Kelime ile Başla
@@ -1894,25 +1865,25 @@ export default function App() {
 
           {/* Action Button Above Keyboard */}
           {gameStatus === 'playing' && (
-            <div className="w-full max-w-2xl lg:max-w-3xl px-2 mt-4 mb-3">
+            <div className="w-full max-w-md px-2 mt-2.5 mb-2">
               <button
                 onClick={submitGuess}
                 disabled={currentAttempt.length !== wordLength || isValidating}
-                className={`w-full py-4 px-6 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest shadow-lg transition-all duration-200 flex items-center justify-center gap-2 border ${
+                className={`w-full py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-widest shadow-md transition-all duration-200 flex items-center justify-center gap-2 border ${
                   currentAttempt.length === wordLength && !isValidating
-                    ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-500 hover:from-emerald-600 hover:to-teal-600 text-white border-emerald-400 hover:shadow-emerald-500/30 active:scale-[0.98] cursor-pointer'
+                    ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-teal-700 text-white border-emerald-400 hover:shadow-emerald-500/20 active:scale-[0.98] cursor-pointer'
                     : 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-gray-200/60 dark:border-gray-800/40 cursor-not-allowed'
                 }`}
                 id="submit-guess-button-above-keyboard"
               >
                 {isValidating ? (
                   <>
-                    <RotateCcw className="animate-spin" size={16} />
+                    <RotateCcw className="animate-spin" size={14} />
                     DOĞRULANIYOR...
                   </>
                 ) : (
                   <>
-                    <Sparkles size={16} className={currentAttempt.length === wordLength ? "animate-bounce" : ""} />
+                    <Sparkles size={14} className={currentAttempt.length === wordLength ? "animate-bounce" : ""} />
                     TAMAM (DENE)
                   </>
                 )}
