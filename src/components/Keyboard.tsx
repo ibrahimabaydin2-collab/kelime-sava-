@@ -76,7 +76,7 @@ export default function Keyboard({
   };
 
   return (
-    <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl mx-auto px-0.5 sm:px-2 mt-2">
+    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto px-0.5 sm:px-2 mt-2">
       <div className="flex flex-col gap-[clamp(0.2rem,0.9vh,0.5rem)]">
         {rows.map((row, rowIndex) => (
           <div key={rowIndex} className="flex justify-center gap-[clamp(0.15rem,0.9vw,0.4rem)]">

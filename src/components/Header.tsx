@@ -31,7 +31,7 @@ export default function Header({
 }: HeaderProps) {
   return (
     <header className="w-full border-b border-[#3E485A] bg-[#2E3748] transition-colors duration-200">
-      <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="max-w-full md:max-w-[95vw] lg:max-w-[90vw] mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img 
             src="./logo.svg" 

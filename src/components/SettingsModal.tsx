@@ -1,5 +1,6 @@
-import React from 'react';
-import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2, Type } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2, Type, User, Edit2 } from 'lucide-react';
+import { UserProfile } from '../types.js';
 
 export interface AppSettings {
   boardTheme: 'classic' | 'ocean' | 'neon' | 'autumn' | 'pastel';
@@ -17,6 +18,8 @@ interface SettingsModalProps {
   darkMode?: boolean;
   onToggleDarkMode?: () => void;
   onOpenStats?: () => void;
+  profile: UserProfile;
+  onUpdateProfile: (name: string, avatarUrl?: string) => void;
 }
 
 export default function SettingsModal({
@@ -25,8 +28,67 @@ export default function SettingsModal({
   onClose,
   darkMode,
   onToggleDarkMode,
-  onOpenStats
+  onOpenStats,
+  profile,
+  onUpdateProfile
 }: SettingsModalProps) {
+  const [editName, setEditName] = useState<string>(profile.name);
+  const [selectedAvatar, setSelectedAvatar] = useState<string>(profile.avatarUrl || '🧠');
+  const [showAvatarPresets, setShowAvatarPresets] = useState<boolean>(false);
+
+  const AVATAR_PRESETS = [
+    '⚔️', '🧠', '🐺', '🦁', '🧙‍♂️', '🦊', 
+    '👾', '🦄', '⚡', '👑', '🎯', '🚀', 
+    '🔥', '🐉', '🐼', '🛡️', '🏆', '🦉'
+  ];
+
+  const handleSaveProfile = () => {
+    if (editName.trim() && (editName.trim() !== profile.name || selectedAvatar !== profile.avatarUrl)) {
+      onUpdateProfile(editName.trim(), selectedAvatar);
+    }
+  };
+
+  const handleCustomAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 128;
+          const MAX_HEIGHT = 128;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            setSelectedAvatar(dataUrl);
+            onUpdateProfile(editName.trim(), dataUrl);
+          }
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     onChangeSettings({
       ...settings,
@@ -72,11 +134,112 @@ export default function SettingsModal({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => {
+              handleSaveProfile();
+              onClose();
+            }}
             className="p-1.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition cursor-pointer"
           >
             <X size={18} />
           </button>
+        </div>
+
+        {/* Profile Editing Section */}
+        <div className="bg-[#3D4756]/30 border border-white/5 rounded-2xl p-4 space-y-4 text-left" id="settings-profile-section">
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+            <User size={14} className="text-amber-400" />
+            Savaşçı Profil Ayarları
+          </h4>
+          
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            {/* Avatar Selector */}
+            <div className="relative shrink-0">
+              <div 
+                onClick={() => setShowAvatarPresets(!showAvatarPresets)}
+                className="w-16 h-16 rounded-full bg-[#3D4756] border-2 border-amber-200/60 shadow-[0_0_15px_rgba(251,191,36,0.25)] flex items-center justify-center text-3xl overflow-hidden transition-transform duration-200 hover:scale-105 cursor-pointer"
+              >
+                {selectedAvatar && selectedAvatar.length > 3 ? (
+                  <img src={selectedAvatar} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="select-none">{selectedAvatar}</span>
+                )}
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                id="settings-avatar-upload"
+                className="hidden"
+                onChange={handleCustomAvatarUpload}
+              />
+              <label 
+                htmlFor="settings-avatar-upload"
+                className="absolute -bottom-1 -right-1 bg-amber-400 hover:bg-amber-300 text-slate-950 p-1.5 rounded-full shadow-md transition cursor-pointer"
+                title="Fotoğraf Yükle"
+              >
+                <Edit2 size={10} strokeWidth={2.5} />
+              </label>
+            </div>
+
+            {/* Username Input */}
+            <div className="flex-1 w-full space-y-1.5">
+              <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-widest block font-sans">KULLANICI ADI</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  maxLength={16}
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Kullanıcı adınızı yazın..."
+                  className="flex-1 bg-[#2E3748]/55 border border-white/5 rounded-xl px-4 py-2 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40 transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (editName.trim()) {
+                      onUpdateProfile(editName.trim(), selectedAvatar);
+                    }
+                  }}
+                  disabled={!editName.trim() || editName.trim() === profile.name}
+                  className="px-3.5 py-2 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] text-xs font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer shrink-0"
+                >
+                  Güncelle
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Avatar Presets grid */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setShowAvatarPresets(!showAvatarPresets)}
+              className="text-[10px] text-amber-200 hover:text-amber-100 flex items-center gap-1 font-bold transition focus:outline-none"
+            >
+              <span>{showAvatarPresets ? '✦ Presets Kapat' : '✦ Preset Avatar Seç...'}</span>
+            </button>
+            
+            {showAvatarPresets && (
+              <div className="grid grid-cols-6 gap-2 p-2.5 bg-black/30 rounded-xl border border-white/5 max-h-24 overflow-y-auto animate-fade-in">
+                {AVATAR_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => {
+                      setSelectedAvatar(preset);
+                      onUpdateProfile(editName.trim(), preset);
+                    }}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg transition duration-150 active:scale-90 hover:bg-white/10 ${
+                      selectedAvatar === preset 
+                        ? 'bg-gradient-to-tr from-amber-400 to-amber-200 text-slate-900 scale-105 shadow' 
+                        : ''
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Section 1: Board Style Theme */}
@@ -277,7 +440,10 @@ export default function SettingsModal({
         {/* Footer info */}
         <div className="pt-4 border-t border-[#3E485A] flex justify-end gap-2 bg-[#3D4756]/30 -mx-6 -mb-6 p-4 rounded-b-[2.2rem]">
           <button
-            onClick={onClose}
+            onClick={() => {
+              handleSaveProfile();
+              onClose();
+            }}
             className="w-full sm:w-auto px-6 py-2.5 bg-[#FAF6E9] text-[#2E3748] hover:bg-[#F3EFE0] text-xs font-black rounded-xl shadow-md transition cursor-pointer border border-[#EBE6D5]"
           >
             Kapat ve Uygula

@@ -168,7 +168,7 @@ export default function WelcomeScreen({
 
   if (showGameSetup) {
     return (
-      <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="welcome-setup-page">
+      <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="welcome-setup-page">
         {/* Glowing 4-point star accent in bottom right */}
         <div className="absolute bottom-6 right-8 text-amber-100/30 animate-pulse select-none pointer-events-none">
           <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
@@ -418,7 +418,7 @@ export default function WelcomeScreen({
   }
 
   return isEditing ? (
-    <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="welcome-screen-root">
+    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="welcome-screen-root">
       {/* Sparkles / Title */}
       <div className="flex justify-between items-center pb-2 border-b border-white/10">
         <span className="text-sm font-bold font-mono text-amber-200 uppercase tracking-widest flex items-center gap-1.5">
@@ -549,7 +549,7 @@ export default function WelcomeScreen({
       </div>
     </div>
   ) : (
-    <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-6" id="welcome-screen-root">
+    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-6" id="welcome-screen-root">
       
       {/* Glowing 4-point star accent in bottom right */}
       <div className="absolute bottom-6 right-8 text-amber-100/30 animate-pulse select-none pointer-events-none">
@@ -598,12 +598,7 @@ export default function WelcomeScreen({
         <div className="relative">
           {/* Golden Glowing Ring around Avatar */}
           <div 
-            onClick={() => {
-              setEditName(profile.name);
-              setSelectedAvatar(profile.avatarUrl || '🧠');
-              setIsEditing(true);
-            }}
-            className="w-16 h-16 rounded-full bg-[#3D4756] border-2 border-amber-200/60 shadow-[0_0_15px_rgba(251,191,36,0.25)] flex items-center justify-center text-3xl overflow-hidden transition-transform duration-300 hover:scale-105 cursor-pointer"
+            className="w-16 h-16 rounded-full bg-[#3D4756] border-2 border-amber-200/60 shadow-[0_0_15px_rgba(251,191,36,0.25)] flex items-center justify-center text-3xl overflow-hidden"
           >
             {profile.avatarUrl && profile.avatarUrl.length > 3 ? (
               <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -611,17 +606,6 @@ export default function WelcomeScreen({
               <span className="select-none">{profile.avatarUrl || '🧠'}</span>
             )}
           </div>
-          <button 
-            onClick={() => {
-              setEditName(profile.name);
-              setSelectedAvatar(profile.avatarUrl || '🧠');
-              setIsEditing(true);
-            }}
-            className="absolute -bottom-1 -right-1 bg-amber-400 hover:bg-amber-300 text-slate-950 p-1.5 rounded-full shadow-md transition"
-            title="Profili Düzenle"
-          >
-            <Edit2 size={10} strokeWidth={2.5} />
-          </button>
         </div>
         
         <div className="flex items-center gap-2">
@@ -636,25 +620,6 @@ export default function WelcomeScreen({
         <span className="flex items-center gap-1"><Flame size={13} className="text-orange-400 animate-pulse" /> {profile.stats?.currentStreak || 0} Seri</span>
         <span className="text-white/15">|</span>
         <span className="flex items-center gap-1"><Swords size={13} className="text-blue-400" /> %{winRate} Galibiyet</span>
-      </div>
-
-      {/* Glassmorphic Nickname Input Box */}
-      <div className="w-full bg-[#4B5563]/40 border border-white/10 rounded-2xl p-4 text-left shadow-inner space-y-1">
-        <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-widest block font-sans">KULLANICI ADINIZ</label>
-        <input
-          type="text"
-          maxLength={16}
-          value={editName}
-          onChange={(e) => {
-            const newVal = e.target.value;
-            setEditName(newVal);
-            if (newVal.trim().length > 0) {
-              onUpdateProfile(newVal.trim(), profile.avatarUrl);
-            }
-          }}
-          placeholder="Kullanıcı adınızı yazın..."
-          className="w-full bg-[#2E3748]/55 border border-white/5 rounded-xl px-4 py-2.5 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40 focus:border-transparent transition"
-        />
       </div>
 
       {/* Direct Challenge Notification */}
@@ -726,8 +691,8 @@ export default function WelcomeScreen({
         )}
       </div>
 
-      {/* Beautiful Cream 2x2 Action Grid */}
-      <div className="grid grid-cols-2 gap-3 w-full">
+      {/* Beautiful Cream Action Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 w-full">
         {/* Button 1: REKABET */}
         <button
           onClick={onOpenStats}

@@ -16,6 +16,7 @@ import MissionsModal from './components/MissionsModal.js';
 import WelcomeScreen from './components/WelcomeScreen.js';
 import GroupRace from './components/GroupRace.js';
 import SettingsModal, { AppSettings } from './components/SettingsModal.js';
+import FirstTimeSetup from './components/FirstTimeSetup.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList } from './data/wordlist.js';
@@ -329,6 +330,10 @@ export default function App() {
         // Ensure missions and badges structures are complete and upgraded if old
         if (!parsed.missions || parsed.missions.length < 10) parsed.missions = DEFAULT_MISSIONS;
         if (!parsed.badges) parsed.badges = DEFAULT_BADGES;
+        // Backward-compatibility: if user has already entered the game before, assume name is set
+        if (parsed.nameSet === undefined) {
+          parsed.nameSet = true;
+        }
         return parsed;
       } catch (e) {
         console.error('Failed parsing profile', e);
@@ -345,7 +350,8 @@ export default function App() {
       badges: DEFAULT_BADGES,
       missions: DEFAULT_MISSIONS,
       dailyScore: 0,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
+      nameSet: false // Brand new users must select their nickname and avatar
     };
   });
 
@@ -1483,7 +1489,7 @@ export default function App() {
   return (
     <div className={`min-h-screen flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
       {/* Main Container */}
-      <main className="flex-1 flex flex-col items-center justify-center py-2 sm:py-4 px-1.5 sm:px-4 max-w-5xl lg:max-w-6xl w-full mx-auto relative">
+      <main className="flex-1 flex flex-col items-center justify-center py-2 sm:py-4 px-1.5 sm:px-4 max-w-full md:max-w-[95vw] lg:max-w-[90vw] w-full mx-auto relative">
         {/* Toast Notification */}
         {toast && (
           <div className={`fixed top-20 z-50 left-1/2 transform -translate-x-1/2 px-4 py-2.5 rounded-xl border flex items-center gap-2.5 text-xs sm:text-sm font-semibold shadow-lg transition duration-200 animate-slide-in ${
@@ -1498,7 +1504,33 @@ export default function App() {
           </div>
         )}
 
-        {isGroupRaceActive ? (
+        {profile.nameSet === false ? (
+          <FirstTimeSetup
+            profile={profile}
+            onComplete={(name, avatarUrl) => {
+              const updated = {
+                ...profile,
+                name,
+                avatarUrl,
+                nameSet: true,
+                lastUpdated: new Date().toISOString()
+              };
+              setProfile(updated);
+              safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updated));
+              
+              // Inform websocket if connection is alive
+              if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+                socketRef.current.send(JSON.stringify({
+                  type: 'join',
+                  id: profile.id,
+                  name,
+                  avatarUrl
+                }));
+              }
+              showToast('Savaşçı profiliniz başarıyla oluşturuldu!', 'success');
+            }}
+          />
+        ) : isGroupRaceActive ? (
           <GroupRace
             profile={profile}
             onUpdateScore={(points) => {
@@ -1547,7 +1579,7 @@ export default function App() {
           <>
             {/* Back to welcome & Compact control panel block */}
             {!activeMatch && (
-              <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl flex flex-col gap-2 mb-2 animate-fadeIn">
+              <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] flex flex-col gap-2 mb-2 animate-fadeIn">
                 {/* Row 1: Back to entry screen, Pes Et & Yenile */}
                 <div className="flex justify-between items-center w-full">
                   <button
@@ -1655,7 +1687,7 @@ export default function App() {
 
             {/* Real-time Match Split View Banner */}
         {activeMatch && (
-          <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-2.5 mb-2.5 flex flex-col sm:flex-row justify-between items-center gap-3 shadow-sm">
+          <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-2.5 mb-2.5 flex flex-col sm:flex-row justify-between items-center gap-3 shadow-sm">
             <div className="flex items-center gap-2.5">
               <Swords size={20} className="text-emerald-500 shrink-0" />
               <div className="text-left">
@@ -1710,7 +1742,7 @@ export default function App() {
         {/* Game Layout Wrapper for Side-by-Side Panels */}
         <div className="w-full flex flex-col md:flex-row items-center md:items-start justify-center gap-4 relative z-10">
           {/* Game Area Card */}
-          <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-5 sm:p-6 shadow-2xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
+          <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-5 sm:p-6 shadow-2xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -1902,7 +1934,7 @@ export default function App() {
 
           {/* Action Button Above Keyboard */}
           {gameStatus === 'playing' && (
-            <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl px-2 mt-2.5 mb-2">
+            <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] px-2 mt-2.5 mb-2">
               <button
                 onClick={submitGuess}
                 disabled={currentAttempt.length !== wordLength || isValidating}
@@ -2205,6 +2237,8 @@ export default function App() {
           darkMode={darkMode}
           onToggleDarkMode={() => setDarkMode(!darkMode)}
           onOpenStats={() => setShowStatsModal(true)}
+          profile={profile}
+          onUpdateProfile={handleUpdateProfile}
         />
       )}
 

@@ -33,6 +33,7 @@ export interface UserProfile {
   missions: DailyMission[];
   dailyScore: number;
   lastUpdated: string;
+  nameSet?: boolean;
 }
 
 export interface GameAttempt {
