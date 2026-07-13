@@ -16,7 +16,8 @@ import MissionsModal from './components/MissionsModal.js';
 import WelcomeScreen from './components/WelcomeScreen.js';
 import GroupRace from './components/GroupRace.js';
 import SettingsModal, { AppSettings } from './components/SettingsModal.js';
-import FirstTimeSetup from './components/FirstTimeSetup.js';
+import AuthScreen from './components/AuthScreen.js';
+import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore } from './lib/firebase.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList } from './data/wordlist.js';
@@ -355,6 +356,10 @@ export default function App() {
     };
   });
 
+  // Firebase Auth states
+  const [firebaseUser, setFirebaseUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+
   // Game Play State
   const [wordLength, setWordLength] = useState<number>(5);
   const [targetWord, setTargetWord] = useState<string>('');
@@ -465,6 +470,35 @@ export default function App() {
     }
     safeLocalStorage.setItem('darkMode', darkMode.toString());
   }, [darkMode]);
+
+  // Listen to Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setFirebaseUser(user);
+        // Fetch profile from Firestore
+        const dbProfile = await fetchUserProfile(user.uid);
+        if (dbProfile) {
+          setProfile(dbProfile);
+          safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(dbProfile));
+        } else {
+          // If no doc in firestore, sync current profile state
+          const updatedProfile = {
+            ...profile,
+            id: user.uid,
+            nameSet: true
+          };
+          setProfile(updatedProfile);
+          await saveUserProfileToFirestore(updatedProfile);
+          safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+        }
+      } else {
+        setFirebaseUser(null);
+      }
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Persist User Profile
   useEffect(() => {
@@ -1458,14 +1492,16 @@ export default function App() {
     }
   };
 
-  const handleUpdateProfile = (name: string, avatarUrl?: string) => {
-    setProfile((prev) => ({
-      ...prev,
+  const handleUpdateProfile = async (name: string, avatarUrl?: string) => {
+    const updated = {
+      ...profile,
       name,
       avatarUrl
-    }));
+    };
+    setProfile(updated);
     setNameInput(name);
     setAvatarInput(avatarUrl);
+    await saveUserProfileToFirestore(updated);
     showToast('Profiliniz güncellendi.', 'success');
   };
 
@@ -1523,31 +1559,30 @@ export default function App() {
           </div>
         )}
 
-        {profile.nameSet === false ? (
-          <FirstTimeSetup
-            profile={profile}
-            onComplete={(name, avatarUrl) => {
-              const updated = {
-                ...profile,
-                name,
-                avatarUrl,
-                nameSet: true,
-                lastUpdated: new Date().toISOString()
-              };
-              setProfile(updated);
-              safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updated));
+        {authLoading ? (
+          <div className="flex-1 flex flex-col items-center justify-center space-y-4">
+            <div className="w-12 h-12 border-4 border-[#FAF6E9] border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm font-bold text-[#FAF6E9]/60">Savaşçı Oturumu Hazırlanıyor...</p>
+          </div>
+        ) : !firebaseUser ? (
+          <AuthScreen
+            onAuthComplete={(updatedProfile, fUser) => {
+              setProfile(updatedProfile);
+              setFirebaseUser(fUser);
+              safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
               
               // Inform websocket if connection is alive
               if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
                 socketRef.current.send(JSON.stringify({
                   type: 'join',
-                  id: profile.id,
-                  name,
-                  avatarUrl
+                  id: updatedProfile.id,
+                  name: updatedProfile.name,
+                  avatarUrl: updatedProfile.avatarUrl
                 }));
               }
-              showToast('Savaşçı profiliniz başarıyla oluşturuldu!', 'success');
+              showToast('Başarıyla giriş yapıldı!', 'success');
             }}
+            lobbyPlayers={lobbyPlayers}
           />
         ) : isGroupRaceActive ? (
           <GroupRace
@@ -2328,6 +2363,7 @@ export default function App() {
           onToggleDarkMode={() => setDarkMode(!darkMode)}
           onOpenStats={() => setShowStatsModal(true)}
           profile={profile}
+          lobbyPlayers={lobbyPlayers}
           onUpdateProfile={handleUpdateProfile}
         />
       )}

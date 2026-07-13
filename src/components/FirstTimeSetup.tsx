@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Sparkles, Swords, User } from 'lucide-react';
-import { UserProfile } from '../types.js';
+import { UserProfile, LobbyPlayer } from '../types.js';
+import { validateUsername } from '../utils/usernameValidation.js';
 
 interface FirstTimeSetupProps {
   profile: UserProfile;
+  lobbyPlayers?: LobbyPlayer[];
   onComplete: (name: string, avatarUrl: string) => void;
 }
 
@@ -13,9 +15,12 @@ const AVATAR_PRESETS = [
   '🔥', '🐉', '🐼', '🛡️', '🏆', '🦉'
 ];
 
-export default function FirstTimeSetup({ profile, onComplete }: FirstTimeSetupProps) {
+export default function FirstTimeSetup({ profile, lobbyPlayers = [], onComplete }: FirstTimeSetupProps) {
   const [username, setUsername] = useState<string>('');
   const [selectedAvatar, setSelectedAvatar] = useState<string>('🧠');
+  const [isTouched, setIsTouched] = useState<boolean>(false);
+
+  const error = isTouched || username ? validateUsername(username, lobbyPlayers, profile.id) : null;
 
   const handleCustomAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,7 +64,9 @@ export default function FirstTimeSetup({ profile, onComplete }: FirstTimeSetupPr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) return;
+    setIsTouched(true);
+    const validationError = validateUsername(username, lobbyPlayers, profile.id);
+    if (validationError) return;
     onComplete(username.trim(), selectedAvatar);
   };
 
@@ -97,14 +104,22 @@ export default function FirstTimeSetup({ profile, onComplete }: FirstTimeSetupPr
             </span>
             <input
               type="text"
-              maxLength={16}
+              maxLength={26}
               required
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                setIsTouched(true);
+              }}
               placeholder="Savaşçı adını belirle..."
-              className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
+              className={`w-full bg-[#3D4756]/40 border ${error ? 'border-rose-500 focus:ring-rose-400/40 focus:border-rose-400/40' : 'border-[#3E485A] focus:ring-amber-400/40 focus:border-amber-400/40'} rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
             />
           </div>
+          {error && (
+            <p className="text-xs text-rose-400 font-semibold px-1 mt-1 animate-fade-in">
+              ⚠️ {error}
+            </p>
+          )}
         </div>
 
         {/* Avatar selection */}
@@ -160,7 +175,7 @@ export default function FirstTimeSetup({ profile, onComplete }: FirstTimeSetupPr
         {/* Submit button */}
         <button
           type="submit"
-          disabled={!username.trim()}
+          disabled={!username.trim() || !!error}
           className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-sm py-4 px-6 rounded-2xl shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] disabled:opacity-50 disabled:pointer-events-none transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
         >
           <Sparkles size={14} className="mr-2 text-amber-500 fill-amber-500" />

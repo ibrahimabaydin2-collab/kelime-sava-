@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2, Type, User, Edit2 } from 'lucide-react';
-import { UserProfile } from '../types.js';
+import { X, Sliders, Palette, Layout, Volume2, VolumeX, Check, Smartphone, Sun, Moon, BarChart2, Type, User, Edit2, Shield, CheckCircle2, AlertTriangle, Key } from 'lucide-react';
+import { UserProfile, LobbyPlayer } from '../types.js';
+import { validateUsername, validatePassword } from '../utils/usernameValidation.js';
+import { auth, linkGuestToEmailAndPassword, sendVerificationEmail } from '../lib/firebase.js';
+
 
 export interface AppSettings {
   boardTheme: 'classic' | 'ocean' | 'neon' | 'autumn' | 'pastel';
@@ -19,6 +22,7 @@ interface SettingsModalProps {
   onToggleDarkMode?: () => void;
   onOpenStats?: () => void;
   profile: UserProfile;
+  lobbyPlayers?: LobbyPlayer[];
   onUpdateProfile: (name: string, avatarUrl?: string) => void;
 }
 
@@ -30,11 +34,25 @@ export default function SettingsModal({
   onToggleDarkMode,
   onOpenStats,
   profile,
+  lobbyPlayers = [],
   onUpdateProfile
 }: SettingsModalProps) {
   const [editName, setEditName] = useState<string>(profile.name);
   const [selectedAvatar, setSelectedAvatar] = useState<string>(profile.avatarUrl || '🧠');
   const [showAvatarPresets, setShowAvatarPresets] = useState<boolean>(false);
+  const [isTouched, setIsTouched] = useState<boolean>(false);
+
+  // Account Security state
+  const [secureEmail, setSecureEmail] = useState<string>('');
+  const [securePassword, setSecurePassword] = useState<string>('');
+  const [securePasswordConfirm, setSecurePasswordConfirm] = useState<string>('');
+  const [securityError, setSecurityError] = useState<string | null>(null);
+  const [securitySuccess, setSecuritySuccess] = useState<string | null>(null);
+  const [isLinking, setIsLinking] = useState<boolean>(false);
+  const [resendingVerification, setResendingVerification] = useState<boolean>(false);
+  const [verificationSent, setVerificationSent] = useState<boolean>(false);
+
+  const error = isTouched || editName !== profile.name ? validateUsername(editName, lobbyPlayers, profile.id) : null;
 
   const AVATAR_PRESETS = [
     '⚔️', '🧠', '🐺', '🦁', '🧙‍♂️', '🦊', 
@@ -42,10 +60,15 @@ export default function SettingsModal({
     '🔥', '🐉', '🐼', '🛡️', '🏆', '🦉'
   ];
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = (): boolean => {
+    setIsTouched(true);
+    const validationError = validateUsername(editName, lobbyPlayers, profile.id);
+    if (validationError) return false;
+
     if (editName.trim() && (editName.trim() !== profile.name || selectedAvatar !== profile.avatarUrl)) {
       onUpdateProfile(editName.trim(), selectedAvatar);
     }
+    return true;
   };
 
   const handleCustomAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,8 +158,9 @@ export default function SettingsModal({
           </div>
           <button
             onClick={() => {
-              handleSaveProfile();
-              onClose();
+              if (handleSaveProfile()) {
+                onClose();
+              }
             }}
             className="p-1.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition cursor-pointer"
           >
@@ -181,30 +205,39 @@ export default function SettingsModal({
             </div>
 
             {/* Username Input */}
-            <div className="flex-1 w-full space-y-1.5">
+            <div className="flex-1 w-full space-y-1.5 text-left">
               <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-widest block font-sans">KULLANICI ADI</label>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  maxLength={16}
+                  maxLength={26}
                   value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
+                  onChange={(e) => {
+                    setEditName(e.target.value);
+                    setIsTouched(true);
+                  }}
                   placeholder="Kullanıcı adınızı yazın..."
-                  className="flex-1 bg-[#2E3748]/55 border border-white/5 rounded-xl px-4 py-2 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40 transition"
+                  className={`flex-1 bg-[#2E3748]/55 border ${error ? 'border-rose-500 focus:ring-rose-400/40' : 'border-white/5 focus:ring-amber-200/40'} rounded-xl px-4 py-2 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
                 />
                 <button
                   type="button"
                   onClick={() => {
-                    if (editName.trim()) {
-                      onUpdateProfile(editName.trim(), selectedAvatar);
+                    setIsTouched(true);
+                    if (handleSaveProfile()) {
+                      setIsTouched(false);
                     }
                   }}
-                  disabled={!editName.trim() || editName.trim() === profile.name}
+                  disabled={!editName.trim() || !!error || editName.trim() === profile.name}
                   className="px-3.5 py-2 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] text-xs font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer shrink-0"
                 >
                   Güncelle
                 </button>
               </div>
+              {error && (
+                <p className="text-[11px] text-rose-400 font-semibold px-1 mt-1 animate-fade-in text-left leading-normal">
+                  ⚠️ {error}
+                </p>
+              )}
             </div>
           </div>
 
@@ -240,6 +273,187 @@ export default function SettingsModal({
               </div>
             )}
           </div>
+        </div>
+
+        {/* Account Security (Hesap Güvenliği) */}
+        <div className="bg-[#3D4756]/30 border border-white/5 rounded-2xl p-4 space-y-4 text-left shadow-inner" id="settings-security-section">
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+            <Shield size={14} className="text-amber-400" />
+            Hesap Güvenliği & Koruma
+          </h4>
+
+          {auth.currentUser ? (
+            !auth.currentUser.isAnonymous ? (
+              /* Connected / Email Login Mode */
+              <div className="space-y-3">
+                <div className="flex items-center justify-between bg-[#232B39]/50 p-3 rounded-xl border border-white/5">
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-bold text-amber-100/50 uppercase tracking-wider font-sans">BAĞLI E-POSTA</p>
+                    <p className="text-xs font-black text-gray-200">{auth.currentUser.email}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">
+                    <CheckCircle2 size={12} />
+                    <span>Bağlı</span>
+                  </div>
+                </div>
+
+                {auth.currentUser.emailVerified ? (
+                  <div className="flex items-start gap-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-3 rounded-xl text-xs font-semibold">
+                    <CheckCircle2 size={16} className="shrink-0 text-emerald-400 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-emerald-200">🟢 Doğrulanmış Savaşçı Üye</p>
+                      <p className="text-[10px] text-emerald-300/80 mt-0.5">Hesabınız tamamen doğrulanmış ve veri kurtarma havuzuna eklenmiştir.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-300 p-3 rounded-xl text-xs font-semibold">
+                      <AlertTriangle size={16} className="shrink-0 mt-0.5 text-rose-400" />
+                      <div>
+                        <p className="font-bold text-rose-200">🟡 E-posta Doğrulanmamış</p>
+                        <p className="text-[10px] text-rose-300/80 mt-0.5 font-medium leading-normal">E-postanız doğrulanana kadar "Doğrulanmış Üye" sayılmaz ve hesap kurtarma havuzuna tam dahil edilmezsiniz.</p>
+                      </div>
+                    </div>
+                    
+                    <button
+                      type="button"
+                      disabled={resendingVerification || verificationSent}
+                      onClick={async () => {
+                        setResendingVerification(true);
+                        setSecurityError(null);
+                        try {
+                          await sendVerificationEmail();
+                          setVerificationSent(true);
+                        } catch (err: any) {
+                          setSecurityError(err.message || 'Doğrulama e-postası gönderilemedi.');
+                        } finally {
+                          setResendingVerification(false);
+                        }
+                      }}
+                      className="w-full py-2.5 px-3 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-slate-900 text-xs font-black rounded-xl transition shadow-md active:scale-95 flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
+                    >
+                      {resendingVerification ? 'Gönderiliyor...' : verificationSent ? 'Doğrulama E-postası Gönderildi ✔' : 'Doğrulama E-postası Gönder'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Anonymous / Guest Mode (Needs Protection) */
+              <div className="space-y-3">
+                <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-300 p-3 rounded-xl text-xs font-semibold">
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-400" />
+                  <div>
+                    <p className="font-bold text-amber-200">Geçici Misafir Profili</p>
+                    <p className="text-[10px] text-amber-300/80 mt-0.5 font-medium leading-normal">Hesabınız e-posta ile korunmuyor. Oyunu sildiğinizde veya başka cihazdan giriş yaptığınızda puanlarınız ve ilerlemeniz kaybolabilir!</p>
+                  </div>
+                </div>
+
+                {securityError && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs font-semibold text-rose-300 leading-normal animate-fade-in">
+                    ⚠️ {securityError}
+                  </div>
+                )}
+
+                {securitySuccess && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs font-semibold text-emerald-300 leading-normal animate-fade-in">
+                    🎉 {securitySuccess}
+                  </div>
+                )}
+
+                {!securitySuccess && (
+                  <div className="space-y-2.5">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-amber-100/50 uppercase tracking-widest block font-sans">E-POSTA ADRESİ</label>
+                      <input
+                        type="email"
+                        placeholder="ornek@domain.com"
+                        value={secureEmail}
+                        onChange={(e) => setSecureEmail(e.target.value)}
+                        className="w-full bg-[#2E3748]/55 border border-white/5 rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-amber-100/50 uppercase tracking-widest block font-sans">YENİ ŞİFRE</label>
+                        <input
+                          type="password"
+                          placeholder="••••••"
+                          value={securePassword}
+                          onChange={(e) => setSecurePassword(e.target.value)}
+                          className="w-full bg-[#2E3748]/55 border border-white/5 rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-amber-100/50 uppercase tracking-widest block font-sans">ŞİFRE TEKRAR</label>
+                        <input
+                          type="password"
+                          placeholder="••••••"
+                          value={securePasswordConfirm}
+                          onChange={(e) => setSecurePasswordConfirm(e.target.value)}
+                          className="w-full bg-[#2E3748]/55 border border-white/5 rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isLinking || !secureEmail || !securePassword}
+                      onClick={async () => {
+                        setSecurityError(null);
+                        setSecuritySuccess(null);
+                        
+                        /* Validations */
+                        const passErr = validatePassword(securePassword);
+                        if (passErr) {
+                          setSecurityError(passErr);
+                          return;
+                        }
+                        if (securePassword !== securePasswordConfirm) {
+                          setSecurityError('Şifreler uyuşmuyor.');
+                          return;
+                        }
+
+                        setIsLinking(true);
+                        try {
+                          await linkGuestToEmailAndPassword(secureEmail, securePassword);
+                          setSecuritySuccess('Tebrikler! Misafir hesabınız başarıyla e-posta ile korunmuştur. Doğrulama e-postası otomatik olarak gönderildi.');
+                          setSecureEmail('');
+                          setSecurePassword('');
+                          setSecurePasswordConfirm('');
+                        } catch (err: any) {
+                          console.error('Error protecting account:', err);
+                          let msg = err.message || 'Hesap eşleştirme başarısız oldu.';
+                          if (err.code?.includes('auth/email-already-in-use')) {
+                            msg = 'Bu e-posta adresi zaten kullanımda.';
+                          } else if (err.code?.includes('auth/invalid-email')) {
+                            msg = 'Geçersiz bir e-posta adresi girdiniz.';
+                          } else if (err.code?.includes('auth/weak-password')) {
+                            msg = 'Şifre çok zayıf. Lütfen en az 6 karakterli daha güçlü bir şifre seçin.';
+                          }
+                          setSecurityError(msg);
+                        } finally {
+                          setIsLinking(false);
+                        }
+                      }}
+                      className="w-full py-2.5 px-4 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] text-xs font-black rounded-xl transition shadow-md active:scale-95 flex items-center justify-center gap-1.5 uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
+                    >
+                      {isLinking ? (
+                        <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Key size={12} />
+                          <span>Hesabımı Koru (E-posta Bağla)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          ) : (
+            <p className="text-xs text-gray-400 font-medium">Hesap koruması için aktif bir oturum algılanamadı.</p>
+          )}
         </div>
 
         {/* Section 1: Board Style Theme */}

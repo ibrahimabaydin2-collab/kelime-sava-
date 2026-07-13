@@ -3,10 +3,11 @@ import {
   Swords, Play, Globe, ShieldAlert, Sparkles, 
   Trophy, Users, HelpCircle, ChevronDown, ChevronUp, 
   Copy, Check, Flame, Zap, Target, Edit2, User, Award, CheckCircle2, TrendingUp,
-  Sun, Moon, Sliders, BarChart2, X, ArrowLeft, UserPlus, UserMinus, Clock
+  Sun, Moon, Sliders, BarChart2, X, ArrowLeft, UserPlus, UserMinus, Clock, Puzzle
 } from 'lucide-react';
 import { UserProfile, LobbyPlayer, Challenge } from '../types.js';
 import { getBaseUrl } from '../utils/api.js';
+import { validateUsername } from '../utils/usernameValidation.js';
 
 interface WelcomeScreenProps {
   profile: UserProfile;
@@ -109,6 +110,9 @@ export default function WelcomeScreen({
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editName, setEditName] = useState<string>(profile.name);
   const [selectedAvatar, setSelectedAvatar] = useState<string>(profile.avatarUrl || '🧠');
+  const [isTouched, setIsTouched] = useState<boolean>(false);
+
+  const error = isTouched || editName !== profile.name ? validateUsername(editName, lobbyPlayers || [], profile.id) : null;
 
   React.useEffect(() => {
     setEditName(profile.name);
@@ -125,9 +129,12 @@ export default function WelcomeScreen({
   };
 
   const handleSaveProfile = () => {
-    if (!editName.trim()) return;
+    setIsTouched(true);
+    const validationError = validateUsername(editName, lobbyPlayers || [], profile.id);
+    if (validationError) return;
     onUpdateProfile(editName.trim(), selectedAvatar);
     setIsEditing(false);
+    setIsTouched(false);
   };
 
   // Determine dynamic inclusive player title based on dailyScore
@@ -193,8 +200,8 @@ export default function WelcomeScreen({
         {/* Big centered game logo header */}
         <div className="flex flex-col items-center justify-center gap-1.5 mt-4 text-center">
           <div className="flex items-center justify-center gap-3">
-            <Swords className="w-8 h-8 text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)] animate-pulse" />
-            <h1 className="text-2xl sm:text-3xl font-black font-serif tracking-[0.18em] text-[#FAF6E9] uppercase drop-shadow-md">
+            <Swords className="w-6 h-6 text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)] animate-pulse" />
+            <h1 className="text-xl sm:text-2xl font-light font-serif tracking-[0.2em] text-[#FAF6E9] uppercase drop-shadow-md">
               KELİME SAVAŞI
             </h1>
           </div>
@@ -208,6 +215,19 @@ export default function WelcomeScreen({
             
             {/* Giant Premium Mode Cards */}
             <div className="grid grid-cols-3 gap-3.5">
+              {/* Solo Card */}
+              <button
+                onClick={() => setSelectedTab('solo')}
+                className={`py-6 px-3 rounded-[2rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-3 text-center cursor-pointer active:scale-95 hover:scale-[1.03] ${
+                  selectedTab === 'solo'
+                    ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] font-black shadow-[0_10px_20px_rgba(250,246,233,0.15)] ring-4 ring-emerald-400/35'
+                    : 'bg-[#3D4756]/40 text-[#FAF6E9]/80 border-white/5 hover:bg-[#3D4756]/70'
+                }`}
+              >
+                <Puzzle className={`w-8 h-8 ${selectedTab === 'solo' ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                <span className="text-xs sm:text-sm font-black uppercase tracking-wider leading-none">SOLO PRATİK</span>
+              </button>
+
               {/* PvP Card */}
               <button
                 onClick={() => setSelectedTab('pvp')}
@@ -217,21 +237,8 @@ export default function WelcomeScreen({
                     : 'bg-[#3D4756]/40 text-[#FAF6E9]/80 border-white/5 hover:bg-[#3D4756]/70'
                 }`}
               >
-                <span className="text-3xl drop-shadow-sm filter">⚔️</span>
-                <span className="text-xs sm:text-sm font-black uppercase tracking-wider leading-none">1v1 DÜELLO</span>
-              </button>
-
-              {/* Solo Card */}
-              <button
-                onClick={() => setSelectedTab('solo')}
-                className={`py-6 px-3 rounded-[2rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-3 text-center cursor-pointer active:scale-95 hover:scale-[1.03] ${
-                  selectedTab === 'solo'
-                    ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] font-black shadow-[0_10px_20px_rgba(250,246,233,0.15)] ring-4 ring-amber-400/20'
-                    : 'bg-[#3D4756]/40 text-[#FAF6E9]/80 border-white/5 hover:bg-[#3D4756]/70'
-                }`}
-              >
-                <span className="text-3xl drop-shadow-sm filter">🧩</span>
-                <span className="text-xs sm:text-sm font-black uppercase tracking-wider leading-none">SOLO PRATİK</span>
+                <Swords className={`w-8 h-8 ${selectedTab === 'pvp' ? 'text-amber-600' : 'text-amber-400'}`} />
+                <span className="text-xs sm:text-sm font-black uppercase tracking-wider leading-none">CANLI DÜELLO</span>
               </button>
 
               {/* Group Card */}
@@ -244,7 +251,7 @@ export default function WelcomeScreen({
                       : 'bg-[#3D4756]/40 text-[#FAF6E9]/80 border-white/5 hover:bg-[#3D4756]/70'
                   }`}
                 >
-                  <span className="text-3xl drop-shadow-sm filter">🏆</span>
+                  <Trophy className={`w-8 h-8 ${selectedTab === 'group' ? 'text-amber-600' : 'text-amber-400'}`} />
                   <span className="text-xs sm:text-sm font-black uppercase tracking-wider leading-none">GRUP YARIŞI</span>
                 </button>
               )}
@@ -376,7 +383,7 @@ export default function WelcomeScreen({
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                 <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest font-mono">
                   {selectedTab === 'solo' && 'SOLO PRATİK MODU AÇIKLAMASI'}
-                  {selectedTab === 'pvp' && '1v1 DÜELLO MODU AÇIKLAMASI'}
+                  {selectedTab === 'pvp' && 'CANLI DÜELLO MODU AÇIKLAMASI'}
                   {selectedTab === 'group' && 'GRUP YARIŞI MODU AÇIKLAMASI'}
                 </span>
               </div>
@@ -387,7 +394,7 @@ export default function WelcomeScreen({
               </p>
             </div>
 
-            {/* Full Width Dynamic Launch Button with Sword Icon */}
+            {/* Full Width Dynamic Launch Button with Puzzle Icon */}
             {selectedTab === 'solo' && (
               <button
                 onClick={() => {
@@ -397,8 +404,8 @@ export default function WelcomeScreen({
                 className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-base sm:text-lg py-4 px-6 rounded-2xl shadow-[0_5px_0_#D9D4C3,0_8px_15px_rgba(0,0,0,0.2)] transition-all flex items-center justify-center uppercase tracking-widest cursor-pointer border border-[#EBE6D5]"
                 id="start-solo-btn"
               >
-                <Swords size={18} className="text-[#2E3748] mr-2.5 stroke-[2.5]" />
-                <span>Tek Oyuncu Savaşını Başlat</span>
+                <Puzzle size={18} className="text-emerald-600 mr-2.5 stroke-[2.5] fill-emerald-600/15" />
+                <span>Solo Oyununu Başlat</span>
               </button>
             )}
 
@@ -419,7 +426,7 @@ export default function WelcomeScreen({
                 id="start-pvp-btn"
               >
                 <Swords size={18} className={`mr-2.5 stroke-[2.5] ${matchmakingStatus === 'queued' ? 'animate-bounce' : 'text-[#2E3748]'}`} />
-                <span>{matchmakingStatus === 'queued' ? 'Aranıyor...' : '1v1 Düelloyu Başlat'}</span>
+                <span>{matchmakingStatus === 'queued' ? 'Aranıyor...' : 'Canlı Düelloyu Başlat'}</span>
               </button>
             )}
 
@@ -550,25 +557,36 @@ export default function WelcomeScreen({
         <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">TAKMA ADINIZ</label>
         <input
           type="text"
-          maxLength={16}
+          maxLength={26}
           value={editName}
-          onChange={(e) => setEditName(e.target.value)}
+          onChange={(e) => {
+            setEditName(e.target.value);
+            setIsTouched(true);
+          }}
           placeholder="Takma adınızı yazın..."
-          className="w-full bg-[#2E3748]/55 border border-white/5 rounded-xl px-4 py-2.5 text-sm font-bold text-[#FAF6E9] focus:outline-none focus:ring-2 focus:ring-amber-200/40"
+          className={`w-full bg-[#2E3748]/55 border ${error ? 'border-rose-500 focus:ring-rose-400/40' : 'border-white/5 focus:ring-amber-200/40'} rounded-xl px-4 py-2.5 text-sm font-bold text-[#FAF6E9] focus:outline-none focus:ring-2`}
         />
+        {error && (
+          <p className="text-xs text-rose-400 font-semibold px-1 mt-1 animate-fade-in">
+            ⚠️ {error}
+          </p>
+        )}
       </div>
 
       {/* Save / Cancel buttons */}
       <div className="flex gap-2 mt-2">
         <button
-          onClick={() => setIsEditing(false)}
+          onClick={() => {
+            setIsEditing(false);
+            setIsTouched(false);
+          }}
           className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-xs font-bold text-gray-300 hover:text-white hover:bg-white/5 transition"
         >
           Vazgeç
         </button>
         <button
           onClick={handleSaveProfile}
-          disabled={!editName.trim()}
+          disabled={!editName.trim() || !!error}
           className="flex-1 py-3 px-4 rounded-xl bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] text-xs font-black transition shadow-md"
         >
           Onayla
@@ -599,44 +617,65 @@ export default function WelcomeScreen({
         )}
       </div>
 
-      {/* Elegant Glowing Book Icon at the top */}
+      {/* Elegant Glowing Stars and Swords at the top */}
       <div className="relative flex flex-col items-center justify-center pt-2">
-        {/* Floating magic/sparkle dots above book */}
-        <div className="absolute -top-1.5 flex gap-1 animate-pulse text-amber-200/80">
-          <span className="text-[10px] delay-100 animate-bounce">✦</span>
-          <span className="text-xs -translate-y-1 animate-bounce">✦</span>
-          <span className="text-[9px] delay-200 animate-bounce">✦</span>
+        {/* Three gold stars */}
+        <div className="flex items-end justify-center gap-1.5 text-amber-300 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <span className="text-xs">★</span>
+          <span className="text-lg -translate-y-0.5">★</span>
+          <span className="text-xs">★</span>
         </div>
-        <svg className="w-14 h-14 text-amber-100/90 drop-shadow-[0_0_12px_rgba(251,191,36,0.3)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-        </svg>
+        {/* Crossed Swords gold icon */}
+        <Swords size={18} className="text-amber-300/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] mt-1.5" />
       </div>
 
       {/* App title */}
-      <div className="text-center">
-        <h1 className="text-2xl sm:text-3xl font-serif font-medium tracking-[0.15em] text-[#FAF6E9] uppercase drop-shadow-md">
+      <div className="text-center mt-1">
+        <h1 className="text-2xl sm:text-3xl font-serif font-light tracking-[0.25em] text-[#FAF6E9] uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
           KELİME SAVAŞI
         </h1>
+        {/* Filigree/Scroll flourish under the title */}
+        <div className="flex justify-center -mt-1 opacity-70">
+          <svg className="w-48 h-8 text-amber-200/50 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" viewBox="0 0 200 30" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M 100,15 C 120,15 130,5 145,5 C 160,5 165,18 150,22 C 140,24 135,14 145,11 C 150,10 155,12 155,15" />
+            <path d="M 100,15 C 80,15 70,5 55,5 C 40,5 35,18 50,22 C 60,24 65,14 55,11 C 50,10 45,12 45,15" />
+            <circle cx="100" cy="15" r="2.5" className="fill-amber-300" />
+          </svg>
+        </div>
       </div>
 
-      {/* User Profile Section with Halo and Name */}
-      <div className="flex items-center justify-center gap-4 py-1 relative z-10">
+      {/* User Profile Section with Halo and Name placed underneath */}
+      <div className="flex flex-col items-center justify-center gap-3 py-2 relative z-10">
         <div className="relative">
-          {/* Golden Glowing Ring around Avatar */}
+          {/* Golden Glowing Ring around Avatar - Büyütülmüş ve Parlatılmış */}
           <div 
-            className="w-16 h-16 rounded-full bg-[#3D4756] border-2 border-amber-200/60 shadow-[0_0_15px_rgba(251,191,36,0.25)] flex items-center justify-center text-3xl overflow-hidden"
+            className="w-24 h-24 rounded-full bg-[#3D4756] border-[3px] border-amber-200/60 shadow-[0_0_20px_rgba(251,191,36,0.3)] flex items-center justify-center text-4xl overflow-hidden transition-transform duration-300 hover:scale-105 cursor-pointer"
+            onClick={() => setIsEditing(true)}
           >
             {profile.avatarUrl && profile.avatarUrl.length > 3 ? (
-              <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+               <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
-              <span className="select-none">{profile.avatarUrl || '🧠'}</span>
+               <span className="select-none">{profile.avatarUrl || '🧠'}</span>
             )}
+          </div>
+          
+          {/* Elegant feather decorative absolute-positioned */}
+          <div className="absolute -bottom-1 -right-3 w-12 h-12 text-amber-200/90 drop-shadow-[0_2px_5px_rgba(0,0,0,0.5)] pointer-events-none transform rotate-[15deg]">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+              {/* Delicate curved feather */}
+              <path d="M20 4c-3.5 1-7.5 4.5-9.5 8.5C9.5 14.5 9 17 8.5 20c3-.5 5.5-1 7.5-3 4-2 7.5-6 8.5-9.5" fill="rgba(251, 191, 36, 0.1)" />
+              <path d="M6 21c4-4 11-10 14-13" strokeWidth="2" />
+              {/* Barbs */}
+              <path d="M11 15c1-.5 2.5-2 3-3" />
+              <path d="M13.5 12.5c1-.5 2.5-2 3-3" />
+              <path d="M16 10c1-.5 2-1.5 2.5-2.5" />
+              <path d="M9.5 17.5c1-.5 2-1.5 2.5-2.5" />
+            </svg>
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          <span className="text-3xl font-medium tracking-wide text-[#FAF6E9]">{profile.name}</span>
+        <div className="flex flex-col items-center">
+          <span className="text-base font-serif tracking-widest text-amber-100/95 font-normal lowercase">{profile.name}</span>
         </div>
       </div>
 
@@ -686,10 +725,11 @@ export default function WelcomeScreen({
         <button
           onClick={() => {
             setShowGameSetup(true);
-            setSelectedTab(isOnline ? 'pvp' : 'solo');
+            setSelectedTab('solo');
           }}
           className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-base sm:text-lg py-4 px-6 rounded-2xl shadow-[0_5px_0_#D9D4C3,0_8px_15px_rgba(0,0,0,0.2)] hover:shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5] relative overflow-hidden"
         >
+          <Swords size={20} className="mr-3 text-[#2E3748] stroke-[2.5]" />
           <span>OYUNA BAŞLA</span>
         </button>
 
