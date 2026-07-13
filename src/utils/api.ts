@@ -66,7 +66,11 @@ if (typeof window !== 'undefined') {
           }
           
           if (token) {
-            headers.set('Cookie', `__SECURE-aistudio_auth_token=${token}; aistudio_auth_token=${token}`);
+            try {
+              headers.set('Cookie', `__SECURE-aistudio_auth_token=${token}; aistudio_auth_token=${token}`);
+            } catch (err) {
+              // Silently ignore browser restrictions on modifying forbidden headers like Cookie
+            }
             headers.set('X-AI-Studio-Auth', token);
           }
           init.headers = headers;

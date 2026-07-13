@@ -18,7 +18,7 @@ import GroupRace from './components/GroupRace.js';
 import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import FirstTimeSetup from './components/FirstTimeSetup.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge } from './types.js';
-import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft } from 'lucide-react';
+import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList } from './data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/turkish.js';
 import { getApiUrl, getWsUrl } from './utils/api.js';
@@ -392,6 +392,7 @@ export default function App() {
   const [showMissionsModal, setShowMissionsModal] = useState<boolean>(false);
   const [showLobbyModal, setShowLobbyModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [showDefinitionModal, setShowDefinitionModal] = useState<boolean>(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -896,7 +897,7 @@ export default function App() {
         picked = getRandomWord(length);
       }
     } catch (e) {
-      console.error('Failed to retrieve random word from server', e);
+      console.warn('Could not retrieve random word from server, falling back to local wordlist:', e);
       picked = getRandomWord(length);
     } finally {
       setTargetWord(picked);
@@ -1880,40 +1881,24 @@ export default function App() {
                   </div>
 
                   <div className="py-1.5 px-3 bg-white/70 dark:bg-gray-950/40 rounded-xl border border-emerald-500/10 shadow-inner inline-block mx-auto">
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-mono mb-0.5 leading-none">Bulunan Kelime</p>
-                    <span className="text-xl sm:text-2xl font-extrabold tracking-widest uppercase bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 bg-clip-text text-transparent drop-shadow-sm filter drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]">
-                      {targetWord}
-                    </span>
-                  </div>
-
-                  {/* Word definition inside Victory */}
-                  {wordDefinition && (
-                    <div className="mt-2.5 p-3 bg-black/30 rounded-2xl border border-emerald-500/20 text-left relative z-10 max-w-xs mx-auto">
-                      <div className="flex justify-between items-center mb-1.5 border-b border-white/10 pb-1">
-                        <span className="text-[10px] font-black text-amber-400 font-mono tracking-wider flex items-center gap-1">
-                          📖 TDK KELİME ANLAMI
-                        </span>
-                        <a
-                          href={`https://sozluk.gov.tr/?ara=${encodeURIComponent(turkishLower(targetWord))}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[9px] font-black text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer"
-                        >
-                          SÖZLÜK ↗
-                        </a>
-                      </div>
-                      {wordDefinition === 'loading' ? (
-                        <div className="flex items-center justify-center gap-2 py-2">
-                          <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
-                          <span className="text-[10px] text-gray-400">Yükleniyor...</span>
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-gray-200 italic font-serif leading-relaxed">
-                          "{wordDefinition}"
-                        </p>
-                      )}
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-mono mb-1 leading-none">Bulunan Kelime</p>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span className="text-xl sm:text-2xl font-extrabold tracking-widest uppercase bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 bg-clip-text text-transparent drop-shadow-sm filter drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]">
+                        {targetWord}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setShowDefinitionModal(true);
+                          playClickSound(settings.soundEnabled);
+                        }}
+                        className="p-1 rounded-full text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition active:scale-95 cursor-pointer flex items-center justify-center"
+                        title="Kelime Anlamı"
+                        id="info-definition-btn-victory"
+                      >
+                        <Info size={16} className="stroke-[2.5]" />
+                      </button>
                     </div>
-                  )}
+                  </div>
 
                   <div className="pt-1 flex flex-col sm:flex-row justify-center items-center gap-2">
                     <button
@@ -1958,37 +1943,21 @@ export default function App() {
               <div className="p-2.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900 rounded-xl space-y-1">
                 <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest font-mono">DENEME HAKKI VEYA SÜRE BİTTİ</p>
                 <h4 className="text-xs font-bold text-gray-900 dark:text-white">Aradığınız kelime şuydu:</h4>
-                <strong className="text-xl text-rose-500 tracking-wider font-extrabold block uppercase leading-none">{targetWord}</strong>
-              </div>
-
-              {/* Word definition inside Loss */}
-              {wordDefinition && (
-                <div className="mt-2.5 p-3 bg-black/30 rounded-2xl border border-rose-500/20 text-left relative z-10 max-w-xs mx-auto">
-                  <div className="flex justify-between items-center mb-1.5 border-b border-white/10 pb-1">
-                    <span className="text-[10px] font-black text-amber-400 font-mono tracking-wider flex items-center gap-1">
-                      📖 TDK KELİME ANLAMI
-                    </span>
-                    <a
-                      href={`https://sozluk.gov.tr/?ara=${encodeURIComponent(turkishLower(targetWord))}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[9px] font-black text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer"
-                    >
-                      SÖZLÜK ↗
-                    </a>
-                  </div>
-                  {wordDefinition === 'loading' ? (
-                    <div className="flex items-center justify-center gap-2 py-2">
-                      <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
-                      <span className="text-[10px] text-gray-400">Yükleniyor...</span>
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-gray-200 italic font-serif leading-relaxed">
-                      "{wordDefinition}"
-                    </p>
-                  )}
+                <div className="flex items-center justify-center gap-1.5">
+                  <strong className="text-xl text-rose-500 tracking-wider font-extrabold uppercase leading-none">{targetWord}</strong>
+                  <button
+                    onClick={() => {
+                      setShowDefinitionModal(true);
+                      playClickSound(settings.soundEnabled);
+                    }}
+                    className="p-1 rounded-full text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition active:scale-95 cursor-pointer flex items-center justify-center"
+                    title="Kelime Anlamı"
+                    id="info-definition-btn-loss"
+                  >
+                    <Info size={16} className="stroke-[2.5]" />
+                  </button>
                 </div>
-              )}
+              </div>
 
               <button
                 onClick={() => startNewGame(wordLength)}
@@ -2274,6 +2243,77 @@ export default function App() {
             setShowMissionsModal(false);
           }}
         />
+      )}
+
+      {/* Word Definition Modal */}
+      {showDefinitionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn" id="definition-modal-container">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-gray-900/60 dark:bg-black/75 backdrop-blur-sm transition-opacity duration-200"
+            onClick={() => setShowDefinitionModal(false)}
+          />
+          
+          {/* Modal Container */}
+          <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-6 max-w-sm w-full shadow-2xl relative z-10 overflow-hidden text-white animate-scale-up" id="definition-modal-card">
+            {/* Atmospheric light glows */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+            
+            {/* Close Button in Upper-Right */}
+            <button
+              onClick={() => {
+                setShowDefinitionModal(false);
+                playClickSound(settings.soundEnabled);
+              }}
+              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition duration-200 cursor-pointer"
+              id="close-definition-modal-button"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Content */}
+            <div className="relative z-10 text-left space-y-4">
+              <div className="flex items-center gap-2 border-b border-[#3E485A] pb-3 mr-6">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-amber-400 font-mono flex items-center gap-1">
+                  📖 TDK KELİME ANLAMI
+                </span>
+              </div>
+
+              <div className="p-3 bg-black/20 rounded-2xl border border-[#3E485A]/50 text-center">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wider font-mono block mb-1">
+                  Aranan Kelime
+                </span>
+                <strong className="text-lg font-black tracking-widest uppercase text-[#FAF6E9]">{targetWord}</strong>
+              </div>
+
+              {wordDefinition === 'loading' ? (
+                <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
+                  <div className="w-6 h-6 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
+                  <span className="text-xs text-gray-400 font-medium tracking-wide">
+                    Anlamı yükleniyor...
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-200 italic font-serif leading-relaxed px-1">
+                    "{wordDefinition || 'Bu kelimenin TDK tanımı otomatik olarak yüklenemedi.'}"
+                  </p>
+                  
+                  <div className="pt-2 border-t border-[#3E485A]/30 flex justify-end">
+                    <a
+                      href={`https://sozluk.gov.tr/?ara=${encodeURIComponent(turkishLower(targetWord))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-bold text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      Resmi Site ↗
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Settings Modal */}
