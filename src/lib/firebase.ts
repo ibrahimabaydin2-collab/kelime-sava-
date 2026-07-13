@@ -97,12 +97,17 @@ export async function signOutUser(): Promise<void> {
 export async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
   try {
     const userDocRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userDocRef);
-    if (userSnap.exists()) {
+    // 4-second timeout to prevent hangs on slow connection or offline state
+    const userSnap = await Promise.race([
+      getDoc(userDocRef),
+      new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Firestore Fetch Timeout')), 4000))
+    ]) as any;
+    
+    if (userSnap && userSnap.exists()) {
       return userSnap.data() as UserProfile;
     }
   } catch (error) {
-    console.error('Failed to fetch user profile from Firestore:', error);
+    console.error('Failed to fetch user profile from Firestore or timed out:', error);
   }
   return null;
 }
@@ -113,13 +118,17 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
 export async function saveUserProfileToFirestore(profile: UserProfile): Promise<void> {
   try {
     const userDocRef = doc(db, 'users', profile.id);
-    await setDoc(userDocRef, {
-      ...profile,
-      lastUpdated: new Date().toISOString(),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+    // 4-second timeout to prevent hangs
+    await Promise.race([
+      setDoc(userDocRef, {
+        ...profile,
+        lastUpdated: new Date().toISOString(),
+        updatedAt: serverTimestamp()
+      }, { merge: true }),
+      new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Firestore Write Timeout')), 4000))
+    ]);
   } catch (error) {
-    console.error('Failed to save user profile to Firestore:', error);
+    console.error('Failed to save user profile to Firestore or timed out:', error);
   }
 }
 

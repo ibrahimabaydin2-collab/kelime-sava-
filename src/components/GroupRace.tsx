@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
 import { GroupRaceQueueManager } from '../utils/GroupRaceQueueManager.js';
+import BottomBar from './BottomBar.js';
 
 interface GroupRaceProps {
   profile: UserProfile;
@@ -1917,6 +1918,21 @@ export default function GroupRace({
               </div>
             )}
           </div>
+
+          {/* Bottom Control Bar */}
+          {!isUserEliminated && (
+            <BottomBar
+              currentGuess={currentGuess}
+              wordLength={wordLength}
+              isValidating={isValidating}
+              onClear={() => {
+                if (currentGuess.length > 0) {
+                  setCurrentGuess('');
+                }
+              }}
+              onSubmit={submitUserGuess}
+            />
+          )}
 
           {/* Virtual Keyboard */}
           {!isUserEliminated && (

@@ -9,6 +9,7 @@ import {
   playDefeatSound
 } from './utils/soundEffects.js';
 import GameBoard from './components/GameBoard.js';
+import BottomBar from './components/BottomBar.js';
 import Keyboard from './components/Keyboard.js';
 import Lobby from './components/Lobby.js';
 import StatsModal from './components/StatsModal.js';
@@ -474,31 +475,70 @@ export default function App() {
 
   // Listen to Firebase Auth state
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setFirebaseUser(user);
-        // Fetch profile from Firestore
-        const dbProfile = await fetchUserProfile(user.uid);
-        if (dbProfile) {
-          setProfile(dbProfile);
-          safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(dbProfile));
-        } else {
-          // If no doc in firestore, sync current profile state
-          const updatedProfile = {
-            ...profile,
-            id: user.uid,
-            nameSet: true
-          };
-          setProfile(updatedProfile);
-          await saveUserProfileToFirestore(updatedProfile);
-          safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
-        }
-      } else {
-        setFirebaseUser(null);
+    let active = true;
+    let resolved = false;
+
+    // 5-second fallback timeout for the "Savaşçı Oturumu Hazırlanıyor..." screen
+    const timeoutId = setTimeout(() => {
+      if (active && !resolved) {
+        resolved = true;
+        console.warn('Firebase Auth/Profile initialization timed out (5s). Reverting to local state.');
+        showToast('Oturum hazırlığı zaman aşımına uğradı, yerel profil ile devam ediliyor.', 'info');
+        setAuthLoading(false);
       }
-      setAuthLoading(false);
+    }, 5000);
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!active) return;
+      try {
+        // Clear previous session states to avoid residual game leaks
+        setAttempts([]);
+        setCurrentAttempt('');
+        setGameStatus('idle');
+        setIsValidating(false);
+        setIsGroupRaceActive(false);
+
+        if (user) {
+          setFirebaseUser(user);
+          // Fetch profile from Firestore (with built-in 4s timeout)
+          const dbProfile = await fetchUserProfile(user.uid);
+          if (active) {
+            if (dbProfile) {
+              setProfile(dbProfile);
+              safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(dbProfile));
+            } else {
+              // If no doc in firestore, sync current profile state
+              const updatedProfile = {
+                ...profile,
+                id: user.uid,
+                nameSet: true
+              };
+              setProfile(updatedProfile);
+              await saveUserProfileToFirestore(updatedProfile);
+              safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+            }
+          }
+        } else {
+          if (active) {
+            setFirebaseUser(null);
+          }
+        }
+      } catch (err) {
+        console.error('Error during onAuthStateChanged processing:', err);
+      } finally {
+        if (active && !resolved) {
+          resolved = true;
+          setAuthLoading(false);
+          clearTimeout(timeoutId);
+        }
+      }
     });
-    return () => unsubscribe();
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   // Persist User Profile
@@ -1999,51 +2039,18 @@ export default function App() {
 
           {/* Action Buttons Above Keyboard */}
           {gameStatus === 'playing' && (
-            <div className="w-full max-w-md px-2 mt-2.5 mb-2 flex items-center gap-2" id="action-buttons-above-keyboard-container">
-              {/* CLEAR ROW BUTTON (TEMİZLE) */}
-              <button
-                onClick={() => {
-                  if (currentAttempt.length > 0) {
-                    setCurrentAttempt('');
-                    playDeleteSound(settings.soundEnabled);
-                  }
-                }}
-                disabled={currentAttempt.length === 0 || isValidating}
-                className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider shadow-md transition-all duration-200 flex items-center justify-center gap-1.5 border ${
-                  currentAttempt.length > 0 && !isValidating
-                    ? 'bg-gradient-to-br from-rose-500 via-red-500 to-rose-600 hover:from-rose-600 hover:to-red-700 text-white border-rose-400 hover:shadow-rose-500/20 active:scale-[0.98] cursor-pointer'
-                    : 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-gray-200/60 dark:border-gray-800/40 cursor-not-allowed'
-                }`}
-                id="clear-row-button"
-              >
-                <Trash2 size={14} />
-                <span>TEMİZLE</span>
-              </button>
-
-              {/* SUBMIT BUTTON (TAMAM) */}
-              <button
-                onClick={submitGuess}
-                disabled={currentAttempt.length !== wordLength || isValidating}
-                className={`flex-[2] py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-widest shadow-md transition-all duration-200 flex items-center justify-center gap-2 border ${
-                  currentAttempt.length === wordLength && !isValidating
-                    ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-teal-700 text-white border-emerald-400 hover:shadow-emerald-500/20 active:scale-[0.98] cursor-pointer'
-                    : 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-gray-200/60 dark:border-gray-800/40 cursor-not-allowed'
-                }`}
-                id="submit-guess-button-above-keyboard"
-              >
-                {isValidating ? (
-                  <>
-                    <RotateCcw className="animate-spin" size={14} />
-                    DOĞRULANIYOR...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={14} className={currentAttempt.length === wordLength ? "animate-bounce" : ""} />
-                    TAMAM (DENE)
-                  </>
-                )}
-              </button>
-            </div>
+            <BottomBar
+              currentGuess={currentAttempt}
+              wordLength={wordLength}
+              isValidating={isValidating}
+              onClear={() => {
+                if (currentAttempt.length > 0) {
+                  setCurrentAttempt('');
+                  playDeleteSound(settings.soundEnabled);
+                }
+              }}
+              onSubmit={submitGuess}
+            />
           )}
 
           {/* Virtual Keyboard */}
