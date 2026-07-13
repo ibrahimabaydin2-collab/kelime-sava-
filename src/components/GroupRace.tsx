@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Swords, Trophy, Users, Clock, Zap, ArrowRight, Home, Play,
-  Check, AlertCircle, Sparkles, Award, RotateCcw, ShieldAlert
+  Check, AlertCircle, Sparkles, Award, RotateCcw, ShieldAlert,
+  Globe, Copy, ArrowLeft, Bot
 } from 'lucide-react';
 import { UserProfile } from '../types.js';
 import { getRandomWord, isWordInCuratedList } from '../data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from '../utils/turkish.js';
 import { getApiUrl } from '../utils/api.js';
+import { 
+  collection, doc, setDoc, getDoc, updateDoc, onSnapshot, 
+  deleteDoc
+} from 'firebase/firestore';
+import { db } from '../lib/firebase.js';
+import { GroupRaceQueueManager } from '../utils/GroupRaceQueueManager.js';
 
 interface GroupRaceProps {
   profile: UserProfile;
@@ -14,6 +21,7 @@ interface GroupRaceProps {
   onExit: () => void;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   dictionaryMode: 'tdk_online' | 'no_validation';
+  initialMode?: 'online' | 'offline';
 }
 
 interface Competitor {
@@ -60,10 +68,30 @@ export default function GroupRace({
   onUpdateScore,
   onExit,
   showToast,
-  dictionaryMode
+  dictionaryMode,
+  initialMode
 }: GroupRaceProps) {
-  // Game phases: 'lobby' | 'playing' | 'elimination' | 'ended'
-  const [phase, setPhase] = useState<'lobby' | 'playing' | 'elimination' | 'ended'>('lobby');
+  // Game phases: 'mode_selection' | 'online_lobby_selection' | 'lobby' | 'online_lobby' | 'playing' | 'elimination' | 'ended'
+  const [phase, setPhase] = useState<'mode_selection' | 'online_lobby_selection' | 'lobby' | 'online_lobby' | 'playing' | 'elimination' | 'ended'>('mode_selection');
+  const [isOnlineMode, setIsOnlineMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (initialMode === 'online') {
+      setIsOnlineMode(true);
+      joinMatchmakingQueue();
+    } else if (initialMode === 'offline') {
+      setIsOnlineMode(false);
+      setPhase('lobby');
+    }
+  }, [initialMode]);
+  const [roomCode, setRoomCode] = useState<string>('');
+  const [isHost, setIsHost] = useState<boolean>(false);
+  const [roomId, setRoomId] = useState<string>('');
+  const [roomPlayers, setRoomPlayers] = useState<any[]>([]);
+  const [joinCodeInput, setJoinCodeInput] = useState<string>('');
+  const [isCreatingRoom, setIsCreatingRoom] = useState<boolean>(false);
+  const [isJoiningRoom, setIsJoiningRoom] = useState<boolean>(false);
+
   const [lobbyCountdown, setLobbyCountdown] = useState<number>(15); // Quick 15s join countdown to keep user action intense, but user can skip!
   const [lobbyPlayers, setLobbyPlayers] = useState<{ name: string; avatar: string; isUser: boolean; ready: boolean }[]>([]);
   
@@ -86,9 +114,109 @@ export default function GroupRace({
   // Live feed log
   const [liveLogs, setLiveLogs] = useState<{ time: string; text: string; icon?: string }[]>([]);
   
+  const [onlineLobbyCountdown, setOnlineLobbyCountdown] = useState<number>(60);
+  const [roomCreatedAt, setRoomCreatedAt] = useState<string | null>(null);
+  const [isQueueing, setIsQueueing] = useState<boolean>(false);
+
+  const joinMatchmakingQueue = async () => {
+    setIsQueueing(true);
+    try {
+      const { roomId: joinedRoomId, isHost: hostStatus } = await GroupRaceQueueManager.joinGroupRaceQueue(profile);
+      setRoomId(joinedRoomId);
+      setRoomCode(joinedRoomId);
+      setIsHost(hostStatus);
+      setPhase('online_lobby');
+      showToast(
+        hostStatus 
+          ? 'Battle Royale araması başladı! Lobi kuruldu.' 
+          : 'Battle Royale lobisine başarıyla katıldınız!', 
+        'success'
+      );
+    } catch (err) {
+      console.error('Queue join error:', err);
+      showToast('Eşleşme sırasına girilirken bir hata oluştu.', 'error');
+      onExit();
+    } finally {
+      setIsQueueing(false);
+    }
+  };
+  const competitorsRef = useRef<Competitor[]>([]);
+
+  useEffect(() => {
+    competitorsRef.current = competitors;
+  }, [competitors]);
+  
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const simulationRef = useRef<NodeJS.Timeout | null>(null);
   const logContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Real-time log synchronization for other players and bots (Online & Offline)
+  const previousCompetitorsState = useRef<Record<string, { currentAttempt: number; solved: boolean; eliminated: boolean }>>({});
+
+  useEffect(() => {
+    if (phase !== 'playing') {
+      previousCompetitorsState.current = {};
+      return;
+    }
+
+    const logsToAdd: { time: string; text: string; icon?: string }[] = [];
+    const timeElapsed = 45 - roundTimer;
+    const timeString = `00:${String(timeElapsed).padStart(2, '0')}`;
+
+    competitors.forEach((c) => {
+      if (c.isUser) return; // Already logged locally
+      
+      const prev = previousCompetitorsState.current[c.id];
+      if (!prev) {
+        // Initialize state
+        previousCompetitorsState.current[c.id] = {
+          currentAttempt: c.currentAttempt,
+          solved: c.solved,
+          eliminated: c.eliminated
+        };
+        return;
+      }
+
+      // Check if attempt increased or solved status changed
+      if (c.currentAttempt > prev.currentAttempt) {
+        if (c.solved && !prev.solved) {
+          logsToAdd.push({
+            time: timeString,
+            text: `${c.name} Kelimeyi ÇÖZDÜ! 🎉 (${c.currentAttempt}. denemede)`,
+            icon: '🎉'
+          });
+        } else if (c.currentAttempt >= 6 && !c.solved) {
+          logsToAdd.push({
+            time: timeString,
+            text: `${c.name} hakkını doldurdu ve elendi! ❌`,
+            icon: '❌'
+          });
+        } else {
+          logsToAdd.push({
+            time: timeString,
+            text: `${c.name} ${c.currentAttempt}. tahminini yaptı...`
+          });
+        }
+      } else if (c.solved && !prev.solved) {
+        logsToAdd.push({
+          time: timeString,
+          text: `${c.name} Kelimeyi ÇÖZDÜ! 🎉`,
+          icon: '🎉'
+        });
+      }
+
+      // Update ref
+      previousCompetitorsState.current[c.id] = {
+        currentAttempt: c.currentAttempt,
+        solved: c.solved,
+        eliminated: c.eliminated
+      };
+    });
+
+    if (logsToAdd.length > 0) {
+      setLiveLogs((prev) => [...prev, ...logsToAdd]);
+    }
+  }, [competitors, phase, roundTimer]);
 
   // Keyboard layout for TR
   const KEYBOARD_ROWS = [
@@ -97,9 +225,535 @@ export default function GroupRace({
     ['Z', 'C', 'V', 'B', 'N', 'M', 'Ö', 'Ç'],
   ];
 
-  // Initialize lobby with joining players
+  // Helper: Generate a random room code
+  const generateRoomCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+
+  // Create an online multiplayer room
+  const createOnlineRoom = async () => {
+    setIsCreatingRoom(true);
+    try {
+      const code = generateRoomCode();
+      setRoomId(code);
+      setRoomCode(code);
+      setIsHost(true);
+
+      const roomRef = doc(db, 'rooms', code);
+      await setDoc(roomRef, {
+        id: code,
+        code: code,
+        hostId: profile.id,
+        hostName: profile.name,
+        status: 'lobby',
+        currentRound: 1,
+        wordLength: 5,
+        targetWord: '',
+        createdAt: new Date().toISOString()
+      });
+
+      const playerRef = doc(db, 'rooms', code, 'players', profile.id);
+      await setDoc(playerRef, {
+        id: profile.id,
+        name: profile.name,
+        avatar: profile.avatarUrl || '👤',
+        solved: false,
+        solvedRound: 0,
+        solveTime: 0,
+        currentAttempt: 0,
+        attemptsFeedback: [],
+        eliminated: false,
+        score: 0,
+        ready: true,
+        joinedAt: new Date().toISOString()
+      });
+
+      setPhase('online_lobby');
+      showToast('Oda başarıyla oluşturuldu! Arkadaşlarını davet et.', 'success');
+    } catch (err) {
+      console.error('Room creation error:', err);
+      showToast('Oda oluşturulurken bir hata oluştu.', 'error');
+    } finally {
+      setIsCreatingRoom(false);
+    }
+  };
+
+  // Join an online multiplayer room
+  const joinOnlineRoom = async () => {
+    const trimmedCode = joinCodeInput.trim().toUpperCase();
+    if (trimmedCode.length !== 6) {
+      showToast('Lütfen geçerli bir 6 haneli oda kodu girin!', 'error');
+      return;
+    }
+
+    setIsJoiningRoom(true);
+    try {
+      const roomRef = doc(db, 'rooms', trimmedCode);
+      const roomSnap = await getDoc(roomRef);
+
+      if (!roomSnap.exists()) {
+        showToast('Oda bulunamadı! Kodu kontrol edin.', 'error');
+        return;
+      }
+
+      const roomData = roomSnap.data();
+      if (roomData.status !== 'lobby') {
+        showToast('Bu oyun zaten başladı veya kapandı!', 'error');
+        return;
+      }
+
+      setRoomId(trimmedCode);
+      setRoomCode(trimmedCode);
+      setIsHost(false);
+
+      const playerRef = doc(db, 'rooms', trimmedCode, 'players', profile.id);
+      await setDoc(playerRef, {
+        id: profile.id,
+        name: profile.name,
+        avatar: profile.avatarUrl || '👤',
+        solved: false,
+        solvedRound: 0,
+        solveTime: 0,
+        currentAttempt: 0,
+        attemptsFeedback: [],
+        eliminated: false,
+        score: 0,
+        ready: true,
+        joinedAt: new Date().toISOString()
+      });
+
+      setPhase('online_lobby');
+      showToast('Odaya başarıyla katıldınız! Oyunun başlaması bekleniyor.', 'success');
+    } catch (err) {
+      console.error('Room joining error:', err);
+      showToast('Odaya katılırken bir hata oluştu.', 'error');
+    } finally {
+      setIsJoiningRoom(false);
+    }
+  };
+
+  // Battle Royale Auto Start with Bots (Host only)
+  const autoStartOnlineTournamentWithBots = async () => {
+    if (!isHost || !roomId) return;
+    
+    try {
+      showToast('Battle Royale Başlıyor! Botlar dolduruluyor...', 'info');
+
+      // 1. Fill missing players with Bots in Firestore up to 20 players
+      const currentList = [...roomPlayers];
+      const needed = 20 - currentList.length;
+      
+      if (needed > 0) {
+        const availableBots = TURKISH_BOTS.filter(b => !currentList.some(p => p.name === b.name));
+        
+        for (let i = 0; i < Math.min(needed, availableBots.length); i++) {
+          const botId = `bot_${i}_${Math.random().toString(36).substr(2, 5)}`;
+          const botRef = doc(db, 'rooms', roomId, 'players', botId);
+          
+          // Allocate bots into difficulty tiers based on index
+          let speedFactor = 1.0;
+          let targetSolveAttempt = 4;
+          if (i < 5) {
+            // Usta (Pro)
+            speedFactor = 1.4 + Math.random() * 0.4;
+            targetSolveAttempt = Math.random() > 0.08 ? Math.floor(Math.random() * 3) + 2 : 0;
+          } else if (i < 13) {
+            // Standart (Average)
+            speedFactor = 0.9 + Math.random() * 0.3;
+            targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 3) + 3 : 0;
+          } else {
+            // Acemi (Novice)
+            speedFactor = 0.4 + Math.random() * 0.3;
+            targetSolveAttempt = Math.random() > 0.3 ? Math.floor(Math.random() * 3) + 4 : 0;
+          }
+
+          await setDoc(botRef, {
+            id: botId,
+            name: availableBots[i].name,
+            avatar: availableBots[i].avatar,
+            isBot: true,
+            solved: false,
+            solvedRound: 0,
+            solveTime: 0,
+            currentAttempt: 0,
+            attemptsFeedback: [],
+            eliminated: false,
+            score: 0,
+            ready: true,
+            speedFactor,
+            targetSolveAttempt,
+            joinedAt: new Date(Date.now() + i * 50).toISOString() // stagger joinedAt slightly
+          });
+        }
+      }
+
+      // 2. Choose first word
+      const length = 5;
+      let pickedWord = getRandomWord(length);
+
+      try {
+        const response = await fetch(getApiUrl('/api/random-word'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ length })
+        });
+        const data = await response.json();
+        if (data.word) {
+          pickedWord = turkishUpper(data.word);
+        }
+      } catch (e) {
+        console.warn('Online room word fetch error:', e);
+      }
+
+      // 3. Update room status to playing
+      const roomRef = doc(db, 'rooms', roomId);
+      await updateDoc(roomRef, {
+        status: 'playing',
+        currentRound: 1,
+        wordLength: length,
+        targetWord: pickedWord
+      });
+    } catch (err) {
+      console.error('Error starting Battle Royale:', err);
+      showToast('Battle Royale başlatılamadı!', 'error');
+    }
+  };
+
+  // Online Battle Royale Lobby Countdown & Auto-start check
   useEffect(() => {
-    if (phase === 'lobby') {
+    if (phase !== 'online_lobby' || !isOnlineMode || !roomId || !roomCreatedAt) return;
+
+    const interval = setInterval(async () => {
+      const elapsed = Math.floor((Date.now() - new Date(roomCreatedAt).getTime()) / 1000);
+      const remaining = Math.max(0, 60 - elapsed);
+      setOnlineLobbyCountdown(remaining);
+
+      // Only the host is in charge of mutating Firestore to start the game
+      if (isHost) {
+        // 1. Auto-start if 20 players reached
+        if (roomPlayers.length >= 20) {
+          clearInterval(interval);
+          await autoStartOnlineTournamentWithBots();
+        }
+        // 2. Auto-start if countdown expired
+        else if (remaining <= 0) {
+          clearInterval(interval);
+          await autoStartOnlineTournamentWithBots();
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [phase, isOnlineMode, roomId, roomCreatedAt, roomPlayers, isHost]);
+
+  // Synchronize Firestore room state and player list in Online Mode
+  useEffect(() => {
+    if (!isOnlineMode || !roomId) return;
+
+    // 1. Listen to Room document
+    const roomRef = doc(db, 'rooms', roomId);
+    const unsubRoom = onSnapshot(roomRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        showToast('Oda kapatıldı veya bulunamadı.', 'error');
+        setPhase('mode_selection');
+        return;
+      }
+      const data = snapshot.data();
+      setTargetWord(data.targetWord || '');
+      setWordLength(data.wordLength || 5);
+      setCurrentRound(data.currentRound || 1);
+      if (data.createdAt) {
+        setRoomCreatedAt(data.createdAt);
+      }
+
+      // Sync isHost state with the database hostId
+      if (data.hostId === profile.id && !isHost) {
+        setIsHost(true);
+      }
+
+      if (data.status === 'playing' && phase !== 'playing') {
+        setupOnlinePlayingRound(data.currentRound, data.wordLength || 5, data.targetWord || '');
+      } else if (data.status === 'elimination' && phase !== 'elimination') {
+        setPhase('elimination');
+      } else if (data.status === 'ended' && phase !== 'ended') {
+        setPhase('ended');
+      } else if (data.status === 'lobby' && phase !== 'online_lobby') {
+        setPhase('online_lobby');
+      }
+    }, (error) => {
+      console.error("Firestore room snap error:", error);
+    });
+
+    // 2. Listen to players subcollection
+    const playersColRef = collection(db, 'rooms', roomId, 'players');
+    const unsubPlayers = onSnapshot(playersColRef, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data());
+      });
+      list.sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
+      setRoomPlayers(list);
+
+      // Convert to competitors structure
+      const mapped = list.map((p) => {
+        const isBot = p.isBot || p.id.startsWith('bot_');
+        return {
+          id: p.id,
+          name: p.name,
+          avatar: p.avatar,
+          isBot: isBot,
+          isUser: p.id === profile.id,
+          solved: p.solved || false,
+          solvedRound: p.solvedRound || 0,
+          solveTime: p.solveTime || 0,
+          currentAttempt: p.currentAttempt || 0,
+          attemptsFeedback: p.attemptsFeedback || [],
+          eliminated: p.eliminated || false,
+          speedFactor: isBot ? (p.speedFactor || 1.0) : 1.0,
+          targetSolveAttempt: isBot ? (p.targetSolveAttempt || 4) : 0
+        };
+      });
+      setCompetitors(mapped);
+
+      // Claim host status if previous host left (hostId is empty)
+      getDoc(roomRef).then((roomSnap) => {
+        if (roomSnap.exists()) {
+          const roomData = roomSnap.data();
+          if (roomData.isGroupRaceMatchmaking && !roomData.hostId) {
+            const humanPlayers = list.filter(p => !p.isBot);
+            if (humanPlayers.length > 0 && humanPlayers[0].id === profile.id) {
+              updateDoc(roomRef, {
+                hostId: profile.id,
+                hostName: profile.name
+              }).then(() => {
+                setIsHost(true);
+              }).catch(err => console.error("Error setting host takeover:", err));
+            }
+          }
+        }
+      }).catch(err => console.error("Claim host check error:", err));
+    }, (error) => {
+      console.error("Firestore players subcol snap error:", error);
+    });
+
+    return () => {
+      unsubRoom();
+      unsubPlayers();
+    };
+  }, [roomId, isOnlineMode, phase, isHost]);
+
+  // Setup the online round
+  const setupOnlinePlayingRound = (roundNum: number, length: number, word: string) => {
+    setWordLength(length);
+    setCurrentRound(roundNum);
+    setRoundTimer(45);
+    setUserGuesses([]);
+    setCurrentGuess('');
+    setLetterStatuses({});
+    setUserFinished(false);
+    setUserSolved(false);
+    setPhase('playing');
+    setLiveLogs([{ time: '00:00', text: `🚩 Çevrimiçi Düello Başladı! ${length} harfli gizemli kelimeyi en hızlı bulan üst tura çıkar.` }]);
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setRoundTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          handleOnlineLocalRoundFinished(roundNum, false, 0, []);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    if (isHost) {
+      startBotSimulation(length);
+    }
+  };
+
+  // Local finished handler for Online Mode
+  const handleOnlineLocalRoundFinished = async (roundNum: number, solved: boolean, solvedRound: number, finalGuesses: string[]) => {
+    setUserFinished(true);
+    setUserSolved(solved);
+    
+    // Save state to firestore player document
+    try {
+      const playerRef = doc(db, 'rooms', roomId, 'players', profile.id);
+      await updateDoc(playerRef, {
+        solved,
+        solvedRound: solved ? solvedRound : 0,
+        solveTime: solved ? roundTimer : 0,
+        currentAttempt: finalGuesses.length,
+        attemptsFeedback: finalGuesses.map(g => evaluateGuessLocally(g, targetWord))
+      });
+    } catch (err) {
+      console.error("Error writing local end round results to Firestore:", err);
+    }
+  };
+
+  // Host end-round monitor
+  useEffect(() => {
+    if (isOnlineMode && isHost && phase === 'playing') {
+      const activeOnlinePlayers = competitors.filter(c => !c.eliminated);
+      const allFinished = activeOnlinePlayers.length > 0 && activeOnlinePlayers.every(p => p.solved || p.currentAttempt >= 6);
+      
+      if (allFinished) {
+        const delayEnd = setTimeout(() => {
+          endOnlineRound();
+        }, 2500);
+        return () => clearTimeout(delayEnd);
+      }
+    }
+  }, [competitors, isOnlineMode, isHost, phase]);
+
+  // Host end online round calculations
+  const endOnlineRound = async () => {
+    if (!isHost) return;
+    if (timerRef.current) clearInterval(timerRef.current);
+    
+    try {
+      const activeOnlinePlayers = competitors.filter(c => !c.eliminated);
+      
+      const sorted = [...activeOnlinePlayers].sort((a, b) => {
+        if (a.solved && !b.solved) return -1;
+        if (!a.solved && b.solved) return 1;
+        if (a.solved && b.solved) {
+          if (a.solvedRound !== b.solvedRound) return a.solvedRound - b.solvedRound;
+          return b.solveTime - a.solveTime;
+        }
+        return b.currentAttempt - a.currentAttempt;
+      });
+
+      let targetSurvivors = 1;
+      if (activeOnlinePlayers.length >= 4) {
+        targetSurvivors = Math.ceil(activeOnlinePlayers.length / 2);
+      } else if (activeOnlinePlayers.length === 3) {
+        targetSurvivors = 2;
+      } else {
+        targetSurvivors = 1;
+      }
+
+      const survivorIds = sorted.slice(0, targetSurvivors).map(s => s.id);
+
+      for (const p of activeOnlinePlayers) {
+        const playerRef = doc(db, 'rooms', roomId, 'players', p.id);
+        const isEliminatedNow = !survivorIds.includes(p.id);
+        
+        let scoreIncrement = 0;
+        if (!isEliminatedNow) {
+          scoreIncrement = currentRound * 15;
+          if (targetSurvivors === 1 && activeOnlinePlayers.length > 1) {
+            scoreIncrement += 100; // Champion bonus
+          }
+        }
+
+        await updateDoc(playerRef, {
+          eliminated: isEliminatedNow,
+          score: p.score + scoreIncrement
+        });
+      }
+
+      const roomRef = doc(db, 'rooms', roomId);
+      await updateDoc(roomRef, {
+        status: currentRound === 4 || targetSurvivors === 1 ? 'ended' : 'elimination'
+      });
+    } catch (err) {
+      console.error("Error ending online round:", err);
+    }
+  };
+
+  // Host advance online round
+  const startNextOnlineRound = async () => {
+    if (!isHost) return;
+    try {
+      const activeOnlinePlayers = competitors.filter(c => !c.eliminated);
+      
+      for (let i = 0; i < activeOnlinePlayers.length; i++) {
+        const p = activeOnlinePlayers[i];
+        const playerRef = doc(db, 'rooms', roomId, 'players', p.id);
+        
+        const updateData: any = {
+          solved: false,
+          solvedRound: 0,
+          solveTime: 0,
+          currentAttempt: 0,
+          attemptsFeedback: []
+        };
+
+        if (p.isBot) {
+          // Re-randomize bot targets for the new word size based on active count index
+          let targetSolveAttempt = 4;
+          if (i < 5) {
+            targetSolveAttempt = Math.random() > 0.08 ? Math.floor(Math.random() * 3) + 2 : 0;
+          } else if (i < 13) {
+            targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 3) + 3 : 0;
+          } else {
+            targetSolveAttempt = Math.random() > 0.3 ? Math.floor(Math.random() * 3) + 4 : 0;
+          }
+          updateData.targetSolveAttempt = targetSolveAttempt;
+        }
+
+        await updateDoc(playerRef, updateData);
+      }
+
+      const nextRoundNum = currentRound + 1;
+      const nextWordLength = nextRoundNum === 2 ? 6 : nextRoundNum === 3 ? 7 : 8;
+      let newWord = getRandomWord(nextWordLength);
+
+      try {
+        const response = await fetch(getApiUrl('/api/random-word'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ length: nextWordLength })
+        });
+        const data = await response.json();
+        if (data.word) newWord = turkishUpper(data.word);
+      } catch (e) {
+        console.warn('Online random word fetch fail:', e);
+      }
+
+      const roomRef = doc(db, 'rooms', roomId);
+      await updateDoc(roomRef, {
+        status: 'playing',
+        currentRound: nextRoundNum,
+        wordLength: nextWordLength,
+        targetWord: newWord
+      });
+    } catch (err) {
+      console.error("Error starting next online round:", err);
+      showToast('Sıraki tur başlatılamadı!', 'error');
+    }
+  };
+
+  // Safe exit helper
+  const handleExitGame = async () => {
+    if (isOnlineMode && roomId) {
+      try {
+        const playerRef = doc(db, 'rooms', roomId, 'players', profile.id);
+        await deleteDoc(playerRef);
+        
+        if (isHost) {
+          const roomRef = doc(db, 'rooms', roomId);
+          await updateDoc(roomRef, {
+            status: 'ended'
+          });
+        }
+      } catch (e) {
+        console.error("Error cleaning player room document on exit:", e);
+      }
+    }
+    onExit();
+  };
+
+  // Initialize lobby with joining players (Offline Mode)
+  useEffect(() => {
+    if (phase === 'lobby' && !isOnlineMode) {
       // Add user first
       setLobbyPlayers([{ name: profile.name, avatar: profile.avatarUrl || '👤', isUser: true, ready: true }]);
       setLobbyCountdown(15);
@@ -140,7 +794,7 @@ export default function GroupRace({
         clearInterval(countInterval);
       };
     }
-  }, [phase]);
+  }, [phase, isOnlineMode]);
 
   // Handle scrolling of logs to bottom
   useEffect(() => {
@@ -165,8 +819,25 @@ export default function GroupRace({
       // Map them to competitors
       const mappedCompetitors: Competitor[] = currentList.map((p, index) => {
         const isUser = p.isUser;
-        const speedFactor = 0.5 + Math.random() * 1.5; // Bot speed factor
-        const targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 4) + 2 : 0; // 2, 3, 4, 5, or fail (0)
+        let speedFactor = 1.0;
+        let targetSolveAttempt = 4;
+        
+        if (!isUser) {
+          // Allocate bots into tiers:
+          if (index < 5) {
+            // Usta (Pro)
+            speedFactor = 1.4 + Math.random() * 0.4; // 1.4 to 1.8
+            targetSolveAttempt = Math.random() > 0.08 ? Math.floor(Math.random() * 3) + 2 : 0; // Solves 2-4 or rarely fails
+          } else if (index < 13) {
+            // Standart (Average)
+            speedFactor = 0.9 + Math.random() * 0.3; // 0.9 to 1.2
+            targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 3) + 3 : 0; // Solves 3-5 or fails
+          } else {
+            // Acemi (Novice)
+            speedFactor = 0.4 + Math.random() * 0.3; // 0.4 to 0.7
+            targetSolveAttempt = Math.random() > 0.3 ? Math.floor(Math.random() * 3) + 4 : 0; // Solves 4-6 or fails frequently
+          }
+        }
         
         return {
           id: isUser ? 'user' : `bot_${index}`,
@@ -225,11 +896,24 @@ export default function GroupRace({
 
     // Initialize competitor states for this round
     setCompetitors((prev) => {
-      return prev.map(c => {
+      return prev.map((c, index) => {
         if (c.eliminated) return c;
         
-        // Re-randomize bot targets for the new word
-        const targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 4) + 2 : 0;
+        // Re-randomize bot targets for the new word based on tiers
+        let targetSolveAttempt = 4;
+        if (!c.isUser) {
+          if (index < 5) {
+            // Usta
+            targetSolveAttempt = Math.random() > 0.08 ? Math.floor(Math.random() * 3) + 2 : 0;
+          } else if (index < 13) {
+            // Standart
+            targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 3) + 3 : 0;
+          } else {
+            // Acemi
+            targetSolveAttempt = Math.random() > 0.3 ? Math.floor(Math.random() * 3) + 4 : 0;
+          }
+        }
+
         return {
           ...c,
           solved: false,
@@ -263,88 +947,127 @@ export default function GroupRace({
     }, 1000);
   };
 
+  const roundTimerRef = useRef<number>(45);
+  useEffect(() => {
+    roundTimerRef.current = roundTimer;
+  }, [roundTimer]);
+
   // Simulation of other players' actions in real-time
   const startBotSimulation = (len: number) => {
     if (simulationRef.current) clearInterval(simulationRef.current);
     
     // Check state and trigger periodic bot actions
     simulationRef.current = setInterval(() => {
-      setCompetitors((prevCompetitors) => {
-        const timeElapsed = 45 - roundTimer;
-        let logsToAdd: { time: string; text: string; icon?: string }[] = [];
-        
-        const nextList = prevCompetitors.map((c) => {
-          if (c.eliminated || c.isUser || c.solved) return c;
+      const currentCompetitors = isOnlineMode ? competitorsRef.current : competitors;
+      const currentTimer = roundTimerRef.current;
+      
+      // Calculate speed modifier based on user's progress/speed
+      const userComp = currentCompetitors.find(c => c.isUser);
+      let speedModifier = 1.0;
+      if (userComp) {
+        if (userComp.solved) {
+          speedModifier = userComp.solvedRound <= 2 ? 1.35 : 1.1;
+        } else if (userComp.currentAttempt >= 4) {
+          speedModifier = 0.75;
+        }
+      }
 
-          // Check if bot should perform an action based on their speed factor
-          const actionChance = 0.12 * c.speedFactor;
+      if (isOnlineMode) {
+        if (!isHost || !roomId) return; // Only host simulates bots in online mode
+        
+        const activeBots = currentCompetitors.filter(c => c.isBot && !c.eliminated && !c.solved);
+        
+        activeBots.forEach(async (c) => {
+          const actionChance = 0.12 * c.speedFactor * speedModifier;
           if (Math.random() < actionChance) {
             const nextAttemptNum = c.currentAttempt + 1;
+            const playerRef = doc(db, 'rooms', roomId, 'players', c.id);
             
-            // Check if this action results in solving
             if (c.targetSolveAttempt > 0 && nextAttemptNum >= c.targetSolveAttempt) {
               // Bot solved!
-              const solvedTime = roundTimer;
-              const feedback: ('green' | 'orange' | 'grey')[] = Array(len).fill('green');
-              
-              logsToAdd.push({
-                time: `00:${String(timeElapsed).padStart(2, '0')}`,
-                text: `${c.name} Kelimeyi ÇÖZDÜ! 🎉 (${nextAttemptNum}. denemede)`,
-                icon: '🎉'
-              });
-
-              return {
-                ...c,
+              const feedback = Array(len).fill('green');
+              await updateDoc(playerRef, {
                 solved: true,
                 solvedRound: nextAttemptNum,
-                solveTime: solvedTime,
+                solveTime: currentTimer,
                 currentAttempt: nextAttemptNum,
                 attemptsFeedback: [...c.attemptsFeedback, feedback]
-              };
-            } else if (nextAttemptNum >= 6) {
-              // Bot failed all attempts
-              const feedback: ('green' | 'orange' | 'grey')[] = Array(len).fill('grey');
-              logsToAdd.push({
-                time: `00:${String(timeElapsed).padStart(2, '0')}`,
-                text: `${c.name} hakkını doldurdu ve elendi! ❌`,
-                icon: '❌'
               });
-              return {
-                ...c,
+            } else if (nextAttemptNum >= 6) {
+              // Bot failed
+              const feedback = Array(len).fill('grey');
+              await updateDoc(playerRef, {
                 currentAttempt: nextAttemptNum,
                 attemptsFeedback: [...c.attemptsFeedback, feedback],
                 solved: false
-              };
+              });
             } else {
-              // Intermediate attempt: generate some orange and green highlights
-              const feedback: ('green' | 'orange' | 'grey')[] = Array(len).fill('grey').map(() => {
+              // Intermediate attempt
+              const feedback = Array(len).fill('grey').map(() => {
                 const r = Math.random();
                 if (r < 0.25) return 'green';
                 if (r < 0.5) return 'orange';
                 return 'grey';
               });
-
-              logsToAdd.push({
-                time: `00:${String(timeElapsed).padStart(2, '0')}`,
-                text: `${c.name} ${nextAttemptNum}. tahminini yaptı...`,
-              });
-
-              return {
-                ...c,
+              await updateDoc(playerRef, {
                 currentAttempt: nextAttemptNum,
                 attemptsFeedback: [...c.attemptsFeedback, feedback]
-              };
+              });
             }
           }
-          return c;
         });
+      } else {
+        // Offline mode: update local state directly
+        setCompetitors((prevCompetitors) => {
+          const nextList = prevCompetitors.map((c) => {
+            if (c.eliminated || c.isUser || c.solved) return c;
 
-        if (logsToAdd.length > 0) {
-          setLiveLogs((prevLogs) => [...prevLogs, ...logsToAdd]);
-        }
+            const actionChance = 0.12 * c.speedFactor * speedModifier;
+            if (Math.random() < actionChance) {
+              const nextAttemptNum = c.currentAttempt + 1;
+              
+              if (c.targetSolveAttempt > 0 && nextAttemptNum >= c.targetSolveAttempt) {
+                // Bot solved!
+                const feedback = Array(len).fill('green');
+                return {
+                  ...c,
+                  solved: true,
+                  solvedRound: nextAttemptNum,
+                  solveTime: currentTimer,
+                  currentAttempt: nextAttemptNum,
+                  attemptsFeedback: [...c.attemptsFeedback, feedback]
+                };
+              } else if (nextAttemptNum >= 6) {
+                // Bot failed all attempts
+                const feedback = Array(len).fill('grey');
+                return {
+                  ...c,
+                  currentAttempt: nextAttemptNum,
+                  attemptsFeedback: [...c.attemptsFeedback, feedback],
+                  solved: false
+                };
+              } else {
+                // Intermediate attempt
+                const feedback = Array(len).fill('grey').map(() => {
+                  const r = Math.random();
+                  if (r < 0.25) return 'green';
+                  if (r < 0.5) return 'orange';
+                  return 'grey';
+                });
 
-        return nextList;
-      });
+                return {
+                  ...c,
+                  currentAttempt: nextAttemptNum,
+                  attemptsFeedback: [...c.attemptsFeedback, feedback]
+                };
+              }
+            }
+            return c;
+          });
+
+          return nextList;
+        });
+      }
     }, 1100);
   };
 
@@ -551,7 +1274,15 @@ export default function GroupRace({
     setLetterStatuses(newKeys);
 
     // Check if won
-    if (currentGuess === targetWord) {
+    const isSolved = currentGuess === targetWord;
+    const isFinished = isSolved || updatedGuesses.length >= 6;
+
+    if (isOnlineMode) {
+      // Write current guess progress in real-time to Firestore
+      handleOnlineLocalRoundFinished(currentRound, isSolved, updatedGuesses.length, updatedGuesses);
+    }
+
+    if (isSolved) {
       setUserSolved(true);
       setUserFinished(true);
       showToast('Kelimeyi doğru çözdünüz! Rakipleri bekleyin.', 'success');
@@ -565,12 +1296,14 @@ export default function GroupRace({
         }
       ]);
 
-      // If all other active bots are already finished or solved, fast-forward round end
-      const otherActive = competitors.filter(c => !c.eliminated && !c.isUser && !c.solved);
-      if (otherActive.length === 0) {
-        setTimeout(endRound, 2000);
+      if (!isOnlineMode) {
+        // If all other active bots are already finished or solved, fast-forward round end
+        const otherActive = competitors.filter(c => !c.eliminated && !c.isUser && !c.solved);
+        if (otherActive.length === 0) {
+          setTimeout(endRound, 2000);
+        }
       }
-    } else if (updatedGuesses.length >= 6) {
+    } else if (isFinished) {
       setUserFinished(true);
       showToast('Hakkınız bitti! Tur sonunu bekleyin.', 'error');
       
@@ -582,6 +1315,14 @@ export default function GroupRace({
           icon: '💀'
         }
       ]);
+      
+      if (!isOnlineMode) {
+        // If all other active bots are already finished or solved, fast-forward round end
+        const otherActive = competitors.filter(c => !c.eliminated && !c.isUser && !c.solved);
+        if (otherActive.length === 0) {
+          setTimeout(endRound, 2000);
+        }
+      }
     }
   };
 
@@ -619,6 +1360,322 @@ export default function GroupRace({
   return (
     <div className="w-full max-w-6xl mx-auto p-2 sm:p-4 space-y-6 animate-fade-in" id="group-race-main-container">
       
+      {/* MATCHMAKING QUEUE LOADER SCREEN */}
+      {isQueueing && (
+        <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-8 sm:p-16 text-center text-white shadow-2xl space-y-6 relative overflow-hidden flex flex-col items-center justify-center min-h-[400px]">
+          <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full border-4 border-emerald-500/20 border-t-emerald-400 animate-spin flex items-center justify-center">
+              <Globe size={32} className="text-emerald-400 animate-pulse" />
+            </div>
+            <div className="absolute top-0 left-0 w-full h-full rounded-full border border-teal-500/30 animate-ping opacity-40"></div>
+          </div>
+
+          <div className="space-y-3 max-w-sm mx-auto">
+            <h3 className="text-2xl font-black text-[#FAF6E9] tracking-tight">
+              Eşleşme Aranıyor...
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed font-medium">
+              Battle Royale arenasına giriş yapıyorsunuz. Sizinle aynı anda butona basan diğer oyuncular taranıyor...
+            </p>
+          </div>
+
+          <div className="flex justify-center items-center gap-1.5 px-4 py-2 bg-[#1E2532]/60 rounded-xl border border-slate-600/30 max-w-[240px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+            <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider font-mono">KUYRUKTA BEKLENİYOR</span>
+          </div>
+
+          <div className="pt-4">
+            <button
+              onClick={handleExitGame}
+              className="px-6 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-400 font-extrabold rounded-xl text-xs transition uppercase tracking-wider"
+            >
+              Kuyruktan Çık / Vazgeç ❌
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODE SELECTION SCREEN */}
+      {phase === 'mode_selection' && !isQueueing && (
+        <div className="bg-[#2E3748]/70 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-6 sm:p-12 text-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] space-y-10 relative overflow-hidden text-center animate-scale-up" id="mode-selection-card">
+          {/* Ambient Glowing Backdrops */}
+          <div className="absolute top-0 left-0 -translate-y-24 -translate-x-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+          <div className="absolute bottom-0 right-0 translate-y-24 translate-x-24 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+          
+          <div className="space-y-4 max-w-xl mx-auto relative z-10">
+            <div className="inline-flex p-4 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-2xl border border-emerald-500/20 text-emerald-400 shadow-inner transform rotate-1 hover:rotate-3 transition duration-300">
+              <Swords size={44} className="stroke-[2]" />
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[#FAF6E9]">
+              Grup Yarışı <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-400 to-indigo-400">Arenası</span>
+            </h1>
+            <p className="text-sm text-slate-300 font-medium leading-relaxed">
+              Mücadeleye nasıl katılmak istersiniz? Çevrimiçi lobide arkadaşlarınızla yarışın ya da anında 19 akıllı bota karşı turnuvaya başlayın.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto pt-2 relative z-10">
+            {/* ONLINE MULTIPLAYER CARD */}
+            <button
+              onClick={() => {
+                setIsOnlineMode(true);
+                joinMatchmakingQueue();
+              }}
+              className="group text-left bg-gradient-to-br from-[#1E2532]/90 to-[#242C3D]/90 border border-white/10 hover:border-emerald-500 hover:shadow-[0_0_25px_rgba(16,185,129,0.15)] rounded-[2rem] p-6 sm:p-8 space-y-6 transition duration-300 active:scale-[0.98] shadow-2xl relative overflow-hidden cursor-pointer"
+            >
+              <div className="absolute top-0 right-0 -translate-y-4 translate-x-4 w-24 h-24 bg-emerald-500/5 group-hover:bg-emerald-500/10 rounded-full blur-xl transition duration-300"></div>
+              
+              <div className="flex items-center justify-between">
+                <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-emerald-400 group-hover:scale-110 group-hover:text-emerald-300 transition duration-300">
+                  <Globe size={26} className="stroke-[2.2]" />
+                </div>
+                <span className="text-[9px] uppercase font-black bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/20 tracking-widest font-mono">
+                  MULTIPLE OYUN
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg sm:text-xl font-extrabold text-[#FAF6E9] group-hover:text-emerald-300 transition duration-300 flex items-center gap-2">
+                  Çevrimiçi Savaş
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                  Hızlı lobi eşleşmesi ile 20 kişilik Battle Royale arenasına anında katılın. Diğer oyuncularla veya eksik yerleri tamamlayan botlarla yarışın!
+                </p>
+              </div>
+            </button>
+
+            {/* OFFLINE BOT CARD */}
+            <button
+              onClick={() => {
+                setIsOnlineMode(false);
+                setPhase('lobby');
+              }}
+              className="group text-left bg-gradient-to-br from-[#1E2532]/90 to-[#242C3D]/90 border border-white/10 hover:border-amber-500 hover:shadow-[0_0_25px_rgba(245,158,11,0.15)] rounded-[2rem] p-6 sm:p-8 space-y-6 transition duration-300 active:scale-[0.98] shadow-2xl relative overflow-hidden cursor-pointer"
+            >
+              <div className="absolute top-0 right-0 -translate-y-4 translate-x-4 w-24 h-24 bg-amber-500/5 group-hover:bg-amber-500/10 rounded-full blur-xl transition duration-300"></div>
+              
+              <div className="flex items-center justify-between">
+                <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-amber-400 group-hover:scale-110 group-hover:text-amber-300 transition duration-300">
+                  <Bot size={26} className="stroke-[2.2]" />
+                </div>
+                <span className="text-[9px] uppercase font-black bg-amber-500/10 text-amber-400 px-3 py-1 rounded-full border border-amber-500/20 tracking-widest font-mono">
+                  YAPAY ZEKA
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg sm:text-xl font-extrabold text-[#FAF6E9] group-hover:text-amber-300 transition duration-300">
+                  Yapay Zekaya Karşı
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                  Bekleme süresi olmadan hemen oyuna başlayın! Çeşitli zorluk seviyelerinde 19 akıllı bota karşı kıyasıya bir turnuvaya adım atın.
+                </p>
+              </div>
+            </button>
+          </div>
+
+          <div className="pt-4 relative z-10">
+            <button
+              onClick={onExit}
+              className="px-6 py-3 bg-[#3D4756] hover:bg-[#485365] active:scale-[0.97] text-[#FAF6E9] rounded-xl text-xs font-bold transition duration-150 shadow-md border border-white/5 cursor-pointer uppercase tracking-wider"
+            >
+              Ana Menüye Dön
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ONLINE LOBBY SELECTION */}
+      {phase === 'online_lobby_selection' && (
+        <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-6 sm:p-12 text-white shadow-2xl space-y-8 relative overflow-hidden" id="online-selection-card">
+          <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="text-center space-y-3">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#FAF6E9]">
+              Çevrimiçi <span className="text-emerald-400">Lobi</span> Kur & Katıl
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
+              Bir lobi kodu girerek arkadaşlarının odasına bağlan veya yeni bir oda açarak şampiyonluk yolunu kendin çiz!
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto pt-4">
+            {/* JOIN ODA */}
+            <div className="bg-[#1E2532]/65 border border-[#3E485A] p-6 sm:p-8 rounded-[2rem] space-y-5 flex flex-col justify-between">
+              <div className="space-y-3">
+                <h3 className="text-base sm:text-lg font-extrabold text-[#FAF6E9] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  Var Olan Odaya Katıl
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Arkadaşının seninle paylaştığı 6 haneli benzersiz oda kodunu buraya girerek lobiye dahil ol.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={joinCodeInput}
+                  onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                  placeholder="ODA KODU (örn. XR9T2W)"
+                  className="w-full bg-[#1A202C] border-2 border-[#3E485A] focus:border-emerald-500 focus:outline-none rounded-xl px-4 py-3 text-center text-lg font-extrabold font-mono tracking-widest text-[#FAF6E9] placeholder:text-gray-500 placeholder:text-xs"
+                />
+
+                <button
+                  onClick={joinOnlineRoom}
+                  disabled={isJoiningRoom}
+                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/40 text-white rounded-xl text-xs font-black tracking-wider uppercase transition shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2"
+                >
+                  {isJoiningRoom ? 'Odaya Katılınıyor...' : 'Odaya Katıl 🚀'}
+                </button>
+              </div>
+            </div>
+
+            {/* CREATE ODA */}
+            <div className="bg-[#1E2532]/65 border border-[#3E485A] p-6 sm:p-8 rounded-[2rem] space-y-5 flex flex-col justify-between">
+              <div className="space-y-3">
+                <h3 className="text-base sm:text-lg font-extrabold text-[#FAF6E9] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-teal-400"></span>
+                  Yeni Bir Oda Kur
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Ev sahibi olarak yeni bir lobi kur ve arkadaşlarına dağıtabileceğin oda koduna anında sahip ol.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="border border-dashed border-[#3E485A] rounded-xl p-3.5 text-center text-xs text-slate-400 font-mono">
+                  Ev Sahibi (Lider): {profile.name}
+                </div>
+
+                <button
+                  onClick={createOnlineRoom}
+                  disabled={isCreatingRoom}
+                  className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 disabled:from-teal-500/40 text-white rounded-xl text-xs font-black tracking-wider uppercase transition shadow-lg shadow-teal-500/10 flex items-center justify-center gap-2"
+                >
+                  {isCreatingRoom ? 'Oda Kuruluyor...' : 'Oda Kur & Kod Üret 👑'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={() => setPhase('mode_selection')}
+              className="px-5 py-2 bg-[#3D4756] hover:bg-[#485365] text-[#FAF6E9] rounded-xl text-xs font-bold transition"
+            >
+              Geri Dön
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ONLINE LOBBY ROOM SCREEN */}
+      {phase === 'online_lobby' && (
+        <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-6 sm:p-10 text-white shadow-2xl space-y-8 relative overflow-hidden" id="online-lobby-card">
+          <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-[#1E2532]/65 border border-[#3E485A] p-6 rounded-2xl">
+            <div className="space-y-1 text-center sm:text-left">
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block">DAVET KODU</span>
+              <div className="flex items-center gap-2.5 justify-center sm:justify-start">
+                <span className="text-3xl font-black font-mono text-white tracking-widest">
+                  {roomCode}
+                </span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(roomCode);
+                    showToast('Oda kodu panoya kopyalandı!', 'success');
+                  }}
+                  className="p-1.5 bg-[#3D4756] hover:bg-[#485365] text-emerald-400 rounded-lg transition"
+                  title="Kodu Kopyala"
+                >
+                  <Copy size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="text-center sm:text-right space-y-2">
+              <span className="text-[10px] font-bold text-gray-400 block uppercase tracking-wider">BATTLE ROYALE GERİ SAYIMI</span>
+              <div className="flex flex-col items-center sm:items-end gap-1">
+                <span className="text-2xl font-black font-mono text-amber-400 animate-pulse">
+                  {onlineLobbyCountdown} sn
+                </span>
+                <div className="w-32 bg-slate-700 h-1.5 rounded-full overflow-hidden border border-slate-600">
+                  <div 
+                    className="h-full bg-gradient-to-r from-amber-500 to-amber-300 transition-all duration-1000"
+                    style={{ width: `${Math.min(100, (onlineLobbyCountdown / 60) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[9px] text-slate-400 font-medium">
+                  {roomPlayers.length}/20 Oyuncu veya Süre Dolunca Başlar
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center px-1">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Users size={14} />
+                Lobideki Oyuncular ({roomPlayers.length})
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {roomPlayers.map((player) => (
+                <div
+                  key={player.id}
+                  className={`p-3 rounded-2xl border flex items-center gap-3 transition ${
+                    player.id === profile.id
+                      ? 'bg-[#3D4756] border-emerald-400/40 shadow-md'
+                      : 'bg-black/20 border-[#3E485A]/70'
+                  }`}
+                >
+                  <span className="w-9 h-9 rounded-full bg-[#1E2532] flex items-center justify-center text-xl shrink-0">
+                    {player.avatar || '👤'}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-extrabold truncate block text-[#FAF6E9]">
+                      {player.name} {player.id === profile.id && '(Siz)'}
+                    </span>
+                    <span className="text-[10px] text-emerald-400 block font-bold">
+                      {player.isBot ? '🤖 Yapay Zeka Bot' : (player.id === roomPlayers[0]?.id ? '👑 Ev Sahibi' : '✔ Katıldı')}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-between items-center border-t border-[#3E485A]/30 pt-6">
+            <button
+              onClick={handleExitGame}
+              className="px-6 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-extrabold rounded-xl text-xs transition uppercase"
+            >
+              Lobiyi Terket / Çık
+            </button>
+
+            {isHost ? (
+              <button
+                onClick={autoStartOnlineTournamentWithBots}
+                className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold rounded-xl text-xs tracking-wider uppercase transition shadow-lg shadow-emerald-500/15"
+              >
+                Savaşı Başlat ⚔
+              </button>
+            ) : (
+              <span className="text-xs font-medium text-slate-400 animate-pulse">
+                Ev sahibinin oyunu başlatması bekleniyor...
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 1. PHASE: LOBBY */}
       {phase === 'lobby' && (
         <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-6 sm:p-10 text-white shadow-2xl space-y-8 relative overflow-hidden" id="group-lobby-card">
@@ -629,7 +1686,7 @@ export default function GroupRace({
               <Swords size={40} />
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              Online <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Grup Yarışı</span> Turnuvası
+              Botlara Karşı <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Grup Yarışı</span> Turnuvası
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
               Sınır 20 kişidir. 1 dakika içinde düello alanında toplanan tüm savaşçılar aynı anda, aynı gizli kelimelerle elenerek finale doğru kıyasıya yarışır!
@@ -653,7 +1710,7 @@ export default function GroupRace({
 
             <div className="flex gap-3 justify-center pt-2">
               <button
-                onClick={onExit}
+                onClick={handleExitGame}
                 className="px-5 py-2.5 bg-[#3D4756] hover:bg-[#3D4756]/80 text-[#FAF6E9] rounded-xl text-xs font-bold transition"
               >
                 Vazgeç / Çık

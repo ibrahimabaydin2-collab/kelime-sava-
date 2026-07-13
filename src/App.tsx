@@ -390,6 +390,7 @@ export default function App() {
 
   const [matchmakingStatus, setMatchmakingStatus] = useState<'idle' | 'queued'>('idle');
   const [isGroupRaceActive, setIsGroupRaceActive] = useState<boolean>(false);
+  const [groupRaceInitialMode, setGroupRaceInitialMode] = useState<'online' | 'offline' | undefined>(undefined);
 
   // UI Modals / Alerts
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'error' | 'success' } | null>(null);
@@ -935,11 +936,7 @@ export default function App() {
       picked = getRandomWord(length);
     } finally {
       setTargetWord(picked);
-      if (gameMode === 'timed' && picked) {
-        setCurrentAttempt(picked[0]);
-      } else {
-        setCurrentAttempt('');
-      }
+      setCurrentAttempt('');
       setIsValidating(false);
     }
   };
@@ -1203,11 +1200,7 @@ export default function App() {
       });
       setLetterStatuses(newLetterStatuses);
       setAttempts(updatedAttempts);
-      if (gameMode === 'timed' && !activeMatch && targetWord) {
-        setCurrentAttempt(targetWord[0]);
-      } else {
-        setCurrentAttempt('');
-      }
+      setCurrentAttempt('');
 
       // Check if won
       const hasWon = feedback.every((f) => f === 'green');
@@ -1381,10 +1374,6 @@ export default function App() {
   // Handle Backspace
   const onDelete = () => {
     if (gameStatus !== 'playing' || isValidating) return;
-    if (gameMode === 'timed' && !activeMatch && currentAttempt.length <= 1) {
-      // In solo timed mode, do not allow deleting the first letter hint
-      return;
-    }
     if (currentAttempt.length > 0) {
       playDeleteSound(settings.soundEnabled);
     }
@@ -1587,6 +1576,7 @@ export default function App() {
         ) : isGroupRaceActive ? (
           <GroupRace
             profile={profile}
+            initialMode={groupRaceInitialMode}
             onUpdateScore={(points) => {
               setProfile((prev) => ({
                 ...prev,
@@ -1595,7 +1585,10 @@ export default function App() {
               }));
               updateMissionProgress('play', 1);
             }}
-            onExit={() => setIsGroupRaceActive(false)}
+            onExit={() => {
+              setIsGroupRaceActive(false);
+              setGroupRaceInitialMode(undefined);
+            }}
             showToast={showToast}
             dictionaryMode={dictionaryMode}
           />
@@ -1627,7 +1620,10 @@ export default function App() {
             onChallenge={handleChallengePlayer}
             onAcceptChallenge={handleAcceptChallenge}
             onDeclineChallenge={handleDeclineChallenge}
-            onStartGroupRace={() => setIsGroupRaceActive(true)}
+            onStartGroupRace={(mode) => {
+              setGroupRaceInitialMode(mode);
+              setIsGroupRaceActive(true);
+            }}
           />
         ) : (
           <>
@@ -1848,14 +1844,6 @@ export default function App() {
               </div>
             )}
           </div>
-
-          {/* Game Hint or Mode Banner */}
-          {gameMode === 'timed' && gameStatus === 'playing' && !activeMatch && targetWord && (
-            <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl mb-2 px-3 py-1.5 bg-gradient-to-r from-emerald-50/70 to-teal-50/70 dark:from-emerald-950/20 dark:to-teal-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-xl text-xs font-black text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2 font-mono animate-fade-in shadow-xs">
-              <Sparkles size={14} className="animate-pulse text-yellow-500" />
-              <span>İPUCU: Kelime <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded text-xs font-black mx-1 inline-block shadow-sm shadow-emerald-500/20">{targetWord[0]}</span> harfi ile başlıyor!</span>
-            </div>
-          )}
 
           {/* Letter Grid */}
           <GameBoard

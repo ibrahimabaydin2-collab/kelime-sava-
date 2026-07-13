@@ -3,7 +3,8 @@ import {
   Swords, Play, Globe, ShieldAlert, Sparkles, 
   Trophy, Users, HelpCircle, ChevronDown, ChevronUp, 
   Copy, Check, Flame, Zap, Target, Edit2, User, Award, CheckCircle2, TrendingUp,
-  Sun, Moon, Sliders, BarChart2, X, ArrowLeft, UserPlus, UserMinus, Clock, Puzzle
+  Sun, Moon, Sliders, BarChart2, X, ArrowLeft, UserPlus, UserMinus, Clock, Puzzle,
+  Bot
 } from 'lucide-react';
 import { UserProfile, LobbyPlayer, Challenge } from '../types.js';
 import { getBaseUrl } from '../utils/api.js';
@@ -25,7 +26,7 @@ interface WelcomeScreenProps {
   onOpenMissions?: () => void;
   matchmakingStatus: 'idle' | 'queued';
   isOnline: boolean;
-  onStartGroupRace?: () => void;
+  onStartGroupRace?: (mode?: 'online' | 'offline') => void;
   
   // New Header integration props
   onOpenStats?: () => void;
@@ -187,26 +188,31 @@ export default function WelcomeScreen({
           </svg>
         </div>
 
-        {/* Absolute-positioned Back Button */}
-        <button
-          onClick={() => setShowGameSetup(false)}
-          className="absolute top-6 left-6 flex items-center gap-1.5 text-xs font-black uppercase bg-[#FAF6E9] hover:bg-[#F3EFE0] active:bg-[#EBE6D5] text-[#2E3748] px-4 py-2 rounded-xl border border-[#EBE6D5] shadow-md transition-all active:scale-95 cursor-pointer z-20"
-          id="setup-back-btn"
-        >
-          <ArrowLeft size={13} className="stroke-[2.5]" />
-          <span>Geri Dön</span>
-        </button>
-
-        {/* Big centered game logo header */}
-        <div className="flex flex-col items-center justify-center gap-1.5 mt-4 text-center">
-          <div className="flex items-center justify-center gap-3">
-            <Swords className="w-6 h-6 text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)] animate-pulse" />
-            <h1 className="text-xl sm:text-2xl font-light font-serif tracking-[0.2em] text-[#FAF6E9] uppercase drop-shadow-md">
-              KELİME SAVAŞI
-            </h1>
+        {/* Header section with back button and centered title */}
+        <div className="w-full flex flex-col md:grid md:grid-cols-5 items-center gap-4 border-b border-[#3E485A]/40 pb-6 relative z-10" id="setup-header-section">
+          <div className="md:col-span-1 w-full flex justify-start">
+            <button
+              onClick={() => setShowGameSetup(false)}
+              className="flex items-center gap-1.5 text-xs font-black uppercase bg-[#FAF6E9] hover:bg-[#F3EFE0] active:bg-[#EBE6D5] text-[#2E3748] px-4 py-2 rounded-xl border border-[#EBE6D5] shadow-md transition-all active:scale-95 cursor-pointer"
+              id="setup-back-btn"
+            >
+              <ArrowLeft size={13} className="stroke-[2.5]" />
+              <span>Geri Dön</span>
+            </button>
           </div>
-          <div className="h-0.5 w-16 bg-gradient-to-r from-transparent via-amber-400/40 to-transparent mt-1" />
-          <span className="text-[10px] font-mono font-bold tracking-[0.2em] text-amber-200/50 uppercase mt-0.5">OYUN KURMA PANELİ</span>
+          
+          <div className="md:col-span-3 flex flex-col items-center justify-center gap-1 text-center">
+            <div className="flex items-center justify-center gap-3">
+              <Swords className="w-6 h-6 text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)] animate-pulse" />
+              <h1 className="text-xl sm:text-2xl font-light font-serif tracking-[0.2em] text-[#FAF6E9] uppercase drop-shadow-md leading-none">
+                KELİME SAVAŞI
+              </h1>
+            </div>
+            <div className="h-0.5 w-16 bg-gradient-to-r from-transparent via-amber-400/40 to-transparent mt-1.5" />
+            <span className="text-[10px] font-mono font-bold tracking-[0.2em] text-amber-200/50 uppercase mt-1">OYUN KURMA PANELİ</span>
+          </div>
+
+          <div className="hidden md:block md:col-span-1" />
         </div>
 
         {/* Setup Content */}
@@ -258,7 +264,7 @@ export default function WelcomeScreen({
             </div>
 
             {/* Parameter Controls specific to selected mode with enlarged fonts and cream highlights */}
-            {selectedTab !== 'group' && (
+            {selectedTab !== 'group' ? (
               <div className="space-y-5 bg-[#3D4756]/30 p-5 sm:p-6 rounded-[2rem] border border-white/5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {/* Word Length Selector */}
@@ -370,6 +376,68 @@ export default function WelcomeScreen({
                   </div>
                 )}
               </div>
+            ) : (
+              <div className="space-y-5 bg-[#3D4756]/35 p-5 sm:p-6 rounded-[2rem] border border-white/10 animate-scale-up text-left relative overflow-hidden shadow-2xl">
+                <div className="absolute top-0 right-0 -translate-y-8 translate-x-8 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
+                
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="text-[10px] font-black text-amber-300 font-mono tracking-wider uppercase">
+                    Grup Yarışı Oyun Modunu Seçin
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Option 1: Çevrimiçi Savaş */}
+                  <button
+                    onClick={() => {
+                      onStartGroupRace && onStartGroupRace('online');
+                      setShowGameSetup(false);
+                    }}
+                    className="group bg-[#1E2532]/90 hover:bg-[#1E2532] border border-white/5 hover:border-emerald-500/50 rounded-[1.5rem] p-4 text-left transition-all duration-300 hover:shadow-[0_4px_25px_rgba(16,185,129,0.15)] active:scale-[0.98] cursor-pointer relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 -translate-y-4 translate-x-4 w-12 h-12 bg-emerald-500/5 group-hover:bg-emerald-500/10 rounded-full blur-lg transition duration-300"></div>
+                    <div className="flex items-center gap-3.5 relative z-10">
+                      <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400 group-hover:scale-110 group-hover:text-emerald-300 transition duration-300 shadow-inner shrink-0 animate-fade-in">
+                        <Globe size={20} className="stroke-[2.5]" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-extrabold text-[#FAF6E9] group-hover:text-emerald-300 transition duration-300 flex items-center gap-1.5">
+                          Çevrimiçi Savaş
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-medium leading-normal mt-0.5">
+                          Arkadaşlarınızla oda kodu ile canlı bağlanıp düello yapın.
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Option 2: Yapay Zekaya Karşı */}
+                  <button
+                    onClick={() => {
+                      onStartGroupRace && onStartGroupRace('offline');
+                      setShowGameSetup(false);
+                    }}
+                    className="group bg-[#1E2532]/90 hover:bg-[#1E2532] border border-white/5 hover:border-amber-500/50 rounded-[1.5rem] p-4 text-left transition-all duration-300 hover:shadow-[0_4px_25px_rgba(245,158,11,0.15)] active:scale-[0.98] cursor-pointer relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 -translate-y-4 translate-x-4 w-12 h-12 bg-amber-500/5 group-hover:bg-amber-500/10 rounded-full blur-lg transition duration-300"></div>
+                    <div className="flex items-center gap-3.5 relative z-10">
+                      <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-400 group-hover:scale-110 group-hover:text-amber-300 transition duration-300 shadow-inner shrink-0 animate-fade-in">
+                        <Bot size={20} className="stroke-[2.5]" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-extrabold text-[#FAF6E9] group-hover:text-amber-300 transition duration-300">
+                          Yapay Zekaya Karşı
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-medium leading-normal mt-0.5">
+                          19 akıllı bota karşı bekleme süresi olmadan hemen oynayın.
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* Sleek Dark Info Panel */}
@@ -430,21 +498,7 @@ export default function WelcomeScreen({
               </button>
             )}
 
-            {selectedTab === 'group' && onStartGroupRace && (
-              <div className="space-y-3">
-                <button
-                  onClick={() => {
-                    onStartGroupRace();
-                    setShowGameSetup(false);
-                  }}
-                  className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-base sm:text-lg py-4 px-6 rounded-2xl shadow-[0_5px_0_#D9D4C3,0_8px_15px_rgba(0,0,0,0.2)] transition-all flex items-center justify-center uppercase tracking-widest cursor-pointer border border-[#EBE6D5]"
-                  id="start-group-btn"
-                >
-                  <Swords size={18} className="text-[#2E3748] mr-2.5 stroke-[2.5]" />
-                  <span>Grup Yarışını Başlat</span>
-                </button>
-              </div>
-            )}
+
           </div>
         </div>
       </div>
