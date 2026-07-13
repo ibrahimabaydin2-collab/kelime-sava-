@@ -113,6 +113,9 @@ export default function GroupRace({
 
   // Live feed log
   const [liveLogs, setLiveLogs] = useState<{ time: string; text: string; icon?: string }[]>([]);
+  const [isRivalsOpen, setIsRivalsOpen] = useState<boolean>(false);
+  const [rivalsTab, setRivalsTab] = useState<'standings' | 'feed'>('standings');
+  const [previousUserRank, setPreviousUserRank] = useState<number | null>(null);
   
   const [onlineLobbyCountdown, setOnlineLobbyCountdown] = useState<number>(60);
   const [roomCreatedAt, setRoomCreatedAt] = useState<string | null>(null);
@@ -217,6 +220,35 @@ export default function GroupRace({
       setLiveLogs((prev) => [...prev, ...logsToAdd]);
     }
   }, [competitors, phase, roundTimer]);
+
+  // Track user's ranking in real time to show non-intrusive toast notification on improvement
+  useEffect(() => {
+    if (phase !== 'playing') return;
+
+    const sorted = [...competitors].filter(c => !c.eliminated || c.isUser).sort((a, b) => {
+      if (a.solved && !b.solved) return -1;
+      if (!a.solved && b.solved) return 1;
+      if (a.solved && b.solved) {
+        if (a.currentAttempt !== b.currentAttempt) {
+          return a.currentAttempt - b.currentAttempt;
+        }
+      }
+      return b.score - a.score;
+    });
+
+    const userIdx = sorted.findIndex(c => c.isUser);
+    const currentRank = userIdx + 1; // 1-indexed
+
+    if (previousUserRank !== null && currentRank < previousUserRank) {
+      if (currentRank === 1) {
+        showToast('Tebrikler! Liderliğe yükseldiniz! 👑', 'success');
+      } else if (currentRank <= 3) {
+        showToast(`Müthiş hamle! ${currentRank}. sıraya yükseldiniz! 🚀`, 'info');
+      }
+    }
+
+    setPreviousUserRank(currentRank);
+  }, [competitors, phase]);
 
   // Keyboard layout for TR
   const KEYBOARD_ROWS = [
@@ -1773,250 +1805,330 @@ export default function GroupRace({
 
       {/* 2. PHASE: ACTIVE TOURNAMENT PLAYING */}
       {phase === 'playing' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="group-race-battlefield">
+        <div className="max-w-md mx-auto space-y-6" id="group-race-battlefield">
           
-          {/* LEFT: Game play Board (8 columns) */}
-          <div className="lg:col-span-8 space-y-6">
+          {/* Top Row: Back button, Title / Round info, Rivals drawer trigger button */}
+          <div className="flex justify-between items-center bg-[#2E3748] border border-[#3E485A] p-4 rounded-[1.8rem] shadow-lg text-white">
+            <button
+              onClick={handleExitGame}
+              className="p-2.5 bg-[#3D4756] hover:bg-rose-500 hover:text-white text-[#FAF6E9] rounded-xl transition duration-150 border border-[#3E485A] cursor-pointer"
+              title="Oyundan Çık"
+            >
+              <ArrowLeft size={16} />
+            </button>
             
-            {/* Round info and Timer row */}
-            <div className="bg-[#2E3748] border border-[#3E485A] p-4 rounded-[2rem] shadow-lg flex justify-between items-center gap-4 text-white">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-gradient-to-tr from-amber-500 to-amber-600 rounded-2xl text-white shadow-md">
-                  <Award size={20} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-extrabold text-[#FAF6E9] uppercase tracking-wider">
-                    TUR #{currentRound} <span className="text-amber-400 font-extrabold">({wordLength} Harf)</span>
-                  </h2>
-                  <p className="text-[10px] text-gray-300 font-semibold uppercase">
-                    Kalan Oyuncu Sayısı: {competitors.filter(c => !c.eliminated).length} / 20
-                  </p>
-                </div>
-              </div>
-
-              {/* Timer wheel */}
-              <div className="flex items-center gap-2.5 bg-black/25 px-4 py-2 rounded-2xl border border-[#3E485A]">
-                <Clock size={16} className={`animate-pulse ${roundTimer < 15 ? 'text-rose-500' : 'text-emerald-500'}`} />
-                <span className={`font-mono text-lg font-extrabold ${roundTimer < 15 ? 'text-rose-500' : 'text-[#FAF6E9]'}`}>
-                  00:{String(roundTimer).padStart(2, '0')}
-                </span>
-              </div>
+            <div className="text-center">
+              <h2 className="text-xs font-black text-[#FAF6E9] uppercase tracking-widest">
+                TUR #{currentRound} <span className="text-amber-400">({wordLength} Harf)</span>
+              </h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
+                Kalan: {competitors.filter(c => !c.eliminated).length} / 20
+              </p>
             </div>
 
-            {/* Wordle Grid block */}
-            <div className="bg-[#2E3748] border border-[#3E485A] p-6 rounded-[2rem] shadow-xl flex flex-col items-center justify-center space-y-5 relative text-white">
-              {isUserEliminated && (
-                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm rounded-3xl z-40 flex flex-col items-center justify-center p-6 text-center space-y-3">
-                  <ShieldAlert size={48} className="text-rose-500" />
-                  <h3 className="text-xl font-bold text-white">Yarıştan Elendiniz!</h3>
-                  <p className="text-xs text-slate-400 max-w-sm">
-                    Bu turda elendiniz ancak diğer savaşçıların kıyasıya düellosunu canlı olarak izleyip kimin kazanacağını görebilirsiniz!
-                  </p>
-                  <button
-                    onClick={endRound}
-                    className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold rounded-xl text-xs transition shadow-md shadow-rose-500/10"
-                  >
-                    Canlı Sıralamayı Gör
-                  </button>
-                </div>
-              )}
+            <button
+              onClick={() => {
+                setRivalsTab('standings');
+                setIsRivalsOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl text-xs font-extrabold transition shadow-md shadow-emerald-500/10 cursor-pointer"
+            >
+              <Users size={14} />
+              <span>Yarışçılar</span>
+            </button>
+          </div>
 
-              {/* Grid representation */}
-              <div className="space-y-2">
-                {Array.from({ length: 6 }).map((_, rowIdx) => {
-                  const guess = userGuesses[rowIdx] || '';
-                  const isCurrent = rowIdx === userGuesses.length && !userFinished;
-                  const feedback = userGuesses[rowIdx] ? evaluateGuessLocally(guess, targetWord) : [];
+          {/* TIMER ROW */}
+          <div className="bg-[#2E3748] border border-[#3E485A] px-5 py-3 rounded-2xl flex items-center justify-between shadow-md">
+            <span className="text-xs font-extrabold text-slate-300 uppercase tracking-wide">Kalan Süre:</span>
+            <div className="flex items-center gap-2.5 bg-black/25 px-3 py-1.5 rounded-xl border border-[#3E485A]">
+              <Clock size={15} className={`animate-pulse ${roundTimer < 15 ? 'text-rose-500' : 'text-emerald-500'}`} />
+              <span className={`font-mono text-sm font-extrabold ${roundTimer < 15 ? 'text-rose-500' : 'text-[#FAF6E9]'}`}>
+                00:{String(roundTimer).padStart(2, '0')}
+              </span>
+            </div>
+          </div>
 
-                  return (
-                    <div key={rowIdx} className="flex gap-2 justify-center">
-                      {Array.from({ length: wordLength }).map((_, colIdx) => {
-                        let letter = '';
-                        if (isCurrent) {
-                          letter = currentGuess[colIdx] || '';
-                        } else if (userGuesses[rowIdx]) {
-                          letter = guess[colIdx] || '';
-                        }
-
-                        const status = feedback[colIdx];
-                        let bgClass = 'bg-[#222B3A]/45 border-[#3E485A] text-[#FAF6E9]';
-                        if (status === 'green') bgClass = 'bg-emerald-500 border-emerald-600 text-white shadow-md shadow-emerald-500/10';
-                        else if (status === 'orange') bgClass = 'bg-amber-500 border-amber-600 text-white shadow-md shadow-amber-500/10';
-                        else if (status === 'grey') bgClass = 'bg-slate-500 border-[#3E485A] text-white';
-
-                        return (
-                          <div
-                            key={colIdx}
-                            className={`w-10 h-10 sm:w-12 sm:h-12 border-[3px] rounded-xl flex items-center justify-center text-sm sm:text-base font-extrabold select-none transition-all duration-300 ${bgClass} ${
-                              isCurrent && letter ? 'scale-105 border-emerald-500 ring-2 ring-emerald-500/15' : ''
-                            }`}
-                          >
-                            {letter}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
+          {/* Wordle Grid block */}
+          <div className="bg-[#2E3748] border border-[#3E485A] p-6 rounded-[2rem] shadow-xl flex flex-col items-center justify-center space-y-5 relative text-white">
+            {isUserEliminated && (
+              <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm rounded-3xl z-40 flex flex-col items-center justify-center p-6 text-center space-y-3">
+                <ShieldAlert size={48} className="text-rose-500" />
+                <h3 className="text-xl font-bold text-white">Yarıştan Elendiniz!</h3>
+                <p className="text-xs text-slate-400 max-w-sm">
+                  Bu turda elendiniz ancak diğer savaşçıların kıyasıya düellosunu canlı olarak izleyip kimin kazanacağını görebilirsiniz!
+                </p>
+                <button
+                  onClick={() => {
+                    setRivalsTab('standings');
+                    setIsRivalsOpen(true);
+                  }}
+                  className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold rounded-xl text-xs transition shadow-md shadow-rose-500/10"
+                >
+                  Canlı Sıralamayı Gör
+                </button>
               </div>
+            )}
 
-              {/* Guesses loader indicator */}
-              {isValidating && (
-                <div className="text-xs text-emerald-500 font-bold flex items-center gap-1.5 animate-pulse">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
-                  Sözlükte Kelime Sorgulanıyor...
-                </div>
-              )}
+            {/* Grid representation */}
+            <div className="space-y-2">
+              {Array.from({ length: 6 }).map((_, rowIdx) => {
+                const guess = userGuesses[rowIdx] || '';
+                const isCurrent = rowIdx === userGuesses.length && !userFinished;
+                const feedback = userGuesses[rowIdx] ? evaluateGuessLocally(guess, targetWord) : [];
+
+                return (
+                  <div key={rowIdx} className="flex gap-2 justify-center">
+                    {Array.from({ length: wordLength }).map((_, colIdx) => {
+                      let letter = '';
+                      if (isCurrent) {
+                        letter = currentGuess[colIdx] || '';
+                      } else if (userGuesses[rowIdx]) {
+                        letter = guess[colIdx] || '';
+                      }
+
+                      const status = feedback[colIdx];
+                      let bgClass = 'bg-[#222B3A]/45 border-[#3E485A] text-[#FAF6E9]';
+                      if (status === 'green') bgClass = 'bg-emerald-500 border-emerald-600 text-white shadow-md shadow-emerald-500/10';
+                      else if (status === 'orange') bgClass = 'bg-amber-500 border-amber-600 text-white shadow-md shadow-amber-500/10';
+                      else if (status === 'grey') bgClass = 'bg-slate-500 border-[#3E485A] text-white';
+
+                      return (
+                        <div
+                          key={colIdx}
+                          className={`w-10 h-10 sm:w-12 sm:h-12 border-[3px] rounded-xl flex items-center justify-center text-sm sm:text-base font-extrabold select-none transition-all duration-300 ${bgClass} ${
+                            isCurrent && letter ? 'scale-105 border-emerald-500 ring-2 ring-emerald-500/15' : ''
+                          }`}
+                        >
+                          {letter}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Virtual Keyboard */}
-            {!isUserEliminated && (
-              <div className="bg-[#2E3748] border border-[#3E485A] p-4 sm:p-5 rounded-[2rem] shadow-lg">
-                <div className="space-y-1.5 sm:space-y-2 max-w-2xl mx-auto">
-                  {KEYBOARD_ROWS.map((row, rowIdx) => (
-                    <div key={rowIdx} className="flex gap-1 sm:gap-1.5 justify-center">
-                      {rowIdx === 2 && (
-                        <button
-                          onClick={() => handleKeyPress('ENTER')}
-                          className="flex-1 sm:flex-none px-3 py-3 rounded-xl bg-[#3D4756] hover:bg-[#3D4756]/80 text-[#FAF6E9] font-bold text-[10px] sm:text-xs transition active:scale-95 border border-[#3E485A] cursor-pointer"
-                        >
-                          GİRİŞ
-                        </button>
-                      )}
-                      
-                      {row.map((char) => {
-                        const status = letterStatuses[char];
-                        let bgClass = 'bg-[#3D4756] hover:bg-[#3D4756]/80 text-[#FAF6E9] border border-[#3E485A] cursor-pointer';
-                        if (status === 'green') bgClass = 'bg-emerald-500 text-white shadow-sm cursor-pointer';
-                        else if (status === 'orange') bgClass = 'bg-amber-500 text-white shadow-sm cursor-pointer';
-                        else if (status === 'grey') bgClass = 'bg-[#1E2532] text-gray-500 border border-[#3E485A]/50 cursor-pointer';
-
-                        return (
-                          <button
-                            key={char}
-                            onClick={() => handleKeyPress(char)}
-                            className={`h-9 sm:h-12 w-8 sm:w-10 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center transition active:scale-95 ${bgClass}`}
-                          >
-                            {char}
-                          </button>
-                        );
-                      })}
-
-                      {rowIdx === 2 && (
-                        <button
-                          onClick={() => handleKeyPress('BACK')}
-                          className="flex-1 sm:flex-none px-3 py-3 rounded-xl bg-[#3D4756] hover:bg-[#3D4756]/80 text-[#FAF6E9] font-bold text-[10px] sm:text-xs transition active:scale-95 border border-[#3E485A] cursor-pointer"
-                        >
-                          SİL
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+            {/* Guesses loader indicator */}
+            {isValidating && (
+              <div className="text-xs text-emerald-500 font-bold flex items-center gap-1.5 animate-pulse">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
+                Sözlükte Kelime Sorgulanıyor...
               </div>
             )}
           </div>
 
-          {/* RIGHT: Live Feed and Competitors Standings (4 columns) */}
-          <div className="lg:col-span-4 space-y-6">
-            
-            {/* Live Competition stand */}
-            <div className="bg-[#2E3748] border border-[#3E485A] p-5 rounded-[2rem] shadow-xl space-y-4 flex flex-col max-h-[440px] text-[#FAF6E9]">
-              <div className="flex justify-between items-center pb-2 border-b border-[#3E485A]">
-                <span className="text-xs font-bold text-[#FAF6E9] uppercase tracking-wider flex items-center gap-1.5">
-                  <Users size={14} />
-                  Sıralama ({competitors.filter(c => !c.eliminated).length} Oyuncu)
-                </span>
-                <span className="text-[9px] font-extrabold bg-amber-500/10 text-amber-400 px-2.5 py-0.5 rounded-full uppercase">
-                  {currentRound === 1 ? 'TOP 10 TUR ATLAR' : currentRound === 2 ? 'TOP 5 TUR ATLAR' : currentRound === 3 ? 'TOP 2 TUR ATLAR' : 'ŞAMPİYONLUK MAÇI'}
-                </span>
-              </div>
+          {/* Virtual Keyboard */}
+          {!isUserEliminated && (
+            <div className="bg-[#2E3748] border border-[#3E485A] p-4 sm:p-5 rounded-[2rem] shadow-lg">
+              <div className="space-y-1.5 sm:space-y-2 max-w-2xl mx-auto">
+                {KEYBOARD_ROWS.map((row, rowIdx) => (
+                  <div key={rowIdx} className="flex gap-1 sm:gap-1.5 justify-center">
+                    {rowIdx === 2 && (
+                      <button
+                        onClick={() => handleKeyPress('ENTER')}
+                        className="flex-1 sm:flex-none px-3 py-3 rounded-xl bg-[#3D4756] hover:bg-[#3D4756]/80 text-[#FAF6E9] font-bold text-[10px] sm:text-xs transition active:scale-95 border border-[#3E485A] cursor-pointer"
+                      >
+                        GİRİŞ
+                      </button>
+                    )}
+                    
+                    {row.map((char) => {
+                      const status = letterStatuses[char];
+                      let bgClass = 'bg-[#3D4756] hover:bg-[#3D4756]/80 text-[#FAF6E9] border border-[#3E485A] cursor-pointer';
+                      if (status === 'green') bgClass = 'bg-emerald-500 text-white shadow-sm cursor-pointer';
+                      else if (status === 'orange') bgClass = 'bg-amber-500 text-white shadow-sm cursor-pointer';
+                      else if (status === 'grey') bgClass = 'bg-[#1E2532] text-gray-500 border border-[#3E485A]/50 cursor-pointer';
 
-              {/* Scrollable list */}
-              <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
-                {activeCompetitors.map((c, idx) => {
-                  return (
-                    <div 
-                      key={c.id} 
-                      className={`p-2 rounded-xl border flex items-center justify-between gap-2.5 transition duration-150 ${
-                        c.isUser 
-                          ? 'bg-[#3D4756] border-emerald-500/40 shadow-sm' 
-                          : c.eliminated 
-                          ? 'bg-black/20 border-[#3E485A]/55 opacity-40' 
-                          : 'bg-black/15 border-[#3E485A]/45'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-7 h-7 rounded-full bg-[#3D4756] border border-[#3E485A] flex items-center justify-center text-sm shadow-inner shrink-0">
-                          {c.avatar}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <span className={`text-xs font-extrabold truncate block ${c.isUser ? 'text-emerald-400' : 'text-[#FAF6E9]'}`}>
-                            {c.name} {c.isUser && '(SİZ)'}
-                          </span>
-                          
-                          {/* visual guessing squares representing effort */}
-                          <div className="flex gap-0.5 mt-0.5">
-                            {Array.from({ length: 6 }).map((_, i) => {
-                              const attempted = i < c.currentAttempt;
-                              const solvedRow = c.solved && i === c.currentAttempt - 1;
-                              return (
-                                <div 
-                                  key={i} 
-                                  className={`w-2 h-2 rounded-sm ${
-                                    solvedRow 
-                                      ? 'bg-emerald-500 shadow-sm shadow-emerald-500/10' 
-                                      : attempted 
-                                      ? 'bg-amber-500' 
-                                      : 'bg-[#1E2532]'
-                                  }`}
-                                ></div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
+                      return (
+                        <button
+                          key={char}
+                          onClick={() => handleKeyPress(char)}
+                          className={`h-9 sm:h-12 w-8 sm:w-10 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center transition active:scale-95 ${bgClass}`}
+                        >
+                          {char}
+                        </button>
+                      );
+                    })}
 
-                      <div className="text-right shrink-0">
-                        {c.solved ? (
-                          <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                            Çözdü ✔
-                          </span>
-                        ) : c.eliminated ? (
-                          <span className="text-[10px] font-semibold text-rose-400">
-                            Elendi
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-mono font-bold text-gray-400">
-                            {c.currentAttempt}/6 Tahmin
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Live broadcast terminal logs */}
-            <div className="bg-slate-950 border border-slate-800 p-4 rounded-3xl shadow-xl flex flex-col h-[180px] text-xs font-mono">
-              <div className="flex justify-between items-center pb-1 border-b border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                <span>Canlı Savaş Akışı</span>
-                <span className="text-rose-500 animate-pulse">● CANLI</span>
-              </div>
-
-              <div ref={logContainerRef} className="flex-1 overflow-y-auto space-y-1.5 scrollbar-thin text-slate-300">
-                {liveLogs.map((log, idx) => (
-                  <div key={idx} className="flex gap-2 items-start leading-tight">
-                    <span className="text-slate-500 text-[10px]">{log.time}</span>
-                    <p className="flex-1 text-[11px]">
-                      {log.text}
-                    </p>
+                    {rowIdx === 2 && (
+                      <button
+                        onClick={() => handleKeyPress('BACK')}
+                        className="flex-1 sm:flex-none px-3 py-3 rounded-xl bg-[#3D4756] hover:bg-[#3D4756]/80 text-[#FAF6E9] font-bold text-[10px] sm:text-xs transition active:scale-95 border border-[#3E485A] cursor-pointer"
+                      >
+                        SİL
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Rivals & Live Feed Drawer Modal */}
+          {isRivalsOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-end animate-fade-in">
+              {/* Backdrop */}
+              <div 
+                onClick={() => setIsRivalsOpen(false)} 
+                className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm transition-opacity"
+              />
+              
+              {/* Content panel */}
+              <div className="relative w-full max-w-md h-full bg-[#2E3748] border-l border-[#3E485A] shadow-2xl flex flex-col text-white animate-scale-up">
+                
+                {/* Header */}
+                <div className="p-5 border-b border-[#3E485A] flex justify-between items-center bg-[#242C3D]">
+                  <div className="flex items-center gap-2">
+                    <Users className="text-emerald-400" size={18} />
+                    <h3 className="text-sm font-black tracking-wider uppercase text-[#FAF6E9]">Yarışçılar & Akış</h3>
+                  </div>
+                  <button 
+                    onClick={() => setIsRivalsOpen(false)}
+                    className="p-1.5 hover:bg-[#3D4756] rounded-lg transition text-slate-400 hover:text-white"
+                  >
+                    <ArrowRight size={18} />
+                  </button>
+                </div>
+
+                {/* Tabs */}
+                <div className="grid grid-cols-2 border-b border-[#3E485A] bg-[#1E2532]/40">
+                  <button
+                    onClick={() => setRivalsTab('standings')}
+                    className={`py-3.5 text-xs font-black uppercase tracking-wider text-center transition border-b-2 ${
+                      rivalsTab === 'standings' 
+                        ? 'border-emerald-500 text-emerald-400 bg-white/5' 
+                        : 'border-transparent text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Sıralama ({competitors.filter(c => !c.eliminated).length}/20)
+                  </button>
+                  <button
+                    onClick={() => setRivalsTab('feed')}
+                    className={`py-3.5 text-xs font-black uppercase tracking-wider text-center transition border-b-2 relative ${
+                      rivalsTab === 'feed' 
+                        ? 'border-emerald-500 text-emerald-400 bg-white/5' 
+                        : 'border-transparent text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Canlı Akış
+                    {liveLogs.length > 0 && (
+                      <span className="absolute top-2.5 right-6 w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Content Area */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                  {rivalsTab === 'standings' ? (
+                    <div className="space-y-2.5">
+                      {/* Sort players for better UX inside standings tab */}
+                      {[...activeCompetitors].sort((a, b) => {
+                        if (a.solved && !b.solved) return -1;
+                        if (!a.solved && b.solved) return 1;
+                        if (a.solved && b.solved) {
+                          if (a.currentAttempt !== b.currentAttempt) {
+                            return a.currentAttempt - b.currentAttempt;
+                          }
+                        }
+                        return b.score - a.score;
+                      }).map((c) => (
+                        <div 
+                          key={c.id} 
+                          className={`p-3 rounded-2xl border flex items-center justify-between gap-2.5 transition duration-150 ${
+                            c.isUser 
+                              ? 'bg-[#3D4756] border-emerald-500/40 shadow-sm' 
+                              : c.eliminated 
+                              ? 'bg-black/20 border-[#3E485A]/55 opacity-40' 
+                              : 'bg-black/15 border-[#3E485A]/45'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="w-8 h-8 rounded-full bg-[#3D4756] border border-[#3E485A] flex items-center justify-center text-base shadow-inner shrink-0">
+                              {c.avatar}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <span className={`text-xs font-extrabold truncate block ${c.isUser ? 'text-emerald-400' : 'text-[#FAF6E9]'}`}>
+                                {c.name} {c.isUser && '(SİZ)'}
+                              </span>
+                              
+                              {/* visual guessing squares representing effort */}
+                              <div className="flex gap-0.5 mt-0.5">
+                                {Array.from({ length: 6 }).map((_, i) => {
+                                  const attempted = i < c.currentAttempt;
+                                  const solvedRow = c.solved && i === c.currentAttempt - 1;
+                                  return (
+                                    <div 
+                                      key={i} 
+                                      className={`w-2.5 h-2.5 rounded-sm ${
+                                        solvedRow 
+                                          ? 'bg-emerald-500 shadow-sm shadow-emerald-500/10' 
+                                          : attempted 
+                                          ? 'bg-amber-500' 
+                                          : 'bg-[#1E2532]'
+                                      }`}
+                                    ></div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            {c.solved ? (
+                              <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
+                                Çözdü ✔
+                              </span>
+                            ) : c.eliminated ? (
+                              <span className="text-[10px] font-semibold text-rose-400">
+                                Elendi
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-mono font-bold text-gray-400">
+                                {c.currentAttempt}/6 Tahmin
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 bg-slate-950/80 border border-slate-800 p-4 rounded-2xl min-h-[300px] max-h-full overflow-y-auto font-mono text-xs">
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        <span>Savaş Harekat Logu</span>
+                        <span className="text-rose-500 animate-pulse flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                          CANLI
+                        </span>
+                      </div>
+
+                      <div ref={logContainerRef} className="space-y-2 max-h-[450px] overflow-y-auto">
+                        {liveLogs.map((log, idx) => (
+                          <div key={idx} className="flex gap-2 items-start leading-tight">
+                            <span className="text-slate-500 text-[10px] shrink-0">{log.time}</span>
+                            <p className="flex-1 text-[11px] text-slate-300">
+                              {log.text}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 bg-[#242C3D]/60 border-t border-[#3E485A] text-center">
+                  <button 
+                    onClick={() => setIsRivalsOpen(false)}
+                    className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl transition shadow-md shadow-emerald-500/10 cursor-pointer"
+                  >
+                    Oyuna Geri Dön 🎮
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
         </div>
       )}
 
