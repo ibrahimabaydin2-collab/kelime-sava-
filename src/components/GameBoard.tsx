@@ -6,6 +6,7 @@ interface GameBoardProps {
   wordLength: number;
   maxAttempts?: number;
   boardTheme?: 'classic' | 'ocean' | 'neon' | 'autumn' | 'pastel';
+  isGameOver?: boolean;
 }
 
 export default function GameBoard({
@@ -13,25 +14,27 @@ export default function GameBoard({
   currentAttempt,
   wordLength,
   maxAttempts = 6,
-  boardTheme = 'classic'
+  boardTheme = 'classic',
+  isGameOver = false
 }: GameBoardProps) {
-  // Pad attempts to maxAttempts (6)
   const rows = [...attempts];
   const isCompleted = rows.length >= maxAttempts;
   
-  if (rows.length < maxAttempts) {
-    // Add active row
-    rows.push({
-      word: currentAttempt.padEnd(wordLength, ' '),
-      feedback: []
-    });
-  }
-  
-  while (rows.length < maxAttempts) {
-    rows.push({
-      word: ' '.repeat(wordLength),
-      feedback: []
-    });
+  if (!isGameOver) {
+    if (rows.length < maxAttempts) {
+      // Add active row
+      rows.push({
+        word: currentAttempt.padEnd(wordLength, ' '),
+        feedback: []
+      });
+    }
+    
+    while (rows.length < maxAttempts) {
+      rows.push({
+        word: ' '.repeat(wordLength),
+        feedback: []
+      });
+    }
   }
 
   // Determine dynamic cell sizing based on word length to scale perfectly on mobile devices

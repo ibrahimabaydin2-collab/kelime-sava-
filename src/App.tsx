@@ -1506,9 +1506,9 @@ export default function App() {
   const opponent = activeMatch ? Object.values(activeMatch.players).find(p => (p as any).name !== profile.name) as any : null;
 
   return (
-    <div className={`min-h-[100dvh] flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
+    <div className={`h-[100dvh] max-h-[100dvh] overflow-hidden flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
       {/* Main Container */}
-      <main className="flex-1 flex flex-col items-center justify-center py-1.5 sm:py-4 px-1.5 sm:px-4 max-w-full md:max-w-[95vw] lg:max-w-[90vw] w-full mx-auto relative">
+      <main className="flex-1 flex flex-col items-center justify-center py-1.5 sm:py-4 px-1.5 sm:px-4 max-w-full md:max-w-[95vw] lg:max-w-[90vw] w-full mx-auto relative overflow-hidden">
         {/* Toast Notification */}
         {toast && (
           <div className={`fixed top-20 z-50 left-1/2 transform -translate-x-1/2 px-4 py-2.5 rounded-xl border flex items-center gap-2.5 text-xs sm:text-sm font-semibold shadow-lg transition duration-200 animate-slide-in ${
@@ -1761,11 +1761,7 @@ export default function App() {
         {/* Game Layout Wrapper */}
         <div className="w-full flex flex-col items-center justify-center gap-3 sm:gap-4 relative z-10">
           {/* Game Area Card */}
-          <div className={`w-full max-w-md bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] shadow-2xl flex flex-col items-center transition-all duration-200 relative overflow-hidden text-white ${
-            gameStatus === 'playing'
-              ? 'p-4 sm:p-6 min-h-[84vh] md:min-h-0 justify-between gap-y-2'
-              : 'p-5 sm:p-6 min-h-[60vh] md:min-h-0 justify-center gap-y-4'
-          }`} id="game-area-card">
+          <div className="w-full max-w-md bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-between p-4 sm:p-6 min-h-[82vh] max-h-[82vh] h-[82vh] md:min-h-0 md:max-h-none md:h-auto gap-y-2 transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -1832,6 +1828,7 @@ export default function App() {
             currentAttempt={currentAttempt}
             wordLength={wordLength}
             boardTheme={settings.boardTheme}
+            isGameOver={gameStatus !== 'playing'}
           />
 
           {/* Victory Celebration Showcase (Zafer Gösterisi) */}
@@ -2027,14 +2024,16 @@ export default function App() {
           )}
 
           {/* Virtual Keyboard */}
-          <Keyboard
-            onChar={onChar}
-            onDelete={onDelete}
-            onEnter={submitGuess}
-            letterStatuses={letterStatuses}
-            keyboardLayout={settings.keyboardLayout}
-            boardTheme={settings.boardTheme}
-          />
+          {gameStatus === 'playing' && (
+            <Keyboard
+              onChar={onChar}
+              onDelete={onDelete}
+              onEnter={submitGuess}
+              letterStatuses={letterStatuses}
+              keyboardLayout={settings.keyboardLayout}
+              boardTheme={settings.boardTheme}
+            />
+          )}
         </div>
       </div>
 
