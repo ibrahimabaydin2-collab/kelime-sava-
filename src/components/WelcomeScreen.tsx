@@ -3,7 +3,7 @@ import {
   Swords, Play, Globe, ShieldAlert, Sparkles, 
   Trophy, Users, HelpCircle, ChevronDown, ChevronUp, 
   Copy, Check, Flame, Zap, Target, Edit2, User, Award, CheckCircle2, TrendingUp,
-  Sun, Moon, Sliders, BarChart2, X, ArrowLeft, UserPlus, UserMinus
+  Sun, Moon, Sliders, BarChart2, X, ArrowLeft, UserPlus, UserMinus, Clock
 } from 'lucide-react';
 import { UserProfile, LobbyPlayer, Challenge } from '../types.js';
 import { getBaseUrl } from '../utils/api.js';
@@ -168,7 +168,7 @@ export default function WelcomeScreen({
 
   if (showGameSetup) {
     return (
-      <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="welcome-setup-page">
+      <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-5 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col justify-between gap-y-[3.5vh] sm:gap-5 min-h-[82vh] md:min-h-0 animate-scale-up" id="welcome-setup-page">
         {/* Glowing 4-point star accent in bottom right */}
         <div className="absolute bottom-6 right-8 text-amber-100/30 animate-pulse select-none pointer-events-none">
           <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
@@ -418,7 +418,7 @@ export default function WelcomeScreen({
   }
 
   return isEditing ? (
-    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="welcome-screen-root">
+    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-5 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col justify-between gap-y-[3.5vh] sm:gap-5 min-h-[82vh] md:min-h-0 animate-scale-up" id="welcome-screen-root">
       {/* Sparkles / Title */}
       <div className="flex justify-between items-center pb-2 border-b border-white/10">
         <span className="text-sm font-bold font-mono text-amber-200 uppercase tracking-widest flex items-center gap-1.5">
@@ -549,7 +549,7 @@ export default function WelcomeScreen({
       </div>
     </div>
   ) : (
-    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-6" id="welcome-screen-root">
+    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-5 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col justify-between gap-y-[3.5vh] sm:gap-6 min-h-[82vh] md:min-h-0" id="welcome-screen-root">
       
       {/* Glowing 4-point star accent in bottom right */}
       <div className="absolute bottom-6 right-8 text-amber-100/30 animate-pulse select-none pointer-events-none">
@@ -736,7 +736,7 @@ export default function WelcomeScreen({
       {/* Rules Detail Popup Modal */}
       {showRulesModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2rem] p-6 w-full max-w-md shadow-2xl space-y-4 animate-scale-up text-left text-white relative overflow-hidden">
+          <div className="bg-[#2E3748] border border-[#3E485A] rounded-[2rem] p-6 w-full max-w-lg shadow-2xl space-y-4 animate-scale-up text-left text-white relative overflow-hidden">
             {/* Glowing 4-point star accent in bottom right */}
             <div className="absolute bottom-6 right-8 text-amber-100/15 animate-pulse select-none pointer-events-none">
               <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
@@ -751,7 +751,7 @@ export default function WelcomeScreen({
                   Nasıl Oynanır & Kurallar
                 </h3>
                 <p className="text-[10px] text-amber-100/50 font-mono font-bold uppercase mt-0.5">
-                  TDK KELİME SAVAŞI REHBERİ
+                  TDK KELİME SAVAŞI REHBERİ & PUANLAMA SİSTEMİ
                 </p>
               </div>
               <button
@@ -762,25 +762,92 @@ export default function WelcomeScreen({
               </button>
             </div>
 
-            <div className="space-y-3 text-xs leading-relaxed text-[#FAF6E9]/90 max-h-[50vh] overflow-y-auto pr-1">
-              <div className="bg-[#3D4756]/40 p-3 rounded-xl border border-white/5">
-                <span className="font-bold text-amber-300 block mb-0.5">1. Harf Renkleri</span>
+            <div className="space-y-3.5 text-xs leading-relaxed text-[#FAF6E9]/90 max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar">
+              {/* Rule 1: Harf Renkleri */}
+              <div className="bg-[#3D4756]/40 p-3.5 rounded-xl border border-white/5 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-amber-300">
+                  <Sparkles size={14} />
+                  <span>1. Harf Renkleri & İpuçları</span>
+                </div>
                 <p className="text-[11px] leading-normal text-gray-300">
-                  Tahmin ettiğiniz kelimedeki doğru yerdeki harfler <span className="text-emerald-400 font-bold">Yeşil</span>, yanlış yerdeki harfler ise <span className="text-amber-400 font-bold">Turuncu</span> renk alır. Gri harfler kelimede yoktur.
+                  Tahmin ettiğiniz kelimedeki harfler size gizli kelimeye giden yolu gösterir:
+                </p>
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-lg p-1.5 text-center">
+                    <span className="text-emerald-400 font-black block text-[11px]">YEŞİL</span>
+                    <span className="text-[9px] text-gray-300 block">Doğru harf, doğru yer</span>
+                  </div>
+                  <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg p-1.5 text-center">
+                    <span className="text-amber-400 font-black block text-[11px]">TURUNCU</span>
+                    <span className="text-[9px] text-gray-300 block">Harf var, yeri yanlış</span>
+                  </div>
+                  <div className="bg-gray-500/10 border border-gray-500/25 rounded-lg p-1.5 text-center">
+                    <span className="text-gray-400 font-black block text-[11px]">GRİ</span>
+                    <span className="text-[9px] text-gray-300 block">Harf kelimede yok</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rule 2: Puanlama Sistemi */}
+              <div className="bg-[#3D4756]/40 p-3.5 rounded-xl border border-white/5 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-amber-300">
+                  <Award size={14} />
+                  <span>2. Puanlama Sistemi</span>
+                </div>
+                <p className="text-[11px] leading-normal text-gray-300">
+                  Kelimeyi doğru bildiğinizde kazandığınız skor dinamik olarak hesaplanır:
+                </p>
+                <div className="space-y-1.5 text-[11px] bg-black/20 p-2.5 rounded-lg text-gray-300 font-mono">
+                  <div className="flex justify-between">
+                    <span>🌟 Taban Ödül:</span>
+                    <span className="text-[#FAF6E9] font-bold">+100 Puan</span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/5 pt-1">
+                    <span>⏱️ Süre Bonusu:</span>
+                    <span className="text-emerald-400 font-bold">Kalan her saniye x 5 Puan</span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/5 pt-1">
+                    <span>🚫 Tahmin Cezası:</span>
+                    <span className="text-rose-400 font-bold">Her yanlış tahmin için -10 Puan</span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/5 pt-1 text-[10px] text-amber-300/80">
+                    <span>🛡️ En Düşük Limit:</span>
+                    <span>Doğru bildiğinizde en az 50 Puan garantidir!</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rule 3: Süre Kuralları */}
+              <div className="bg-[#3D4756]/40 p-3.5 rounded-xl border border-white/5 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-amber-300">
+                  <Clock size={14} />
+                  <span>3. Süre Kuralları (⏱️ Süreli Oyun)</span>
+                </div>
+                <p className="text-[11px] leading-normal text-gray-300">
+                  Süreli oyun modunda her geçerli tahmin girdikten sonra süre sayacı tekrar <strong className="text-white">20 saniyeye</strong> sıfırlanır. Bu sayede hızlı düşünen ve kelimeleri seri bilen oyuncular devasa zaman bonusları toplayabilirler!
                 </p>
               </div>
 
-              <div className="bg-[#3D4756]/40 p-3 rounded-xl border border-white/5">
-                <span className="font-bold text-amber-300 block mb-0.5">2. Canlı Eş Zamanlı Yarış</span>
+              {/* Rule 4: TDK & Dil Kuralları Doğrulaması */}
+              <div className="bg-[#3D4756]/40 p-3.5 rounded-xl border border-white/5 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-amber-300">
+                  <ShieldAlert size={14} />
+                  <span>4. Akıllı Kelime Doğrulama</span>
+                </div>
                 <p className="text-[11px] leading-normal text-gray-300">
-                  Rakibinizle aynı gizli kelimeyi çözmeye çalışırsınız. En az deneme ile en hızlı sürede çözen düellonun kazananı olur.
+                  Rastgele harf tuşlanmasını önlemek için tüm kelimeler TDK (Türk Dil Kurumu) veri tabanı ile anlık doğrulanır. 
+                  İnternet kesildiğinde ise gelişmiş yapay zeka algoritmalı <strong className="text-white">Türkçe Hece ve Harf Uyumu Koruması</strong> devreye girerek geçerli Türkçe kelimeleri oynamaya devam etmenizi sağlar.
                 </p>
               </div>
 
-              <div className="bg-[#3D4756]/40 p-3 rounded-xl border border-white/5">
-                <span className="font-bold text-amber-300 block mb-0.5">3. TDK Sözlük Doğrulaması</span>
+              {/* Rule 5: Çok Oyunculu Düellolar */}
+              <div className="bg-[#3D4756]/40 p-3.5 rounded-xl border border-white/5 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-amber-300">
+                  <Swords size={14} />
+                  <span>5. Canlı Düello & Grup Yarışları</span>
+                </div>
                 <p className="text-[11px] leading-normal text-gray-300">
-                  Girdiğiniz her tahminin TDK sözlüğünde yer alması gerekir. Çözülemeyen kelimelerin anlamlarını oyun bittiğinde görebilirsiniz.
+                  Arkadaşlarınızla lobide buluşarak veya rastgele eşleşme ile canlı düello başlatabilirsiniz. İki taraf da aynı gizli kelimeyi çözmeye çalışır. Kelimeyi en az denemede ve en kısa sürede çözen taraf düelloyu kazanır ve hanesine devasa <strong className="text-amber-400">+100 Savaş Puanı</strong> yazdırır!
                 </p>
               </div>
             </div>

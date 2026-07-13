@@ -230,14 +230,60 @@ app.post('/api/validate-word', async (req, res) => {
       console.warn('TDK GTS API Request failed or timed out:', tdkErr);
     }
 
-    // Default to true with linguistic validation fallback if TDK API is offline/down/throttled.
-    // This ensures gameplay is never interrupted by government API outages while still blocking gibberish.
-    const fallbackResult = {
-      valid: true,
-      definition: 'TDK Sözlük servisine şu an erişilemiyor. Kelime Türkçe dil kurallarına göre doğrulandı.'
-    };
-    wordCache[cacheKey] = fallbackResult;
-    return res.json(fallbackResult);
+    // 3. Fallback to Gemini AI Validation if TDK API is offline, down, or blocked
+    try {
+      console.log(`[Validation Fallback] TDK API is unavailable. Using Gemini to validate word: "${normalized}"`);
+      const prompt = `Lütfen "${normalized}" kelimesinin geçerli bir Türkçe kelime olup olmadığını (isim, fiil, sıfat vb.) kontrol et. 
+Klavye tuşlamaları (asd, asdf, jkl, qwe, asda, dfg vb.), rastgele yan yana gelen uyumsuz harfler veya uydurma kelimeler kesinlikle GEÇERSİZ (valid: false) olmalıdır. 
+Eğer kelime gerçek, anlamlı bir Türkçe kelime ise "valid" değerini true yap ve kısa bir Türkçe tanım ("definition") ekle.
+Kelime uydurmaysa veya klavye mıncıklaması ise "valid" değerini false yap.
+
+Yanıtını SADECE aşağıdaki JSON yapısında döndür:
+{
+  "valid": boolean,
+  "definition": "Kelimelerin anlamı veya geçersiz olma sebebi"
+}`;
+
+      const geminiResponse = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          systemInstruction: "Sen Türkçe kelime doğrulama sistemisin. Görevin, verilen kelimenin uydurma veya klavye tuşlaması (gibberish/nonsense) olmayıp, gerçek bir Türkçe sözlük kelimesi olduğunu onaylamaktır. Sadece gerçek ve anlamlı kelimeleri onaylarsın. Sonuçları her zaman JSON olarak dönersin."
+        }
+      });
+
+      if (geminiResponse && geminiResponse.text) {
+        const geminiData = JSON.parse(geminiResponse.text.trim());
+        if (typeof geminiData.valid === 'boolean') {
+          const geminiResult = {
+            valid: geminiData.valid,
+            definition: geminiData.definition || (geminiData.valid ? 'Türkçe dil kurallarına uygun kelime.' : 'Geçersiz Türkçe kelime.')
+          };
+          console.log(`[Gemini Fallback Result] Word: "${normalized}", Valid: ${geminiResult.valid}, Def: ${geminiResult.definition}`);
+          wordCache[cacheKey] = geminiResult;
+          return res.json(geminiResult);
+        }
+      }
+    } catch (geminiErr) {
+      console.error('[Gemini Fallback ERROR]:', geminiErr);
+    }
+
+    // 4. Absolute offline fallback if both TDK and Gemini fail
+    const finalOfflineCheck = isWordInCuratedList(normalized, wordLength);
+    if (finalOfflineCheck) {
+      const fallbackResult = {
+        valid: true,
+        definition: 'Kelime çevrimdışı sözlük listesinde onaylandı.'
+      };
+      wordCache[cacheKey] = fallbackResult;
+      return res.json(fallbackResult);
+    }
+
+    return res.json({
+      valid: false,
+      definition: 'Bağlantı kurulamadı ve kelime Türkçe sözlüğünde bulunamadı!'
+    });
   } catch (error: any) {
     console.error('[Word Validation ERROR]:', error?.message || error);
     res.json({

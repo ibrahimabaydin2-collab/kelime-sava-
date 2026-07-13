@@ -37,21 +37,21 @@ export default function GameBoard({
   // Determine dynamic cell sizing based on word length to scale perfectly on mobile devices
   const getCellSizeClass = () => {
     if (wordLength === 3) {
-      return 'w-[clamp(2.6rem,min(14vw,8.5vh),5rem)] h-[clamp(2.6rem,min(14vw,8.5vh),5rem)] text-2xl sm:text-3xl md:text-4xl border-[3px] rounded-xl';
+      return 'w-[clamp(2.6rem,min(14vw,9.5vh),5.5rem)] h-[clamp(2.6rem,min(14vw,9.5vh),5.5rem)] text-2xl sm:text-3xl md:text-4xl border-[3px] rounded-xl';
     }
     if (wordLength === 4) {
-      return 'w-[clamp(2.3rem,min(12vw,8vh),4.5rem)] h-[clamp(2.3rem,min(12vw,8vh),4.5rem)] text-xl sm:text-2xl md:text-3xl border-[3px] rounded-xl';
+      return 'w-[clamp(2.3rem,min(12vw,9vh),5rem)] h-[clamp(2.3rem,min(12vw,9vh),5rem)] text-xl sm:text-2xl md:text-3xl border-[3px] rounded-xl';
     }
     if (wordLength === 5) {
-      return 'w-[clamp(2rem,min(10vw,7.5vh),4rem)] h-[clamp(2rem,min(10vw,7.5vh),4rem)] text-lg sm:text-xl md:text-2xl border-[2.5px] rounded-xl';
+      return 'w-[clamp(2rem,min(10vw,8.5vh),4.5rem)] h-[clamp(2rem,min(10vw,8.5vh),4.5rem)] text-lg sm:text-xl md:text-2xl border-[2.5px] rounded-xl';
     }
     if (wordLength === 6) {
-      return 'w-[clamp(1.8rem,min(8.5vw,7vh),3.5rem)] h-[clamp(1.8rem,min(8.5vw,7vh),3.5rem)] text-base sm:text-lg md:text-xl border-[2px] sm:border-[2.5px] rounded-lg';
+      return 'w-[clamp(1.8rem,min(8.5vw,8vh),4rem)] h-[clamp(1.8rem,min(8.5vw,8vh),4rem)] text-base sm:text-lg md:text-xl border-[2px] sm:border-[2.5px] rounded-lg';
     }
     if (wordLength === 7) {
-      return 'w-[clamp(1.6rem,min(7.5vw,6.5vh),3.1rem)] h-[clamp(1.6rem,min(7.5vw,6.5vh),3.1rem)] text-sm sm:text-base md:text-lg border-[1.5px] sm:border-[2px] rounded-md sm:rounded-lg';
+      return 'w-[clamp(1.6rem,min(7.5vw,7.5vh),3.5rem)] h-[clamp(1.6rem,min(7.5vw,7.5vh),3.5rem)] text-sm sm:text-base md:text-lg border-[1.5px] sm:border-[2px] rounded-md sm:rounded-lg';
     }
-    return 'w-[clamp(1.5rem,min(6.5vw,6vh),2.8rem)] h-[clamp(1.5rem,min(6.5vw,6vh),2.8rem)] text-xs sm:text-sm md:text-base border-[1.5px] sm:border-[2px] rounded-md sm:rounded-lg';
+    return 'w-[clamp(1.5rem,min(6.5vw,7vh),3.2rem)] h-[clamp(1.5rem,min(6.5vw,7vh),3.2rem)] text-xs sm:text-sm md:text-base border-[1.5px] sm:border-[2px] rounded-md sm:rounded-lg';
   };
 
   // Determine cell classes based on status

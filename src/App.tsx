@@ -1505,9 +1505,9 @@ export default function App() {
   const opponent = activeMatch ? Object.values(activeMatch.players).find(p => (p as any).name !== profile.name) as any : null;
 
   return (
-    <div className={`min-h-screen flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
+    <div className={`min-h-[100dvh] flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
       {/* Main Container */}
-      <main className="flex-1 flex flex-col items-center justify-center py-2 sm:py-4 px-1.5 sm:px-4 max-w-full md:max-w-[95vw] lg:max-w-[90vw] w-full mx-auto relative">
+      <main className="flex-1 flex flex-col items-center justify-center py-1.5 sm:py-4 px-1.5 sm:px-4 max-w-full md:max-w-[95vw] lg:max-w-[90vw] w-full mx-auto relative">
         {/* Toast Notification */}
         {toast && (
           <div className={`fixed top-20 z-50 left-1/2 transform -translate-x-1/2 px-4 py-2.5 rounded-xl border flex items-center gap-2.5 text-xs sm:text-sm font-semibold shadow-lg transition duration-200 animate-slide-in ${
@@ -1757,10 +1757,14 @@ export default function App() {
           </div>
         )}
 
-        {/* Game Layout Wrapper for Side-by-Side Panels */}
-        <div className="w-full flex flex-col md:flex-row items-center md:items-start justify-center gap-4 relative z-10">
+        {/* Game Layout Wrapper */}
+        <div className="w-full flex flex-col items-center justify-center gap-3 sm:gap-4 relative z-10">
           {/* Game Area Card */}
-          <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-5 sm:p-6 shadow-2xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
+          <div className={`w-full max-w-md bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] shadow-2xl flex flex-col items-center transition-all duration-200 relative overflow-hidden text-white ${
+            gameStatus === 'playing'
+              ? 'p-4 sm:p-6 min-h-[84vh] md:min-h-0 justify-between gap-y-2'
+              : 'p-5 sm:p-6 min-h-[60vh] md:min-h-0 justify-center gap-y-4'
+          }`} id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -1882,7 +1886,34 @@ export default function App() {
                     </span>
                   </div>
 
-                  {/* Word definition is now shown in the dedicated side panel */}
+                  {/* Word definition inside Victory */}
+                  {wordDefinition && (
+                    <div className="mt-2.5 p-3 bg-black/30 rounded-2xl border border-emerald-500/20 text-left relative z-10 max-w-xs mx-auto">
+                      <div className="flex justify-between items-center mb-1.5 border-b border-white/10 pb-1">
+                        <span className="text-[10px] font-black text-amber-400 font-mono tracking-wider flex items-center gap-1">
+                          📖 TDK KELİME ANLAMI
+                        </span>
+                        <a
+                          href={`https://sozluk.gov.tr/?ara=${encodeURIComponent(turkishLower(targetWord))}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[9px] font-black text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                        >
+                          SÖZLÜK ↗
+                        </a>
+                      </div>
+                      {wordDefinition === 'loading' ? (
+                        <div className="flex items-center justify-center gap-2 py-2">
+                          <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
+                          <span className="text-[10px] text-gray-400">Yükleniyor...</span>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-gray-200 italic font-serif leading-relaxed">
+                          "{wordDefinition}"
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="pt-1 flex flex-col sm:flex-row justify-center items-center gap-2">
                     <button
@@ -1930,7 +1961,34 @@ export default function App() {
                 <strong className="text-xl text-rose-500 tracking-wider font-extrabold block uppercase leading-none">{targetWord}</strong>
               </div>
 
-              {/* Word definition is now shown in the dedicated side panel */}
+              {/* Word definition inside Loss */}
+              {wordDefinition && (
+                <div className="mt-2.5 p-3 bg-black/30 rounded-2xl border border-rose-500/20 text-left relative z-10 max-w-xs mx-auto">
+                  <div className="flex justify-between items-center mb-1.5 border-b border-white/10 pb-1">
+                    <span className="text-[10px] font-black text-amber-400 font-mono tracking-wider flex items-center gap-1">
+                      📖 TDK KELİME ANLAMI
+                    </span>
+                    <a
+                      href={`https://sozluk.gov.tr/?ara=${encodeURIComponent(turkishLower(targetWord))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[9px] font-black text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      SÖZLÜK ↗
+                    </a>
+                  </div>
+                  {wordDefinition === 'loading' ? (
+                    <div className="flex items-center justify-center gap-2 py-2">
+                      <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
+                      <span className="text-[10px] text-gray-400">Yükleniyor...</span>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-gray-200 italic font-serif leading-relaxed">
+                      "{wordDefinition}"
+                    </p>
+                  )}
+                </div>
+              )}
 
               <button
                 onClick={() => startNewGame(wordLength)}
@@ -1950,13 +2008,34 @@ export default function App() {
             </div>
           )}
 
-          {/* Action Button Above Keyboard */}
+          {/* Action Buttons Above Keyboard */}
           {gameStatus === 'playing' && (
-            <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] px-2 mt-2.5 mb-2">
+            <div className="w-full max-w-md px-2 mt-2.5 mb-2 flex items-center gap-2" id="action-buttons-above-keyboard-container">
+              {/* CLEAR ROW BUTTON (TEMİZLE) */}
+              <button
+                onClick={() => {
+                  if (currentAttempt.length > 0) {
+                    setCurrentAttempt('');
+                    playDeleteSound(settings.soundEnabled);
+                  }
+                }}
+                disabled={currentAttempt.length === 0 || isValidating}
+                className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider shadow-md transition-all duration-200 flex items-center justify-center gap-1.5 border ${
+                  currentAttempt.length > 0 && !isValidating
+                    ? 'bg-gradient-to-br from-rose-500 via-red-500 to-rose-600 hover:from-rose-600 hover:to-red-700 text-white border-rose-400 hover:shadow-rose-500/20 active:scale-[0.98] cursor-pointer'
+                    : 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-gray-200/60 dark:border-gray-800/40 cursor-not-allowed'
+                }`}
+                id="clear-row-button"
+              >
+                <Trash2 size={14} />
+                <span>TEMİZLE</span>
+              </button>
+
+              {/* SUBMIT BUTTON (TAMAM) */}
               <button
                 onClick={submitGuess}
                 disabled={currentAttempt.length !== wordLength || isValidating}
-                className={`w-full py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-widest shadow-md transition-all duration-200 flex items-center justify-center gap-2 border ${
+                className={`flex-[2] py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-widest shadow-md transition-all duration-200 flex items-center justify-center gap-2 border ${
                   currentAttempt.length === wordLength && !isValidating
                     ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-teal-700 text-white border-emerald-400 hover:shadow-emerald-500/20 active:scale-[0.98] cursor-pointer'
                     : 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-gray-200/60 dark:border-gray-800/40 cursor-not-allowed'
@@ -1988,52 +2067,6 @@ export default function App() {
             boardTheme={settings.boardTheme}
           />
         </div>
-
-        {/* Word Definition Panel (Side-by-Side on Desktop or Below on Mobile) */}
-        {(gameStatus === 'won' || gameStatus === 'lost') && wordDefinition && (
-          <div className="w-full max-w-md md:max-w-xs bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-5 sm:p-6 shadow-2xl flex flex-col transition-all duration-200 relative overflow-hidden text-white animate-scale-up shrink-0" id="side-definition-card">
-            {/* Ambient glow inside definition card */}
-            <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-            
-            <div className="w-full flex justify-between items-center mb-4 border-b border-[#3E485A] pb-3 relative z-10">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-amber-400 font-mono flex items-center gap-1">
-                📖 TDK KELİME ANLAMI
-              </span>
-              <a
-                href={`https://sozluk.gov.tr/?ara=${encodeURIComponent(turkishLower(targetWord))}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] font-bold text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer"
-              >
-                Resmi Site ↗
-              </a>
-            </div>
-
-            {wordDefinition === 'loading' ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 text-center relative z-10">
-                <div className="w-6 h-6 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
-                <span className="text-xs text-gray-400 font-medium tracking-wide">
-                  Kelimenin anlamı yükleniyor...
-                </span>
-              </div>
-            ) : (
-              <div className="space-y-4 relative z-10 text-left">
-                <div className="p-3 bg-black/20 rounded-2xl border border-[#3E485A]/50 text-center">
-                  <span className="text-[10px] text-gray-400 uppercase tracking-wider font-mono block mb-1">
-                    Aranan Kelime
-                  </span>
-                  <strong className="text-lg font-black tracking-widest uppercase text-[#FAF6E9]">{targetWord}</strong>
-                </div>
-                
-                <div className="space-y-2">
-                  <p className="text-xs text-gray-300 italic font-serif leading-relaxed">
-                    "{wordDefinition}"
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
 
