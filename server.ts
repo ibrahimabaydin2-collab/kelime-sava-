@@ -6,6 +6,8 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import { WebSocketServer, WebSocket } from 'ws';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from './src/lib/firebase.js';
 import { getRandomWord, isWordInCuratedList } from './src/data/wordlist.js';
 import { turkishUpper, turkishLower } from './src/utils/turkish.js';
 
@@ -184,6 +186,24 @@ app.post('/api/validate-word', async (req, res) => {
       return res.json(wordCache[cacheKey]);
     }
 
+    // 2.1 Check Firestore Database
+    try {
+      const wordDocRef = doc(db, 'dictionary', normalized);
+      const wordSnap = await getDoc(wordDocRef);
+      if (wordSnap.exists()) {
+        const dbData = wordSnap.data();
+        const dbResult = {
+          valid: dbData.valid,
+          definition: dbData.definition || ''
+        };
+        wordCache[cacheKey] = dbResult;
+        console.log(`[Database Hit] Word "${normalized}" found in database:`, dbResult);
+        return res.json(dbResult);
+      }
+    } catch (dbErr) {
+      console.warn('Firestore database read failed:', dbErr);
+    }
+
     // 2.2 Direct official TDK GTS API verification on the exact word
     try {
       const lowercaseWord = turkishLower(normalized);
@@ -204,7 +224,7 @@ app.post('/api/validate-word', async (req, res) => {
         if (Array.isArray(tdkData) && tdkData.length > 0) {
           let definition = 'TDK Sözlüğünde mevcut.';
           try {
-            const meanings = tdkData[0].anlamlarListe;
+            const meanings = tdkData[0].anlim_goster ? tdkData[0].anlamlarListe : tdkData[0].anlamlarListe;
             if (Array.isArray(meanings) && meanings.length > 0) {
               definition = meanings[0].anlam || 'TDK Sözlüğünde mevcut.';
             }
@@ -216,6 +236,21 @@ app.post('/api/validate-word', async (req, res) => {
             definition
           };
           wordCache[cacheKey] = tdkResult;
+
+          // AUTOMATICALLY SAVE TO FIRESTORE DATABASE!
+          try {
+            const wordDocRef = doc(db, 'dictionary', normalized);
+            await setDoc(wordDocRef, {
+              word: normalized,
+              valid: true,
+              definition,
+              createdAt: new Date().toISOString()
+            });
+            console.log(`[Database Save] Saved valid word "${normalized}" to database with definition: "${definition}".`);
+          } catch (saveErr) {
+            console.error('Failed to save valid word to Firestore:', saveErr);
+          }
+
           return res.json(tdkResult);
         } else {
           const notFoundResult = {
@@ -262,6 +297,23 @@ Yanıtını SADECE aşağıdaki JSON yapısında döndür:
           };
           console.log(`[Gemini Fallback Result] Word: "${normalized}", Valid: ${geminiResult.valid}, Def: ${geminiResult.definition}`);
           wordCache[cacheKey] = geminiResult;
+
+          // AUTOMATICALLY SAVE TO FIRESTORE IF GEMINI DEEMS VALID!
+          if (geminiResult.valid) {
+            try {
+              const wordDocRef = doc(db, 'dictionary', normalized);
+              await setDoc(wordDocRef, {
+                word: normalized,
+                valid: true,
+                definition: geminiResult.definition,
+                createdAt: new Date().toISOString()
+              });
+              console.log(`[Database Save - Gemini] Saved valid word "${normalized}" to database with definition: "${geminiResult.definition}".`);
+            } catch (saveErr) {
+              console.error('Failed to save valid word to Firestore:', saveErr);
+            }
+          }
+
           return res.json(geminiResult);
         }
       }
@@ -309,6 +361,23 @@ app.post('/api/get-definition', async (req, res) => {
       return res.json(wordCache[cacheKey]);
     }
 
+    // Check Firestore Database
+    try {
+      const wordDocRef = doc(db, 'dictionary', normalized);
+      const wordSnap = await getDoc(wordDocRef);
+      if (wordSnap.exists()) {
+        const dbData = wordSnap.data();
+        if (dbData.valid && dbData.definition) {
+          const dbResult = { valid: true, definition: dbData.definition };
+          wordCache[cacheKey] = dbResult;
+          console.log(`[Database Hit - Definition] Word "${normalized}" found in database:`, dbResult);
+          return res.json(dbResult);
+        }
+      }
+    } catch (dbErr) {
+      console.warn('Firestore database read for definition failed:', dbErr);
+    }
+
     const lowercaseWord = turkishLower(normalized);
     try {
       const tdkResponse = await fetch(`https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lowercaseWord)}`, {
@@ -342,6 +411,21 @@ app.post('/api/get-definition', async (req, res) => {
 
           const result = { valid: true, definition };
           wordCache[cacheKey] = result;
+
+          // Save definition back to Firestore dictionary!
+          try {
+            const wordDocRef = doc(db, 'dictionary', normalized);
+            await setDoc(wordDocRef, {
+              word: normalized,
+              valid: true,
+              definition,
+              createdAt: new Date().toISOString()
+            }, { merge: true });
+            console.log(`[Database Save - Definition] Saved/Updated definition for "${normalized}" in database.`);
+          } catch (saveErr) {
+            console.error('Failed to save word definition to Firestore:', saveErr);
+          }
+
           return res.json(result);
         }
       }
