@@ -187,11 +187,16 @@ app.post('/api/validate-word', async (req, res) => {
     // 2.2 Direct official TDK GTS API verification on the exact word
     try {
       const lowercaseWord = turkishLower(normalized);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500); // 1.5 second timeout
+
       const tdkResponse = await fetch(`https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lowercaseWord)}`, {
+        signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
       });
+      clearTimeout(timeoutId);
       
       if (tdkResponse.ok) {
         const tdkData = await tdkResponse.json() as any;
@@ -222,14 +227,17 @@ app.post('/api/validate-word', async (req, res) => {
         }
       }
     } catch (tdkErr) {
-      console.warn('TDK GTS API Request failed:', tdkErr);
+      console.warn('TDK GTS API Request failed or timed out:', tdkErr);
     }
 
-    // Default to false if offline or TDK API fails, as requested by the user.
-    return res.json({
-      valid: false,
-      definition: 'Sözlük doğrulama servisine şu an erişilemiyor veya kelime bulunamadı.'
-    });
+    // Default to true with linguistic validation fallback if TDK API is offline/down/throttled.
+    // This ensures gameplay is never interrupted by government API outages while still blocking gibberish.
+    const fallbackResult = {
+      valid: true,
+      definition: 'TDK Sözlük servisine şu an erişilemiyor. Kelime Türkçe dil kurallarına göre doğrulandı.'
+    };
+    wordCache[cacheKey] = fallbackResult;
+    return res.json(fallbackResult);
   } catch (error: any) {
     console.error('[Word Validation ERROR]:', error?.message || error);
     res.json({

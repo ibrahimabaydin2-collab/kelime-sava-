@@ -41,3 +41,56 @@ export function turkishLower(str: string): string {
     .map((char) => LOWER_MAP[char] || char.toLowerCase())
     .join('');
 }
+
+export function validateTurkishLinguistics(word: string, length: number): { valid: boolean; reason: string } {
+  const normalized = turkishLower(word)
+    .replace(/â/g, 'a')
+    .replace(/î/g, 'i')
+    .replace(/û/g, 'u')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ş/g, 's')
+    .replace(/ü/g, 'u');
+
+  // 1. Check for valid characters: Turkish letters only (standard lower alphabet is a-z except q, w, x)
+  const validCharsRegex = /^[a-z]+$/;
+  if (!validCharsRegex.test(normalized)) {
+    return { valid: false, reason: 'Kelime Türkçe alfabesinde bulunmayan geçersiz karakterler barındırıyor.' };
+  }
+
+  // 2. Must contain at least one vowel
+  const vowels = /[aeiou]/g;
+  const vowelMatches = normalized.match(vowels);
+  if (!vowelMatches || vowelMatches.length === 0) {
+    return { valid: false, reason: 'Türkçe kelimelerde en az bir sesli harf bulunmalıdır.' };
+  }
+
+  // 3. Repeating characters: No character can be repeated 3 or more times consecutively.
+  for (let i = 0; i < normalized.length - 2; i++) {
+    if (normalized[i] === normalized[i + 1] && normalized[i] === normalized[i + 2]) {
+      return { valid: false, reason: 'Aynı harf ardışık 3 veya daha fazla kez tekrarlanamaz.' };
+    }
+  }
+
+  // 4. Consecutive consonants: maximum 4 consecutive consonants (e.g. "ekspres" has 4: "kspr").
+  const consecutiveConsonantsRegex = /[^aeiou]{5,}/;
+  if (consecutiveConsonantsRegex.test(normalized)) {
+    return { valid: false, reason: 'Türkçe hece yapısına aykırı ardışık sessiz harf grubu barındırıyor.' };
+  }
+
+  // 5. Letter diversity: If length >= 3 and unique letters is 1 (e.g. "rrrrr" or "aaaaa"), it's definitely invalid
+  const uniqueChars = new Set(normalized.split(''));
+  if (uniqueChars.size === 1 && length >= 3) {
+    return { valid: false, reason: 'Tek bir harfin tekrarından oluşan bir kelime geçerli olamaz.' };
+  }
+
+  // 6. Minimum vowel count: For words of length >= 7, there must be at least 2 vowels.
+  const vowelCount = vowelMatches.length;
+  if (length >= 7 && vowelCount < 2) {
+    return { valid: false, reason: 'Uzun Türkçe kelimelerde en az 2 sesli harf bulunmalıdır.' };
+  }
+
+  return { valid: true, reason: '' };
+}

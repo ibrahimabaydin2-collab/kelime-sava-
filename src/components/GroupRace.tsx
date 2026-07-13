@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { UserProfile } from '../types.js';
 import { getRandomWord, isWordInCuratedList } from '../data/wordlist.js';
-import { turkishUpper, turkishLower } from '../utils/turkish.js';
+import { turkishUpper, turkishLower, validateTurkishLinguistics } from '../utils/turkish.js';
 import { getApiUrl } from '../utils/api.js';
 
 interface GroupRaceProps {
@@ -493,21 +493,36 @@ export default function GroupRace({
     if (dictionaryMode === 'no_validation') {
       isValid = true;
     } else {
-      // Check server validation
+      // Check server validation with timeout to avoid hanging during live Group Race rounds
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 seconds timeout
+
         const response = await fetch(getApiUrl('/api/validate-word'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ word: currentGuess, length: wordLength })
+          body: JSON.stringify({ word: currentGuess, length: wordLength }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
+
         if (response.ok) {
           const data = await response.json();
           isValid = data.valid;
         } else {
-          isValid = isWordInCuratedList(currentGuess, wordLength);
+          throw new Error('Server returned non-ok status');
         }
       } catch (e) {
-        isValid = isWordInCuratedList(currentGuess, wordLength);
+        console.warn('GroupRace TDK API validation failed or timed out, using offline fallbacks:', e);
+        
+        // First check curated list
+        if (isWordInCuratedList(currentGuess, wordLength)) {
+          isValid = true;
+        } else {
+          // Second check heuristic linguistic rules
+          const linguisticCheck = validateTurkishLinguistics(currentGuess, wordLength);
+          isValid = linguisticCheck.valid;
+        }
       }
     }
 

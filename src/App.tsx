@@ -20,7 +20,7 @@ import FirstTimeSetup from './components/FirstTimeSetup.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList } from './data/wordlist.js';
-import { turkishUpper, turkishLower } from './utils/turkish.js';
+import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/turkish.js';
 import { getApiUrl, getWsUrl } from './utils/api.js';
 
 const INITIAL_STATS = {
@@ -1097,13 +1097,19 @@ export default function App() {
         isValid = true;
         definition = 'Doğrulama dışı serbest oyun modu.';
       } else {
-        // TDK Online validation
+        // TDK Online validation with AbortController timeout to prevent UI hang in timed game
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 seconds timeout
+
           const response = await fetch(getApiUrl('/api/validate-word'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ word: guess, length: wordLength })
+            body: JSON.stringify({ word: guess, length: wordLength }),
+            signal: controller.signal
           });
+          clearTimeout(timeoutId);
+
           if (response.ok) {
             const data = await response.json();
             isValid = data.valid;
@@ -1112,13 +1118,25 @@ export default function App() {
             throw new Error('Server returned non-ok status');
           }
         } catch (fetchErr) {
-          console.warn('TDK API validation failed, falling back to offline list:', fetchErr);
-          isValid = isWordInCuratedList(guess, wordLength);
-          if (isValid) {
-            definition = 'TDK API bağlantısı kurulamadı. Çevrimdışı sözlük doğrulaması uygulandı.';
-            showToast('İnternet bağlantı hatası: Kelime çevrimdışı sözlükle doğrulandı.', 'info');
+          console.warn('TDK API validation failed or timed out, falling back to local linguistic filters:', fetchErr);
+          
+          // First, check curated list
+          const inCurated = isWordInCuratedList(guess, wordLength);
+          if (inCurated) {
+            isValid = true;
+            definition = 'Kelime çevrimdışı sözlük listesinde onaylandı.';
+            showToast('Bağlantı kesik: Kelime çevrimdışı sözlükle doğrulandı.', 'info');
           } else {
-            definition = 'TDK API bağlantı hatası ve kelime çevrimdışı sözlükte de bulunamadı!';
+            // Second, check heuristic linguistic validation to accept valid words even if offline!
+            const linguisticCheck = validateTurkishLinguistics(guess, wordLength);
+            if (linguisticCheck.valid) {
+              isValid = true;
+              definition = 'TDK bağlantısı kurulamadı, ancak Türkçe hece ve harf yapısına göre onaylandı.';
+              showToast('Bağlantı kesik: Türkçe dil kurallarına göre kelime onaylandı.', 'info');
+            } else {
+              isValid = false;
+              definition = linguisticCheck.reason || 'Türkçe hece ve harf yapısına uymayan kelime!';
+            }
           }
         }
       }
