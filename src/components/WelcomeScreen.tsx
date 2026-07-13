@@ -168,7 +168,7 @@ export default function WelcomeScreen({
 
   if (showGameSetup) {
     return (
-      <div className="w-full max-w-md mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="welcome-setup-page">
+      <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="welcome-setup-page">
         {/* Glowing 4-point star accent in bottom right */}
         <div className="absolute bottom-6 right-8 text-amber-100/30 animate-pulse select-none pointer-events-none">
           <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
@@ -418,7 +418,7 @@ export default function WelcomeScreen({
   }
 
   return isEditing ? (
-    <div className="w-full max-w-md mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="welcome-screen-root">
+    <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="welcome-screen-root">
       {/* Sparkles / Title */}
       <div className="flex justify-between items-center pb-2 border-b border-white/10">
         <span className="text-sm font-bold font-mono text-amber-200 uppercase tracking-widest flex items-center gap-1.5">
@@ -549,7 +549,7 @@ export default function WelcomeScreen({
       </div>
     </div>
   ) : (
-    <div className="w-full max-w-md mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-6" id="welcome-screen-root">
+    <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-6" id="welcome-screen-root">
       
       {/* Glowing 4-point star accent in bottom right */}
       <div className="absolute bottom-6 right-8 text-amber-100/30 animate-pulse select-none pointer-events-none">

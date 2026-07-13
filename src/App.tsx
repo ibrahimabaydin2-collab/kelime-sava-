@@ -1547,7 +1547,7 @@ export default function App() {
           <>
             {/* Back to welcome & Compact control panel block */}
             {!activeMatch && (
-              <div className="w-full max-w-md flex flex-col gap-2 mb-2 animate-fadeIn">
+              <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl flex flex-col gap-2 mb-2 animate-fadeIn">
                 {/* Row 1: Back to entry screen, Pes Et & Yenile */}
                 <div className="flex justify-between items-center w-full">
                   <button
@@ -1655,7 +1655,7 @@ export default function App() {
 
             {/* Real-time Match Split View Banner */}
         {activeMatch && (
-          <div className="w-full max-w-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-2.5 mb-2.5 flex flex-col sm:flex-row justify-between items-center gap-3 shadow-sm">
+          <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-2.5 mb-2.5 flex flex-col sm:flex-row justify-between items-center gap-3 shadow-sm">
             <div className="flex items-center gap-2.5">
               <Swords size={20} className="text-emerald-500 shrink-0" />
               <div className="text-left">
@@ -1710,7 +1710,7 @@ export default function App() {
         {/* Game Layout Wrapper for Side-by-Side Panels */}
         <div className="w-full flex flex-col md:flex-row items-center md:items-start justify-center gap-4 relative z-10">
           {/* Game Area Card */}
-          <div className="w-full max-w-md bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-5 sm:p-6 shadow-2xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
+          <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-5 sm:p-6 shadow-2xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -1765,7 +1765,7 @@ export default function App() {
 
           {/* Game Hint or Mode Banner */}
           {gameMode === 'timed' && gameStatus === 'playing' && !activeMatch && targetWord && (
-            <div className="w-full max-w-md mb-2 px-3 py-1.5 bg-gradient-to-r from-emerald-50/70 to-teal-50/70 dark:from-emerald-950/20 dark:to-teal-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-xl text-xs font-black text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2 font-mono animate-fade-in shadow-xs">
+            <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl mb-2 px-3 py-1.5 bg-gradient-to-r from-emerald-50/70 to-teal-50/70 dark:from-emerald-950/20 dark:to-teal-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-xl text-xs font-black text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2 font-mono animate-fade-in shadow-xs">
               <Sparkles size={14} className="animate-pulse text-yellow-500" />
               <span>İPUCU: Kelime <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded text-xs font-black mx-1 inline-block shadow-sm shadow-emerald-500/20">{targetWord[0]}</span> harfi ile başlıyor!</span>
             </div>
@@ -1902,7 +1902,7 @@ export default function App() {
 
           {/* Action Button Above Keyboard */}
           {gameStatus === 'playing' && (
-            <div className="w-full max-w-md px-2 mt-2.5 mb-2">
+            <div className="w-full max-w-md md:max-w-xl lg:max-w-2xl px-2 mt-2.5 mb-2">
               <button
                 onClick={submitGuess}
                 disabled={currentAttempt.length !== wordLength || isValidating}
