@@ -944,6 +944,69 @@ export default function App() {
     };
   }, [gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch]); // Resets interval on attempt submission or validation change or exit or gameMode change
 
+  // Fetch direct definition for the target word when the game ends (won or lost)
+  const fetchTargetWordDefinition = async (wordToFetch: string) => {
+    if (!wordToFetch) return;
+    setWordDefinition('loading');
+    try {
+      const response = await fetch(getApiUrl('/api/get-definition'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word: wordToFetch })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.definition) {
+          setWordDefinition(data.definition);
+          return;
+        }
+      }
+      setWordDefinition('Bu kelimenin TDK tanımı otomatik olarak yüklenemedi.');
+    } catch (e) {
+      console.error('Failed to fetch target word definition:', e);
+      setWordDefinition('Tanım yüklenirken bağlantı hatası oluştu.');
+    }
+  };
+
+  const renderWordDefinition = (themeColor: 'emerald' | 'rose') => {
+    if (!wordDefinition) return null;
+
+    if (wordDefinition === 'loading') {
+      return (
+        <div className="w-full max-w-sm mx-auto p-4 bg-black/10 rounded-2xl border border-[#3E485A] flex items-center justify-center gap-2 animate-pulse py-4 text-center my-2">
+          <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
+          <span className="text-[10px] text-gray-400 font-medium tracking-wide font-sans">
+            Kelimenin TDK anlamı yükleniyor...
+          </span>
+        </div>
+      );
+    }
+
+    const titleColorClass = themeColor === 'emerald' ? 'text-emerald-400' : 'text-rose-400';
+    const borderColorClass = themeColor === 'emerald' ? 'border-emerald-500/15' : 'border-rose-500/15';
+
+    return (
+      <div className={`w-full max-w-sm mx-auto p-4 bg-black/25 rounded-2xl border ${borderColorClass} text-left space-y-1.5 transition-all duration-300 shadow-md my-2`}>
+        <div className="flex items-center justify-between">
+          <span className={`text-[10px] font-black uppercase tracking-wider ${titleColorClass} font-mono flex items-center gap-1`}>
+            📖 TDK SÖZLÜK ANLAMI
+          </span>
+          <a
+            href={`https://sozluk.gov.tr/?ara=${encodeURIComponent(turkishLower(targetWord))}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] font-bold text-amber-400 hover:underline flex items-center gap-0.5"
+          >
+            TDK Resmi Sitesi ↗
+          </a>
+        </div>
+        <p className="text-[11px] text-gray-300 italic font-serif leading-relaxed">
+          "{wordDefinition}"
+        </p>
+      </div>
+    );
+  };
+
   // Handle Game Loss
   const handleGameLoss = async (reason: string = 'Hakkınız Bitti') => {
     setGameStatus('lost');
@@ -951,22 +1014,8 @@ export default function App() {
     playDefeatSound(settings.soundEnabled);
     
     // Fetch definition for targetWord so the user can learn its meaning even on loss!
-    if (dictionaryMode !== 'no_validation' && targetWord) {
-      try {
-        const response = await fetch(getApiUrl('/api/validate-word'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ word: targetWord, length: wordLength })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.definition) {
-            setWordDefinition(data.definition);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to fetch target word definition on loss', e);
-      }
+    if (targetWord) {
+      fetchTargetWordDefinition(targetWord);
     }
 
     // Increment gamesPlayed and reset streak
@@ -1107,7 +1156,11 @@ export default function App() {
 
       if (hasWon) {
         setGameStatus('won');
-        setWordDefinition(definition || 'Kelime başarılı bir şekilde çözüldü.');
+        if (targetWord) {
+          fetchTargetWordDefinition(targetWord);
+        } else {
+          setWordDefinition(definition || 'Kelime başarılı bir şekilde çözüldü.');
+        }
         showToast(`TEBRİKLER! Kelimeyi doğru bildiniz! +${scoreAwarded} Puan`, 'success');
         triggerVictoryCelebration(settings.soundEnabled);
         
@@ -1654,8 +1707,10 @@ export default function App() {
           </div>
         )}
 
-        {/* Game Area Card */}
-        <div className="w-full max-w-md bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-5 sm:p-6 shadow-2xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
+        {/* Game Layout Wrapper for Side-by-Side Panels */}
+        <div className="w-full flex flex-col md:flex-row items-center md:items-start justify-center gap-4 relative z-10">
+          {/* Game Area Card */}
+          <div className="w-full max-w-md bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-5 sm:p-6 shadow-2xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -1777,16 +1832,7 @@ export default function App() {
                     </span>
                   </div>
 
-                  {wordDefinition && (
-                    <div className="bg-white/50 dark:bg-gray-950/20 rounded-lg p-2.5 border border-emerald-500/5 text-left max-w-sm mx-auto">
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-mono block mb-0.5">
-                        TDK SÖZLÜK ANLAMI
-                      </span>
-                      <p className="text-[11px] text-gray-600 dark:text-gray-300 italic font-sans leading-snug">
-                        "{wordDefinition}"
-                      </p>
-                    </div>
-                  )}
+                  {/* Word definition is now shown in the dedicated side panel */}
 
                   <div className="pt-1 flex flex-col sm:flex-row justify-center items-center gap-2">
                     <button
@@ -1834,16 +1880,7 @@ export default function App() {
                 <strong className="text-xl text-rose-500 tracking-wider font-extrabold block uppercase leading-none">{targetWord}</strong>
               </div>
 
-              {wordDefinition && (
-                <div className="p-2.5 bg-white/70 dark:bg-gray-950/40 rounded-xl border border-rose-500/15 shadow-inner text-left animate-fade-in">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 font-mono block mb-0.5">
-                    TDK SÖZLÜK ANLAMI
-                  </span>
-                  <p className="text-[11px] text-gray-600 dark:text-gray-300 italic font-sans leading-snug">
-                    "{wordDefinition}"
-                  </p>
-                </div>
-              )}
+              {/* Word definition is now shown in the dedicated side panel */}
 
               <button
                 onClick={() => startNewGame(wordLength)}
@@ -1901,6 +1938,53 @@ export default function App() {
             boardTheme={settings.boardTheme}
           />
         </div>
+
+        {/* Word Definition Panel (Side-by-Side on Desktop or Below on Mobile) */}
+        {(gameStatus === 'won' || gameStatus === 'lost') && wordDefinition && (
+          <div className="w-full max-w-md md:max-w-xs bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] p-5 sm:p-6 shadow-2xl flex flex-col transition-all duration-200 relative overflow-hidden text-white animate-scale-up shrink-0" id="side-definition-card">
+            {/* Ambient glow inside definition card */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="w-full flex justify-between items-center mb-4 border-b border-[#3E485A] pb-3 relative z-10">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-amber-400 font-mono flex items-center gap-1">
+                📖 TDK KELİME ANLAMI
+              </span>
+              <a
+                href={`https://sozluk.gov.tr/?ara=${encodeURIComponent(turkishLower(targetWord))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] font-bold text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+              >
+                Resmi Site ↗
+              </a>
+            </div>
+
+            {wordDefinition === 'loading' ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 text-center relative z-10">
+                <div className="w-6 h-6 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
+                <span className="text-xs text-gray-400 font-medium tracking-wide">
+                  Kelimenin anlamı yükleniyor...
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-4 relative z-10 text-left">
+                <div className="p-3 bg-black/20 rounded-2xl border border-[#3E485A]/50 text-center">
+                  <span className="text-[10px] text-gray-400 uppercase tracking-wider font-mono block mb-1">
+                    Aranan Kelime
+                  </span>
+                  <strong className="text-lg font-black tracking-widest uppercase text-[#FAF6E9]">{targetWord}</strong>
+                </div>
+                
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-300 italic font-serif leading-relaxed">
+                    "{wordDefinition}"
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
 
       </>

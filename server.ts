@@ -239,6 +239,76 @@ app.post('/api/validate-word', async (req, res) => {
   }
 });
 
+// Endpoint to fetch direct definition of any target word from TDK API
+app.post('/api/get-definition', async (req, res) => {
+  try {
+    const { word } = req.body;
+    if (!word || typeof word !== 'string') {
+      return res.status(400).json({ error: 'Word is required' });
+    }
+
+    const normalized = turkishUpper(word.trim());
+    const cacheKey = `definition_${normalized}`;
+
+    // Check if we have cached this definition
+    if (wordCache[cacheKey]) {
+      return res.json(wordCache[cacheKey]);
+    }
+
+    const lowercaseWord = turkishLower(normalized);
+    try {
+      const tdkResponse = await fetch(`https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lowercaseWord)}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (tdkResponse.ok) {
+        const tdkData = await tdkResponse.json() as any;
+        if (Array.isArray(tdkData) && tdkData.length > 0) {
+          let definition = '';
+          try {
+            const meanings = tdkData[0].anlamlarListe;
+            if (Array.isArray(meanings) && meanings.length > 0) {
+              // Combine up to 3 meanings for a rich definition
+              definition = meanings.slice(0, 3).map((m: any, idx: number) => {
+                const prefix = m.anlam_ozelliklerListe && m.anlam_ozelliklerListe[0]?.tam_adi 
+                  ? `(${m.anlam_ozelliklerListe[0].tam_adi}) ` 
+                  : '';
+                return `${idx + 1}. ${prefix}${m.anlam}`;
+              }).join(' ');
+            }
+          } catch (e) {
+            // Fallback
+          }
+
+          if (!definition) {
+            definition = 'TDK Sözlüğünde mevcut.';
+          }
+
+          const result = { valid: true, definition };
+          wordCache[cacheKey] = result;
+          return res.json(result);
+        }
+      }
+    } catch (tdkErr) {
+      console.warn('TDK GTS API Request failed for get-definition:', tdkErr);
+    }
+
+    // Fallback if not found or failed
+    return res.json({
+      valid: false,
+      definition: 'Bu kelimenin anlamı TDK sözlüğünde bulunamadı.'
+    });
+  } catch (error: any) {
+    console.error('[Get Definition ERROR]:', error);
+    res.json({
+      valid: false,
+      definition: 'Sözlükten anlam yüklenirken bir hata oluştu.'
+    });
+  }
+});
+
 // Endpoint for AI chat/assistant proxy using Gemini
 app.post('/api/chat', async (req, res) => {
   try {
