@@ -17,11 +17,14 @@ import {
   linkWithPopup
 } from 'firebase/auth';
 import { 
-  getFirestore, 
+  initializeFirestore, 
   doc, 
   getDoc, 
   setDoc,
-  serverTimestamp
+  serverTimestamp,
+  getDocFromCache,
+  persistentLocalCache,
+  persistentMultipleTabManager
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { UserProfile } from '../types.js';
@@ -32,7 +35,14 @@ export const auth = getAuth(app);
 
 // Use the custom firestore database ID from firebase-applet-config.json if specified
 const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-export const db = getFirestore(app, dbId);
+
+// Initialize Firestore with long polling and persistent offline cache
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+}, dbId);
 
 /**
  * Signs in anonymously (Guest Mode)
@@ -97,9 +107,9 @@ export async function signOutUser(): Promise<void> {
  * Fetches the user profile from Firestore
  */
 export async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
+  const userDocRef = doc(db, 'users', uid);
   try {
-    const userDocRef = doc(db, 'users', uid);
-    // 4-second timeout to prevent hangs on slow connection or offline state
+    // 1. Try to fetch from server with a timeout
     const userSnap = await Promise.race([
       getDoc(userDocRef),
       new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Firestore Fetch Timeout')), 4000))
@@ -109,8 +119,35 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
       return userSnap.data() as UserProfile;
     }
   } catch (error) {
-    console.error('Failed to fetch user profile from Firestore or timed out:', error);
+    console.warn('Failed to fetch user profile from server, trying offline cache:', error);
+    try {
+      // 2. Try to fetch from local Firestore cache
+      const userSnap = await getDocFromCache(userDocRef);
+      if (userSnap && userSnap.exists()) {
+        console.log('Successfully fetched user profile from Firestore offline cache.');
+        return userSnap.data() as UserProfile;
+      }
+    } catch (cacheError) {
+      console.warn('Failed to fetch from Firestore offline cache:', cacheError);
+    }
   }
+  
+  // 3. Fallback to localStorage if Firestore is completely unreachable and cache is empty
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const localSaved = window.localStorage.getItem('kelimesavasi_profile');
+      if (localSaved) {
+        const parsed = JSON.parse(localSaved);
+        if (parsed && (parsed.id === uid || parsed.uid === uid || parsed.id)) {
+          console.log('Restored user profile from localStorage fallback.');
+          return parsed as UserProfile;
+        }
+      }
+    }
+  } catch (localError) {
+    console.warn('Failed to restore from localStorage:', localError);
+  }
+
   return null;
 }
 
@@ -120,17 +157,22 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
 export async function saveUserProfileToFirestore(profile: UserProfile): Promise<void> {
   try {
     const userDocRef = doc(db, 'users', profile.id);
-    // 4-second timeout to prevent hangs
-    await Promise.race([
-      setDoc(userDocRef, {
-        ...profile,
-        lastUpdated: new Date().toISOString(),
-        updatedAt: serverTimestamp()
-      }, { merge: true }),
-      new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Firestore Write Timeout')), 4000))
-    ]);
+    
+    // Attempt background save to Firestore (without hard-failing the app if network is slow/offline)
+    setDoc(userDocRef, {
+      ...profile,
+      lastUpdated: new Date().toISOString(),
+      updatedAt: serverTimestamp()
+    }, { merge: true }).catch(error => {
+      console.warn('Background Firestore profile save queued/deferred:', error);
+    });
+    
+    // Update browser local storage immediately so client-side state is always perfectly synchronized
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('kelimesavasi_profile', JSON.stringify(profile));
+    }
   } catch (error) {
-    console.error('Failed to save user profile to Firestore or timed out:', error);
+    console.error('Failed to save user profile:', error);
   }
 }
 
