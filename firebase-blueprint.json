@@ -48,6 +48,18 @@
         "joinedAt": { "type": "string" }
       },
       "required": ["id", "name", "eliminated"]
+    },
+    "DictionaryWord": {
+      "title": "DictionaryWord",
+      "description": "A cached word validation and definition from TDK/Gemini",
+      "type": "object",
+      "properties": {
+        "word": { "type": "string" },
+        "valid": { "type": "boolean" },
+        "definition": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["word", "valid"]
     }
   },
   "firestore": {
@@ -62,6 +74,10 @@
     "/rooms/{roomId}/players/{playerId}": {
       "schema": "RoomPlayer",
       "description": "Players in an online multiplayer room"
+    },
+    "/dictionary/{word}": {
+      "schema": "DictionaryWord",
+      "description": "Cached word definitions and validity status"
     }
   }
 }

@@ -896,50 +896,76 @@ export default function WelcomeScreen({
       {/* Günün Bulmacası (Daily Puzzle) Card */}
       <div className="w-full">
         {isDailyPuzzleCompletedToday ? (
-          <div className="w-full bg-slate-800/40 border border-emerald-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg backdrop-blur-sm animate-fade-in">
-            <div className="flex items-center gap-3 text-left">
-              <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center border border-emerald-500/20 shadow-inner">
-                <CheckCircle2 size={24} className="animate-pulse" />
+          <div className="w-full relative overflow-hidden bg-[#FAF6E9] border-2 border-amber-500/40 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-[0_0_15px_rgba(245,158,11,0.15),0_4px_0_#D9D4C3] animate-fade-in">
+            {/* Shimmer light effect overlay */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/5 via-transparent to-yellow-500/5 pointer-events-none" />
+            
+            <div className="flex items-center gap-3 text-left w-full sm:w-auto relative z-10">
+              <div className="relative flex items-center justify-center shrink-0">
+                {/* Radiant glow behind badge */}
+                <div className="absolute inset-0 bg-amber-400/20 rounded-full blur animate-pulse" />
+                <div className="relative w-10 h-10 bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-white rounded-xl flex items-center justify-center border border-amber-300 shadow-md">
+                  <Award size={20} className="stroke-[2.5]" />
+                </div>
               </div>
               <div>
-                <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-widest font-mono">Günün Bulmacası</h4>
-                <p className="text-sm font-black text-[#FAF6E9] mt-0.5">Harika! Bugünün kelimesini çözdün 🎯</p>
-                <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
-                  <Award size={12} className="text-emerald-400" />
-                  +100 Puan & 'Günlük Bilge' Rozeti Hesabına Eklendi!
+                <div className="flex items-center gap-2">
+                  <span className="text-[8px] font-black bg-amber-500/10 text-amber-700 border border-amber-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-mono">
+                    TAMAMLANDI
+                  </span>
+                  <h4 className="text-[10px] font-medium tracking-[0.15em] text-[#2E3748]/60 uppercase font-sans">Günün Bulmacası</h4>
+                </div>
+                <p className="text-xs font-black text-[#2E3748] mt-1">Bugünün kelimesini ustalıkla çözdün! 🎉</p>
+                <p className="text-[9.5px] text-amber-700 font-medium mt-0.5 flex items-center gap-1.5">
+                  <Sparkles size={11} className="text-amber-600 fill-amber-500/10 animate-pulse" />
+                  <span>+100 Ekstra Puan & 'Günlük Bilge' Rozeti Koleksiyonuna Eklendi!</span>
                 </p>
               </div>
             </div>
-            <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-xl px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wide">
-              TAMAMLANDI
+
+            <div className="w-full sm:w-auto flex justify-end shrink-0 relative z-10">
+              <div className="bg-[#FEF9E6] text-amber-700 border border-amber-400/40 rounded-xl px-3 py-1.5 text-[9px] font-mono font-black uppercase tracking-widest shadow-sm flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                <span>GÜNLÜK BİLGE</span>
+              </div>
             </div>
           </div>
         ) : (
           <button
             onClick={() => onStartDailyPuzzle?.()}
-            className="w-full relative group overflow-hidden bg-slate-800/40 hover:bg-slate-800/60 border border-amber-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-left transition-all duration-300 shadow-[0_4px_20px_rgba(245,158,11,0.15)] active:scale-[0.99] cursor-pointer"
+            className="w-full relative group overflow-hidden bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] border border-[#EBE6D5] rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-left transition-all duration-300 shadow-[0_4px_0_#D9D4C3,0_6px_12px_rgba(0,0,0,0.1)] cursor-pointer"
           >
-            <div className="flex items-center gap-3.5 text-left w-full sm:w-auto">
-              <div className="w-12 h-12 bg-amber-500/10 text-amber-400 rounded-xl flex items-center justify-center border border-amber-500/30 group-hover:scale-110 transition duration-300 shadow-md">
-                <Puzzle size={24} className="text-amber-400" />
+            {/* Highlight beam on hover */}
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+            
+            <div className="flex items-center gap-3 text-left w-full sm:w-auto relative z-10">
+              <div className="relative flex items-center justify-center shrink-0">
+                <div className="absolute inset-0 bg-amber-500/5 rounded-2xl blur-sm group-hover:bg-amber-500/10 transition duration-300" />
+                <div className="relative w-10 h-10 bg-[#FAF6E9] text-amber-600 rounded-xl flex items-center justify-center border border-[#E2DCBF] group-hover:scale-105 transition duration-300 shadow-sm">
+                  <Puzzle size={20} className="text-amber-600 animate-pulse" />
+                </div>
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-extrabold bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono animate-pulse">AKTİF</span>
-                  <h4 className="text-xs font-black text-amber-400 uppercase tracking-widest font-mono">GÜNÜN BULMACASI</h4>
+                <div className="flex items-center gap-2">
+                  <span className="text-[8px] font-black bg-amber-500/10 text-amber-700 border border-amber-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-mono">
+                    GÜNLÜK
+                  </span>
+                  <h4 className="text-[10px] font-medium tracking-[0.15em] text-[#2E3748]/60 uppercase font-sans">Günün Bulmacası</h4>
                 </div>
-                <p className="text-sm font-black text-[#FAF6E9] mt-1">Zihnini Zorla: <span className="text-amber-300">{getDailyWordAndLength().length} Harfli</span> Gizemli Kelime!</p>
-                <p className="text-[10px] text-gray-300 mt-1 flex items-center gap-1">
-                  <Sparkles size={11} className="text-amber-400 fill-amber-400/20" />
-                  Ödül: +100 Ekstra Puan & Özel 'Günlük Bilge' Rozeti!
+                <p className="text-xs font-black text-[#2E3748] mt-1">
+                  Zihnini Sına: <span className="text-amber-700 font-bold">{getDailyWordAndLength().length} Harfli</span> Kelimeyi Keşfet!
+                </p>
+                <p className="text-[9.5px] text-[#2E3748]/55 mt-0.5 flex items-center gap-1.5">
+                  <Sparkles size={11} className="text-amber-600 fill-amber-500/10 animate-pulse" />
+                  <span>Büyük Ödül: <strong className="text-amber-700 font-bold">+100 Puan</strong> & Özel Rozet</span>
                 </p>
               </div>
             </div>
 
-            <div className="w-full sm:w-auto flex justify-end shrink-0">
-              <div className="px-4 py-2 bg-amber-500 group-hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition shadow-md flex items-center gap-1.5">
-                <span>HEMEN ÇÖZ</span>
-                <Play size={12} className="fill-current" />
+            <div className="w-full sm:w-auto flex justify-end shrink-0 relative z-10">
+              <div className="px-4 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-extrabold text-[10px] uppercase tracking-widest rounded-lg transition-all duration-200 shadow-sm flex items-center gap-1.5 group-hover:translate-x-1">
+                <span>Oyna</span>
+                <Play size={10} className="fill-current" />
               </div>
             </div>
           </button>

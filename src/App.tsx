@@ -2463,6 +2463,17 @@ export default function App() {
                     "{wordDefinition || 'Bu kelimenin TDK tanımı otomatik olarak yüklenemedi.'}"
                   </p>
                   
+                  {/* If there was an error, show a retry button */}
+                  {(wordDefinition.includes('hata') || wordDefinition.includes('yüklenemedi') || wordDefinition.includes('bağlantı')) && (
+                    <button
+                      onClick={() => fetchTargetWordDefinition(targetWord)}
+                      className="w-full mt-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 py-2 px-4 rounded-xl text-xs font-bold transition duration-200 cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Tekrar Yüklemeyi Dene</span>
+                    </button>
+                  )}
+                  
                   <div className="pt-2 border-t border-[#3E485A]/30 flex justify-end">
                     <a
                       href={`https://sozluk.gov.tr/?ara=${encodeURIComponent(turkishLower(targetWord))}`}

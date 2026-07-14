@@ -380,11 +380,15 @@ app.post('/api/get-definition', async (req, res) => {
 
     const lowercaseWord = turkishLower(normalized);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout for TDK
       const tdkResponse = await fetch(`https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lowercaseWord)}`, {
+        signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
       });
+      clearTimeout(timeoutId);
 
       if (tdkResponse.ok) {
         const tdkData = await tdkResponse.json() as any;
@@ -430,10 +434,63 @@ app.post('/api/get-definition', async (req, res) => {
         }
       }
     } catch (tdkErr) {
-      console.warn('TDK GTS API Request failed for get-definition:', tdkErr);
+      console.warn('TDK GTS API Request failed for get-definition, falling back to Gemini:', tdkErr);
     }
 
-    // Fallback if not found or failed
+    // Fallback to Gemini AI to generate / fetch the word's definition
+    try {
+      console.log(`[Definition Fallback] TDK API is unavailable or word not found. Using Gemini to get definition for: "${normalized}"`);
+      const prompt = `Lütfen "${normalized}" kelimesinin Türkçe sözlük anlamını (tanımını) bul veya oluştur.
+Eğer kelime geçerli bir Türkçe kelime ise, kısa, net ve doğru bir Türkçe tanım yaz. 
+Eğer kelime geçersiz veya uydurma ise, bunu belirt.
+
+Yanıtını SADECE aşağıdaki JSON yapısında döndür:
+{
+  "valid": boolean,
+  "definition": "Kelimenin Türkçe tanımı veya açıklaması"
+}`;
+
+      const geminiResponse = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          systemInstruction: "Sen bir Türkçe sözlük asistanısın. Görevin, verilen kelimenin doğru ve net Türkçe tanımını sağlamaktır. Yanıtları her zaman JSON biçiminde dönersin."
+        }
+      });
+
+      if (geminiResponse && geminiResponse.text) {
+        const geminiData = JSON.parse(geminiResponse.text.trim());
+        if (geminiData.definition) {
+          const geminiResult = {
+            valid: geminiData.valid !== false,
+            definition: geminiData.definition
+          };
+          
+          wordCache[cacheKey] = geminiResult;
+
+          // Save definition back to Firestore dictionary!
+          try {
+            const wordDocRef = doc(db, 'dictionary', normalized);
+            await setDoc(wordDocRef, {
+              word: normalized,
+              valid: geminiResult.valid,
+              definition: geminiResult.definition,
+              createdAt: new Date().toISOString()
+            }, { merge: true });
+            console.log(`[Database Save - Definition Gemini] Saved definition for "${normalized}" to database.`);
+          } catch (saveErr) {
+            console.error('Failed to save Gemini definition to Firestore:', saveErr);
+          }
+
+          return res.json(geminiResult);
+        }
+      }
+    } catch (geminiErr) {
+      console.error('[Gemini Definition Fallback ERROR]:', geminiErr);
+    }
+
+    // Fallback if both failed
     return res.json({
       valid: false,
       definition: 'Bu kelimenin anlamı TDK sözlüğünde bulunamadı.'
