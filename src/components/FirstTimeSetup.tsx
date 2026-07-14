@@ -85,7 +85,7 @@ export default function FirstTimeSetup({ profile, lobbyPlayers = [], onComplete 
           <span className="absolute top-0 right-[40%] text-amber-200 animate-pulse text-xs">✦</span>
         </div>
         <h1 className="text-2xl font-serif font-medium tracking-wide text-[#FAF6E9] uppercase">
-          Savaşçı Profilini Oluştur
+          Kullanıcı Profilini Oluştur
         </h1>
         <p className="text-xs text-gray-400 font-medium max-w-xs mx-auto">
           Kelime Savaşı'na başlamadan önce kendine harika bir takma ad ve avatar seç!
@@ -96,7 +96,7 @@ export default function FirstTimeSetup({ profile, lobbyPlayers = [], onComplete 
         {/* Username input */}
         <div className="space-y-2">
           <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
-            Savaşçı Adın (Kullanıcı Adı)
+            Kullanıcı Adınız
           </label>
           <div className="relative">
             <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
@@ -111,7 +111,7 @@ export default function FirstTimeSetup({ profile, lobbyPlayers = [], onComplete 
                 setUsername(e.target.value);
                 setIsTouched(true);
               }}
-              placeholder="Savaşçı adını belirle..."
+              placeholder="Kullanıcı adını belirle..."
               className={`w-full bg-[#3D4756]/40 border ${error ? 'border-rose-500 focus:ring-rose-400/40 focus:border-rose-400/40' : 'border-[#3E485A] focus:ring-amber-400/40 focus:border-amber-400/40'} rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
             />
           </div>

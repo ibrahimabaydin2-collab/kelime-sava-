@@ -62,7 +62,7 @@ export function validateUsername(
     });
 
     if (isTaken) {
-      return 'Bu kullanıcı adı zaten başka bir savaşçı tarafından alınmış.';
+      return 'Bu kullanıcı adı zaten başka bir kullanıcı tarafından alınmış.';
     }
   }
 

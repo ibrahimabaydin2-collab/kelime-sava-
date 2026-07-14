@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Swords, Play, Globe, ShieldAlert, Sparkles, 
   Trophy, Users, HelpCircle, ChevronDown, ChevronUp, 
@@ -96,6 +96,29 @@ export default function WelcomeScreen({
 
   const [friendsTab, setFriendsTab] = useState<'friends' | 'find'>('friends');
   const [friendsSearchTerm, setFriendsSearchTerm] = useState<string>('');
+  
+  // Daily Puzzle reset countdown timer state
+  const [timeLeftToReset, setTimeLeftToReset] = useState<string>('');
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const nextMidnight = new Date();
+      nextMidnight.setHours(24, 0, 0, 0); // Next midnight
+      const diffMs = nextMidnight.getTime() - now.getTime();
+      
+      const hours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+      const minutes = Math.max(0, Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)));
+      const seconds = Math.max(0, Math.floor((diffMs % (1000 * 60)) / 1000));
+      
+      const pad = (num: number) => String(num).padStart(2, '0');
+      setTimeLeftToReset(`${pad(hours)}:${pad(minutes)}:${pad(seconds)}`);
+    };
+
+    calculateTimeLeft();
+    const timerId = setInterval(calculateTimeLeft, 1000);
+    return () => clearInterval(timerId);
+  }, []);
 
   const isFriend = (playerId: string) => friendsList.some(f => f.id === playerId);
 
@@ -512,7 +535,7 @@ export default function WelcomeScreen({
               <p className="text-xs text-gray-300 leading-relaxed font-sans">
                 {selectedTab === 'solo' && 'Kendi başınıza pratik yapıp kendinizi test edin! Süreli veya süresiz oynayarak kelime haznenizi genişletin ve yeni rekorlara koşun.'}
                 {selectedTab === 'pvp' && 'Canlı rakiplerle kıyasıya rekabet edin! Aynı gizli kelimeyi en az denemede ve en kısa sürede çözerek liderlik sıralamasında yükselin.'}
-                {selectedTab === 'group' && 'Arkadaşlarınızla aynı oda koduyla canlı bağlanın! Kimin daha hızlı ve usta bir kelime savaşçısı olduğunu herkese kanıtlayın.'}
+                {selectedTab === 'group' && 'Arkadaşlarınızla aynı oda koduyla canlı bağlanın! Kimin daha hızlı ve usta bir kelime bükücü olduğunu herkese kanıtlayın.'}
               </p>
             </div>
 
@@ -784,33 +807,6 @@ export default function WelcomeScreen({
         
         <div className="flex flex-col items-center w-full max-w-xs">
           <span className="text-base font-serif tracking-widest text-amber-100/95 font-normal lowercase">{profile.name}</span>
-          
-          {/* Dynamic Premium Level Title */}
-          <span className="text-xs font-black text-amber-400 uppercase tracking-widest font-mono mt-1.5 flex items-center gap-1">
-            {getWarriorTitle(profile.dailyScore)}
-          </span>
-
-          {/* Level Progress Bar */}
-          {(() => {
-            const progress = getLevelProgress(profile.dailyScore);
-            return (
-              <div className="w-full mt-2 px-6">
-                <div className="flex justify-between text-[10px] font-bold text-gray-400 font-mono mb-1">
-                  <span>{progress.currentLevelScore} Puan</span>
-                  <span className="text-amber-300">
-                    {progress.level < 5 ? `${progress.progressInLevel}/${progress.range} Puan` : 'Efsanevi Maks Seviye!'}
-                  </span>
-                  <span>{progress.level < 5 ? `${progress.nextLevelScore} Puan` : '∞'}</span>
-                </div>
-                <div className="w-full bg-black/45 h-2 rounded-full overflow-hidden p-[2px] border border-white/5 shadow-inner">
-                  <div 
-                    style={{ width: `${progress.percent}%` }}
-                    className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-300 rounded-full transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(251,191,36,0.3)]"
-                  />
-                </div>
-              </div>
-            );
-          })()}
         </div>
       </div>
 
@@ -821,6 +817,39 @@ export default function WelcomeScreen({
         <span className="flex items-center gap-1"><Flame size={13} className="text-orange-400 animate-pulse" /> {profile.stats?.currentStreak || 0} Seri</span>
         <span className="text-white/15">|</span>
         <span className="flex items-center gap-1"><Swords size={13} className="text-blue-400" /> %{winRate} Galibiyet</span>
+      </div>
+
+      {/* Seviye Göstergesi Kartı (MaterialCardView) */}
+      <div className="w-full bg-[#FAF6E9] border border-[#EBE6D5] rounded-2xl p-3.5 shadow-[0_4px_0_#D9D4C3,0_6px_12px_rgba(0,0,0,0.1)] flex items-center justify-between gap-3 text-left">
+        <div className="flex items-center gap-3 w-full">
+          <div className="w-10 h-10 rounded-xl bg-[#FEF9E6] border border-[#E2DCBF] flex items-center justify-center shrink-0">
+            <Trophy size={20} className="text-amber-500 stroke-[2.5]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] font-black text-amber-700 tracking-wider font-mono uppercase">Mevcut Seviye</div>
+            <div className="text-xs font-black text-[#2E3748] truncate mt-0.5">{getWarriorTitle(profile.dailyScore)}</div>
+            {(() => {
+              const progress = getLevelProgress(profile.dailyScore);
+              return (
+                <div className="w-full mt-1.5">
+                  <div className="w-full bg-black/10 h-1.5 rounded-full overflow-hidden">
+                    <div 
+                      style={{ width: `${progress.percent}%` }}
+                      className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full transition-all duration-1000 ease-out shadow-[0_0_6px_rgba(245,158,11,0.2)]"
+                    />
+                  </div>
+                  <div className="flex justify-between text-[8.5px] font-bold text-gray-500 font-mono mt-1">
+                    <span>{progress.currentLevelScore} Puan</span>
+                    <span className="text-amber-700 font-semibold">
+                      {progress.level < 5 ? `${progress.progressInLevel}/${progress.range} Puan` : 'Efsanevi Maks Seviye!'}
+                    </span>
+                    <span>{progress.level < 5 ? `${progress.nextLevelScore} Puan` : '∞'}</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       </div>
 
       {/* Direct Challenge Notification */}
@@ -896,77 +925,54 @@ export default function WelcomeScreen({
       {/* Günün Bulmacası (Daily Puzzle) Card */}
       <div className="w-full">
         {isDailyPuzzleCompletedToday ? (
-          <div className="w-full relative overflow-hidden bg-[#FAF6E9] border-2 border-amber-500/40 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-[0_0_15px_rgba(245,158,11,0.15),0_4px_0_#D9D4C3] animate-fade-in">
-            {/* Shimmer light effect overlay */}
+          <div className="w-full relative overflow-hidden bg-[#FAF6E9] border border-amber-300 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-[0_4px_0_#D9D4C3,0_6px_12px_rgba(0,0,0,0.1)] text-left animate-fade-in">
             <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/5 via-transparent to-yellow-500/5 pointer-events-none" />
-            
-            <div className="flex items-center gap-3 text-left w-full sm:w-auto relative z-10">
-              <div className="relative flex items-center justify-center shrink-0">
-                {/* Radiant glow behind badge */}
-                <div className="absolute inset-0 bg-amber-400/20 rounded-full blur animate-pulse" />
-                <div className="relative w-10 h-10 bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-white rounded-xl flex items-center justify-center border border-amber-300 shadow-md">
-                  <Award size={20} className="stroke-[2.5]" />
-                </div>
+            <div className="flex items-center gap-3 min-w-0 z-10">
+              <div className="w-10 h-10 bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-white rounded-xl flex items-center justify-center border border-amber-300 shadow-sm shrink-0">
+                <Award size={20} className="stroke-[2.5]" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[8px] font-black bg-amber-500/10 text-amber-700 border border-amber-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-mono">
-                    TAMAMLANDI
-                  </span>
+                  <span className="text-[8px] font-black bg-amber-500/10 text-amber-700 border border-amber-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-mono">TAMAMLANDI</span>
                   <h4 className="text-[10px] font-medium tracking-[0.15em] text-[#2E3748]/60 uppercase font-sans">Günün Bulmacası</h4>
                 </div>
-                <p className="text-xs font-black text-[#2E3748] mt-1">Bugünün kelimesini ustalıkla çözdün! 🎉</p>
-                <p className="text-[9.5px] text-amber-700 font-medium mt-0.5 flex items-center gap-1.5">
-                  <Sparkles size={11} className="text-amber-600 fill-amber-500/10 animate-pulse" />
-                  <span>+100 Ekstra Puan & 'Günlük Bilge' Rozeti Koleksiyonuna Eklendi!</span>
+                <p className="text-xs font-black text-[#2E3748] truncate mt-0.5">Bugünün kelimesini çözdün! 🎉</p>
+                <p className="text-[9px] text-amber-700 font-bold mt-0.5 flex items-center gap-1">
+                  <span>Sıfırlanma:</span>
+                  <span className="font-mono text-amber-600">{timeLeftToReset}</span>
                 </p>
               </div>
             </div>
-
-            <div className="w-full sm:w-auto flex justify-end shrink-0 relative z-10">
-              <div className="bg-[#FEF9E6] text-amber-700 border border-amber-400/40 rounded-xl px-3 py-1.5 text-[9px] font-mono font-black uppercase tracking-widest shadow-sm flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                <span>GÜNLÜK BİLGE</span>
-              </div>
+            <div className="bg-[#FEF9E6] text-amber-700 border border-amber-400/45 rounded-xl px-2.5 py-1 text-[8px] font-mono font-black uppercase tracking-widest shrink-0 flex items-center gap-1">
+              <span className="w-1 h-1 rounded-full bg-amber-500 animate-ping" />
+              <span>BİLGE</span>
             </div>
           </div>
         ) : (
           <button
             onClick={() => onStartDailyPuzzle?.()}
-            className="w-full relative group overflow-hidden bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] border border-[#EBE6D5] rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-left transition-all duration-300 shadow-[0_4px_0_#D9D4C3,0_6px_12px_rgba(0,0,0,0.1)] cursor-pointer"
+            className="w-full relative group overflow-hidden bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] border border-[#EBE6D5] rounded-2xl p-3.5 flex items-center justify-between gap-3 text-left transition-all duration-300 shadow-[0_4px_0_#D9D4C3,0_6px_12px_rgba(0,0,0,0.1)] cursor-pointer"
           >
-            {/* Highlight beam on hover */}
             <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-            
-            <div className="flex items-center gap-3 text-left w-full sm:w-auto relative z-10">
-              <div className="relative flex items-center justify-center shrink-0">
-                <div className="absolute inset-0 bg-amber-500/5 rounded-2xl blur-sm group-hover:bg-amber-500/10 transition duration-300" />
-                <div className="relative w-10 h-10 bg-[#FAF6E9] text-amber-600 rounded-xl flex items-center justify-center border border-[#E2DCBF] group-hover:scale-105 transition duration-300 shadow-sm">
-                  <Puzzle size={20} className="text-amber-600 animate-pulse" />
-                </div>
+            <div className="flex items-center gap-3 min-w-0 z-10">
+              <div className="w-10 h-10 bg-[#FAF6E9] text-amber-600 rounded-xl flex items-center justify-center border border-[#E2DCBF] group-hover:scale-105 transition duration-300 shadow-sm shrink-0">
+                <Puzzle size={20} className="text-amber-600 animate-pulse" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[8px] font-black bg-amber-500/10 text-amber-700 border border-amber-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-mono">
-                    GÜNLÜK
-                  </span>
+                  <span className="text-[8px] font-black bg-amber-500/10 text-amber-700 border border-amber-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-mono">GÜNLÜK</span>
                   <h4 className="text-[10px] font-medium tracking-[0.15em] text-[#2E3748]/60 uppercase font-sans">Günün Bulmacası</h4>
                 </div>
-                <p className="text-xs font-black text-[#2E3748] mt-1">
-                  Zihnini Sına: <span className="text-amber-700 font-bold">{getDailyWordAndLength().length} Harfli</span> Kelimeyi Keşfet!
-                </p>
-                <p className="text-[9.5px] text-[#2E3748]/55 mt-0.5 flex items-center gap-1.5">
-                  <Sparkles size={11} className="text-amber-600 fill-amber-500/10 animate-pulse" />
-                  <span>Büyük Ödül: <strong className="text-amber-700 font-bold">+100 Puan</strong> & Özel Rozet</span>
+                <p className="text-xs font-black text-[#2E3748] truncate mt-0.5">{getDailyWordAndLength().length} Harfli Gizemli Kelime</p>
+                <p className="text-[9px] text-gray-500 mt-0.5 flex items-center gap-1">
+                  <span>Kalan Süre:</span>
+                  <span className="font-mono text-amber-700 font-bold">{timeLeftToReset}</span>
                 </p>
               </div>
             </div>
-
-            <div className="w-full sm:w-auto flex justify-end shrink-0 relative z-10">
-              <div className="px-4 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-extrabold text-[10px] uppercase tracking-widest rounded-lg transition-all duration-200 shadow-sm flex items-center gap-1.5 group-hover:translate-x-1">
-                <span>Oyna</span>
-                <Play size={10} className="fill-current" />
-              </div>
+            <div className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-[10px] uppercase tracking-widest rounded-lg transition-all duration-200 shadow-sm flex items-center gap-1 shrink-0 group-hover:translate-x-1">
+              <span>Oyna</span>
+              <Play size={10} className="fill-current" />
             </div>
           </button>
         )}
@@ -1271,7 +1277,7 @@ export default function WelcomeScreen({
                   ) : (
                     <div className="space-y-1.5 animate-fade-in">
                       <div className="text-left py-1 text-amber-200/85 font-black uppercase text-[9px] tracking-wider font-mono">
-                        Aktif Oyuncular (Savaşçılar)
+                        Aktif Oyuncular
                       </div>
                       {otherPlayers.map((player) => (
                         <div key={player.id} className="p-2.5 bg-[#3D4756]/45 rounded-xl border border-white/5 flex items-center justify-between text-left animate-scale-up">

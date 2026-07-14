@@ -240,11 +240,11 @@ export default function SettingsModal({
           {activeTab === 'account' && (
             <div className="space-y-4 animate-fade-in">
               
-              {/* Card 1: Savaşçı Profil Ayarları */}
+              {/* Card 1: Kullanıcı Profil Ayarları */}
               <div className="inner-theme border border-theme rounded-2xl p-4.5 space-y-4 text-left shadow-md">
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
                   <User size={14} className="text-amber-400" />
-                  Savaşçı Profil Ayarları
+                  Kullanıcı Profil Ayarları
                 </h4>
                 
                 <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -373,7 +373,7 @@ export default function SettingsModal({
                         <div className="flex items-start gap-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-3 rounded-xl text-xs font-semibold">
                           <CheckCircle2 size={16} className="shrink-0 text-emerald-400 mt-0.5" />
                           <div>
-                            <p className="font-bold text-emerald-200">🟢 Doğrulanmış Savaşçı Üye</p>
+                            <p className="font-bold text-emerald-200">🟢 Doğrulanmış Üye</p>
                             <p className="text-[10px] text-emerald-300/80 mt-0.5 leading-normal">Hesabınız tamamen doğrulanmış ve veri kurtarma havuzuna eklenmiştir.</p>
                           </div>
                         </div>
@@ -553,7 +553,7 @@ export default function SettingsModal({
                         console.error('Google link error:', err);
                         let msg = err.message || 'Google ile bağlanma başarısız oldu.';
                         if (err.code === 'auth/credential-already-in-use') {
-                          msg = 'Bu Google hesabı zaten başka bir savaşçı profili ile eşleşmiş.';
+                          msg = 'Bu Google hesabı zaten başka bir kullanıcı profili ile eşleşmiş.';
                         }
                         setSecurityError(msg);
                       }

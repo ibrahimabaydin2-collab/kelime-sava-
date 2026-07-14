@@ -24,6 +24,7 @@ import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, H
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/turkish.js';
 import { getApiUrl, getWsUrl } from './utils/api.js';
+import { calculateDynamicScore, verifyScoringAccuracy } from './utils/scoring.js';
 
 const INITIAL_STATS = {
   gamesPlayed: 0,
@@ -170,7 +171,7 @@ export default function App() {
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const saved = safeLocalStorage.getItem('darkMode');
     if (saved !== null) return saved === 'true';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return true; // Default to Gece Modu (Night Mode) for the initial visit
   });
 
   const [isConnectPage] = useState<boolean>(() => {
@@ -449,7 +450,7 @@ export default function App() {
             'Kelimeler seni özledi, günün bulmacasını kaçırma! 🧩',
             'Zihnini çalıştırmaya ne dersin? Yeni bulmaca hazır! ⚡',
             'Günün gizemli kelimesini çözüp "Günlük Bilge" rozetini kapmaya hazır mısın? 🎖️',
-            'Savaşçı! Kelime tahtası boş kaldı, bugün zekanı konuşturma zamanı! ⚔️',
+            'Oyuncu! Kelime tahtası boş kaldı, bugün zekanı konuşturma zamanı! ⚔️',
             'Zirvedeki yerini korumak için bugün de kelimeleri avla! 🏆'
           ];
           const randomMsg = RETENTION_MESSAGES[Math.floor(Math.random() * RETENTION_MESSAGES.length)];
@@ -480,7 +481,7 @@ export default function App() {
         'Kelimeler seni özledi, günün bulmacasını kaçırma! 🧩',
         'Zihnini çalıştırmaya ne dersin? Yeni bulmaca hazır! ⚡',
         'Günün gizemli kelimesini çözüp "Günlük Bilge" rozetini kapmaya hazır mısın? 🎖️',
-        'Savaşçı! Kelime tahtası boş kaldı, bugün zekanı konuşturma zamanı! ⚔️',
+        'Oyuncu! Kelime tahtası boş kaldı, bugün zekanı konuşturma zamanı! ⚔️',
         'Zirvedeki yerini korumak için bugün de kelimeleri avla! 🏆'
       ];
       const randomMsg = RETENTION_MESSAGES[Math.floor(Math.random() * RETENTION_MESSAGES.length)];
@@ -556,7 +557,7 @@ export default function App() {
     let active = true;
     let resolved = false;
 
-    // 5-second fallback timeout for the "Savaşçı Oturumu Hazırlanıyor..." screen
+    // 5-second fallback timeout for the "Oturum Hazırlanıyor..." screen
     const timeoutId = setTimeout(() => {
       if (active && !resolved) {
         resolved = true;
@@ -1332,14 +1333,12 @@ export default function App() {
       let scoreAwarded = 0;
       if (hasWon) {
         const attemptsCount = updatedAttempts.length;
-        if (attemptsCount === 1) scoreAwarded = 5;
-        else if (attemptsCount === 2) scoreAwarded = 4;
-        else if (attemptsCount === 3) scoreAwarded = 3;
-        else if (attemptsCount === 4) scoreAwarded = 2;
-        else scoreAwarded = 1;
-
-        if (isDailyPuzzle) {
-          scoreAwarded += 5;
+        scoreAwarded = calculateDynamicScore(wordLength, secondsLeft, attemptsCount, isDailyPuzzle);
+        
+        // Verification function to ensure scoring accuracy and reject invalid edge cases
+        if (!verifyScoringAccuracy(scoreAwarded)) {
+          console.warn(`Scoring verification failed for calculated score: ${scoreAwarded}. Falling back to 50.`);
+          scoreAwarded = 50;
         }
       }
 
@@ -1712,7 +1711,7 @@ export default function App() {
         {authLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center space-y-4">
             <div className="w-12 h-12 border-4 border-[#FAF6E9] border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm font-bold text-[#FAF6E9]/60">Savaşçı Oturumu Hazırlanıyor...</p>
+            <p className="text-sm font-bold text-[#FAF6E9]/60">Kullanıcı Oturumu Hazırlanıyor...</p>
           </div>
         ) : !firebaseUser ? (
           <AuthScreen

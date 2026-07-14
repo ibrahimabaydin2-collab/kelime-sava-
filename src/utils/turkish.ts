@@ -60,6 +60,19 @@ export function validateTurkishLinguistics(word: string, length: number): { vali
     return { valid: false, reason: 'Kelime Türkçe alfabesinde bulunmayan geçersiz karakterler barındırıyor.' };
   }
 
+  // 1.1 Keyboard smash detector (reject common sequences of keys adjacent on keyboards)
+  const keyboardSmashes = [
+    'asdf', 'sdfg', 'dfgh', 'fghj', 'ghjk', 'hjkl',
+    'qwer', 'wert', 'erty', 'rtyu', 'tyui', 'yuio', 'uiop',
+    'zxcv', 'xcvb', 'cvbn', 'vbnm',
+    'asda', 'sada', 'dasa', 'fasa', 'ghjg', 'jklj', 'qweq', 'rewr'
+  ];
+  for (const smash of keyboardSmashes) {
+    if (normalized.includes(smash)) {
+      return { valid: false, reason: 'Anlamsız klavye tuşlaması veya ardışık harf grubu tespit edildi.' };
+    }
+  }
+
   // 2. Must contain at least one vowel
   const vowels = /[aeiou]/g;
   const vowelMatches = normalized.match(vowels);

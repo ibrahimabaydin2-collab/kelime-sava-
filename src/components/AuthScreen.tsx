@@ -146,7 +146,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         } else {
           const initialProfile: UserProfile = {
             id: user.uid,
-            name: user.displayName || user.email?.split('@')[0] || 'Facebook Savaşçısı',
+            name: user.displayName || user.email?.split('@')[0] || 'Facebook Oyuncusu',
             avatarUrl: user.photoURL || '🧠',
             stats: {
               gamesPlayed: 0,
@@ -187,7 +187,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         } else {
           const initialProfile: UserProfile = {
             id: user.uid,
-            name: user.displayName || 'Instagram Savaşçısı',
+            name: user.displayName || 'Instagram Oyuncusu',
             avatarUrl: user.photoURL || '🧠',
             stats: {
               gamesPlayed: 0,
@@ -337,7 +337,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
           </div>
           <h2 className="text-lg font-serif font-semibold tracking-widest text-[#FAF6E9] uppercase">Hesap Birleştirme</h2>
           <p className="text-xs text-gray-400 leading-normal max-w-xs mx-auto">
-            <b>{pendingEmail}</b> e-posta adresi ile zaten bir savaşçı hesabınız bulunuyor. 
+            <b>{pendingEmail}</b> e-posta adresi ile zaten bir kullanıcı hesabınız bulunuyor. 
             Sosyal medya hesabınızı bağlayarak puanlarınızı tek hesapta toplamak için şifrenizi girin.
           </p>
         </div>
@@ -462,7 +462,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         <p className="text-xs text-gray-400 font-medium max-w-xs mx-auto">
           {mode === 'guest' && 'Sadece bir takma ad belirleyerek hemen misafir olarak başla!'}
           {mode === 'register' && 'E-posta ile kayıt ol, tüm puanlarını ve rütbeni koruma altına al!'}
-          {mode === 'login' && 'Eski rütbelerin, puanların ve savaşçı bilgilerinle kaldığın yerden devam et!'}
+          {mode === 'login' && 'Eski rütbelerin, puanların ve profil bilgilerinle kaldığın yerden devam et!'}
         </p>
       </div>
 
@@ -528,7 +528,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         {(mode === 'guest' || mode === 'register') && (
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
-              Savaşçı Adın (Username)
+              Kullanıcı Adın (Username)
             </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">
@@ -543,7 +543,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
                   setUsername(e.target.value);
                   setIsTouched(true);
                 }}
-                placeholder="Savaşçı adını belirle..."
+                placeholder="Kullanıcı adını belirle..."
                 className={`w-full bg-[#3D4756]/40 border ${usernameError ? 'border-rose-500 focus:ring-rose-400/40 focus:border-rose-400/40' : 'border-[#3E485A] focus:ring-amber-400/40 focus:border-amber-400/40'} rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
               />
             </div>
@@ -616,7 +616,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
           <div className="space-y-3 pt-2">
             <div className="flex justify-between items-end">
               <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
-                Savaşçı Avatarını Seç
+                Kullanıcı Avatarını Seç
               </label>
               
               {/* Custom Image Upload Button */}
@@ -688,7 +688,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
               {mode === 'register' && (
                 <>
                   <Sparkles size={15} className="mr-2 text-amber-500 fill-amber-500" />
-                  <span>Kayıt Ol ve Savaşçı Ol</span>
+                  <span>Kayıt Ol ve Oyuna Başla</span>
                 </>
               )}
               {mode === 'login' && (

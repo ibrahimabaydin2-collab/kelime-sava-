@@ -1722,7 +1722,7 @@ export default function GroupRace({
               Botlara Karşı <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Grup Yarışı</span> Turnuvası
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
-              Sınır 20 kişidir. 1 dakika içinde düello alanında toplanan tüm savaşçılar aynı anda, aynı gizli kelimelerle elenerek finale doğru kıyasıya yarışır!
+              Sınır 20 kişidir. 1 dakika içinde düello alanında toplanan tüm oyuncular aynı anda, aynı gizli kelimelerle elenerek finale doğru kıyasıya yarışır!
             </p>
           </div>
 
@@ -1857,7 +1857,7 @@ export default function GroupRace({
                 <ShieldAlert size={48} className="text-rose-500" />
                 <h3 className="text-xl font-bold text-white">Yarıştan Elendiniz!</h3>
                 <p className="text-xs text-slate-400 max-w-sm">
-                  Bu turda elendiniz ancak diğer savaşçıların kıyasıya düellosunu canlı olarak izleyip kimin kazanacağını görebilirsiniz!
+                  Bu turda elendiniz ancak diğer oyuncuların kıyasıya düellosunu canlı olarak izleyip kimin kazanacağını görebilirsiniz!
                 </p>
                 <button
                   onClick={() => {
