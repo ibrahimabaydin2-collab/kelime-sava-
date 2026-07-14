@@ -778,15 +778,6 @@ export default function WelcomeScreen({
         <span className="text-sm font-serif tracking-widest text-amber-100/95 font-normal lowercase leading-none mt-1">{profile.name}</span>
       </div>
 
-      {/* Mini Stats Pill - Shrunk */}
-      <div className="flex justify-center items-center gap-2.5 text-[10px] font-medium text-[#FAF6E9]/80 bg-[#3D4756]/40 px-3 py-1 rounded-full border border-white/5 w-fit mx-auto my-0.5">
-        <span className="flex items-center gap-1"><Award size={11} className="text-amber-400" /> {profile.dailyScore} Puan</span>
-        <span className="text-white/10">|</span>
-        <span className="flex items-center gap-1"><Flame size={11} className="text-orange-400 animate-pulse" /> {profile.stats?.currentStreak || 0} Seri</span>
-        <span className="text-white/10">|</span>
-        <span className="flex items-center gap-1"><Swords size={11} className="text-blue-400" /> %{winRate} Galibiyet</span>
-      </div>
-
       {/* Direct Challenge Notification */}
       {activeChallenges.length > 0 && (
         <div className="bg-amber-500/10 border border-dashed border-amber-500/30 p-2 rounded-xl space-y-1 animate-pulse text-left relative overflow-hidden">

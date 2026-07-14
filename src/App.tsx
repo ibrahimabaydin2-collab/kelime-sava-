@@ -6,7 +6,8 @@ import {
   playEnterSound,
   playErrorSound,
   playVictorySound,
-  playDefeatSound
+  playDefeatSound,
+  playCountdownBeepSound
 } from './utils/soundEffects.js';
 import GameBoard from './components/GameBoard.js';
 import BottomBar from './components/BottomBar.js';
@@ -845,11 +846,12 @@ export default function App() {
             }
 
             case 'match_update': {
-              const { playerUpdate } = data;
+              const { playerUpdate, roundsWon } = data;
               setActiveMatch((prev) => {
                 if (!prev) return null;
                 return {
                   ...prev,
+                  roundsWon: roundsWon || prev.roundsWon,
                   players: {
                     ...prev.players,
                     [playerUpdate.id]: {
@@ -862,6 +864,42 @@ export default function App() {
                       timeRemaining: playerUpdate.timeRemaining
                     }
                   }
+                };
+              });
+              break;
+            }
+
+            case 'match_next_word': {
+              const { targetWord: newWord, roundsWon: rw, currentRound: round } = data;
+              showToast(`Sıradaki kelimeye geçtin! Başarılar!`, 'success');
+              
+              setTargetWord(newWord);
+              setAttempts([]);
+              setCurrentAttempt('');
+              setGameStatus('playing');
+              setSecondsLeft(20);
+              setWordDefinition('');
+              setLetterStatuses({});
+
+              setActiveMatch((prev) => {
+                if (!prev) return null;
+                // Reset self attempts on the UI
+                const updatedPlayers = { ...prev.players };
+                if (updatedPlayers[profile.id]) {
+                  updatedPlayers[profile.id] = {
+                    ...updatedPlayers[profile.id],
+                    attempts: [],
+                    currentAttempt: 0,
+                    completed: false,
+                    won: false,
+                    timeRemaining: 20
+                  };
+                }
+                return {
+                  ...prev,
+                  currentRound: round,
+                  roundsWon: rw || prev.roundsWon,
+                  players: updatedPlayers
                 };
               });
               break;
@@ -1099,7 +1137,11 @@ export default function App() {
           handleGameLoss('Süre Sınırı Aşıldı');
           return 0;
         }
-        return prev - 1;
+        const nextSec = prev - 1;
+        if (nextSec <= 5 && nextSec >= 1) {
+          playCountdownBeepSound(settings.soundEnabled, nextSec);
+        }
+        return nextSec;
       });
     }, 1000);
 
@@ -1372,7 +1414,9 @@ export default function App() {
       } else {
         // Continue playing, reset timer back to 20s
         setSecondsLeft(20);
-        showToast('Deneme kabul edildi. Süre sıfırlandı!', 'success');
+        if (gameMode === 'timed' && !isDailyPuzzle) {
+          showToast('Deneme kabul edildi. Süre sıfırlandı!', 'success');
+        }
         playEnterSound(settings.soundEnabled);
       }
 

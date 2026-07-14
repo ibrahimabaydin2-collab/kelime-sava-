@@ -249,3 +249,30 @@ export function playDefeatSound(enabled: boolean) {
     });
   }, 360);
 }
+
+/**
+ * Play a high-pitched sharp beep warning sound for the countdown (son 5 saniye)
+ */
+export function playCountdownBeepSound(enabled: boolean, secondsLeft: number) {
+  if (!enabled) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = 'sine';
+  // Pitch rises as time is lower: 5 -> 800Hz, 4 -> 850Hz, 3 -> 900Hz, 2 -> 950Hz, 1 -> 1050Hz
+  const pitch = 800 + (6 - secondsLeft) * 50;
+  osc.frequency.setValueAtTime(pitch, ctx.currentTime);
+
+  // Short sharp beep
+  gain.gain.setValueAtTime(0.08, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start();
+  osc.stop(ctx.currentTime + 0.15);
+}
