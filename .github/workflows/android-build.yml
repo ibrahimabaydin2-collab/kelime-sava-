@@ -46,23 +46,23 @@ jobs:
           tar -xf node_modules/@capacitor/cli/assets/android-template.tar.gz -C android --wildcards "app/src/main/res/**/*.png"
           
           # Forcefully download a fresh Gradle distribution and regenerate gradle wrapper to bypass any git line ending corruption of binary files
-          echo "Downloading fresh Gradle 8.14.3 binary..."
-          wget -q https://services.gradle.org/distributions/gradle-8.14.3-bin.zip
-          unzip -q gradle-8.14.3-bin.zip
-          chmod +x gradle-8.14.3/bin/gradle
-          export PATH=$PWD/gradle-8.14.3/bin:$PATH
+          echo "Downloading fresh Gradle 8.7 binary..."
+          wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip -q gradle-8.7-bin.zip
+          chmod +x gradle-8.7/bin/gradle
+          export PATH=$PWD/gradle-8.7/bin:$PATH
           
           echo "Regenerating gradle wrapper..."
           cd android
           rm -f gradle/wrapper/gradle-wrapper.jar gradlew gradlew.bat
-          gradle wrapper --gradle-version 8.14.3 --distribution-type all --no-daemon
+          gradle wrapper --gradle-version 8.7 --distribution-type all --no-daemon
           cd ..
           
           echo "Stopping Gradle Daemon..."
-          gradle-8.14.3/bin/gradle --stop || true
+          gradle-8.7/bin/gradle --stop || true
           
           echo "Cleaning up temp Gradle download..."
-          rm -rf gradle-8.14.3 gradle-8.14.3-bin.zip
+          rm -rf gradle-8.7 gradle-8.7-bin.zip
           
           npx cap sync android
           chmod +x android/gradlew
