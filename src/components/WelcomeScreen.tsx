@@ -725,10 +725,10 @@ export default function WelcomeScreen({
       </div>
     </div>
   ) : (
-    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border p-5 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between gap-y-[3.5vh] sm:gap-6 min-h-[82vh] md:min-h-0" id="welcome-screen-root">
+    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-3xl border p-4 sm:p-6 shadow-xl relative overflow-hidden flex flex-col justify-start gap-y-3 sm:gap-y-4 min-h-0" id="welcome-screen-root">
       
       {/* Glowing 4-point star accent in bottom right */}
-      <div className="absolute bottom-6 right-8 text-amber-100/30 animate-pulse select-none pointer-events-none">
+      <div className="absolute bottom-6 right-8 text-amber-100/20 animate-pulse select-none pointer-events-none">
         <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 0c.5 6.5 5.5 11.5 12 12-.5 6.5-5.5 11.5-12 12-.5-6.5-5.5-11.5-12-12 .5-6.5 5.5-11.5 12-12z" />
         </svg>
@@ -748,39 +748,20 @@ export default function WelcomeScreen({
         )}
       </div>
 
-      {/* Elegant Glowing Stars and Swords at the top */}
-      <div className="relative flex flex-col items-center justify-center pt-2">
-        {/* Three gold stars */}
-        <div className="flex items-end justify-center gap-1.5 text-amber-300 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-          <span className="text-xs">★</span>
-          <span className="text-lg -translate-y-0.5">★</span>
-          <span className="text-xs">★</span>
-        </div>
-        {/* Crossed Swords gold icon */}
-        <Swords size={18} className="text-amber-300/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] mt-1.5" />
-      </div>
-
-      {/* App title */}
-      <div className="text-center mt-1">
-        <h1 className="text-2xl sm:text-3xl font-serif font-light tracking-[0.25em] text-[#FAF6E9] uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
+      {/* App Title and Logo combined to save vertical space */}
+      <div className="flex items-center justify-center gap-2 mt-1 relative z-10" id="welcome-header-title">
+        <Swords size={18} className="text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)] animate-pulse shrink-0" />
+        <h1 className="text-xl sm:text-2xl font-serif font-light tracking-[0.2em] text-[#FAF6E9] uppercase drop-shadow-[0_1px_3px_rgba(0,0,0,0.4)]">
           KELİME SAVAŞI
         </h1>
-        {/* Filigree/Scroll flourish under the title */}
-        <div className="flex justify-center -mt-1 opacity-70">
-          <svg className="w-48 h-8 text-amber-200/50 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" viewBox="0 0 200 30" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M 100,15 C 120,15 130,5 145,5 C 160,5 165,18 150,22 C 140,24 135,14 145,11 C 150,10 155,12 155,15" />
-            <path d="M 100,15 C 80,15 70,5 55,5 C 40,5 35,18 50,22 C 60,24 65,14 55,11 C 50,10 45,12 45,15" />
-            <circle cx="100" cy="15" r="2.5" className="fill-amber-300" />
-          </svg>
-        </div>
       </div>
 
-      {/* User Profile Section with Halo and Name placed underneath */}
-      <div className="flex flex-col items-center justify-center gap-3 py-2 relative z-10">
+      {/* User Profile Section - Shrunk to save space */}
+      <div className="flex flex-col items-center justify-center gap-1 py-1 relative z-10">
         <div className="relative">
-          {/* Golden Glowing Ring around Avatar - Büyütülmüş ve Parlatılmış */}
+          {/* Golden Glowing Ring around Avatar - Compacted */}
           <div 
-            className="w-24 h-24 rounded-full bg-[#3D4756] border-[3px] border-amber-200/60 shadow-[0_0_20px_rgba(251,191,36,0.3)] flex items-center justify-center text-4xl overflow-hidden transition-transform duration-300 hover:scale-105 cursor-pointer"
+            className="w-14 h-14 rounded-full bg-[#3D4756] border-2 border-amber-200/60 shadow-[0_0_12px_rgba(251,191,36,0.35)] flex items-center justify-center text-2xl overflow-hidden transition-transform duration-300 hover:scale-105 cursor-pointer"
             onClick={() => setIsEditing(true)}
           >
             {profile.avatarUrl && profile.avatarUrl.length > 3 ? (
@@ -791,91 +772,50 @@ export default function WelcomeScreen({
           </div>
           
           {/* Elegant feather decorative absolute-positioned */}
-          <div className="absolute -bottom-1 -right-3 w-12 h-12 text-amber-200/90 drop-shadow-[0_2px_5px_rgba(0,0,0,0.5)] pointer-events-none transform rotate-[15deg]">
+          <div className="absolute -bottom-1 -right-2.5 w-8 h-8 text-amber-200/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)] pointer-events-none transform rotate-[15deg]">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-              {/* Delicate curved feather */}
               <path d="M20 4c-3.5 1-7.5 4.5-9.5 8.5C9.5 14.5 9 17 8.5 20c3-.5 5.5-1 7.5-3 4-2 7.5-6 8.5-9.5" fill="rgba(251, 191, 36, 0.1)" />
               <path d="M6 21c4-4 11-10 14-13" strokeWidth="2" />
-              {/* Barbs */}
-              <path d="M11 15c1-.5 2.5-2 3-3" />
-              <path d="M13.5 12.5c1-.5 2.5-2 3-3" />
-              <path d="M16 10c1-.5 2-1.5 2.5-2.5" />
-              <path d="M9.5 17.5c1-.5 2-1.5 2.5-2.5" />
             </svg>
           </div>
         </div>
         
-        <div className="flex flex-col items-center w-full max-w-xs">
-          <span className="text-base font-serif tracking-widest text-amber-100/95 font-normal lowercase">{profile.name}</span>
-        </div>
+        <span className="text-sm font-serif tracking-widest text-amber-100/95 font-normal lowercase leading-none mt-1">{profile.name}</span>
       </div>
 
-      {/* Mini Stats Pill */}
-      <div className="flex justify-center items-center gap-3 text-[11px] font-medium text-[#FAF6E9]/80 bg-[#3D4756]/40 px-4 py-1.5 rounded-full border border-white/5 w-fit mx-auto">
-        <span className="flex items-center gap-1"><Award size={13} className="text-amber-400" /> {profile.dailyScore} Puan</span>
-        <span className="text-white/15">|</span>
-        <span className="flex items-center gap-1"><Flame size={13} className="text-orange-400 animate-pulse" /> {profile.stats?.currentStreak || 0} Seri</span>
-        <span className="text-white/15">|</span>
-        <span className="flex items-center gap-1"><Swords size={13} className="text-blue-400" /> %{winRate} Galibiyet</span>
-      </div>
-
-      {/* Seviye Göstergesi Kartı (MaterialCardView) */}
-      <div className="w-full bg-[#FAF6E9] border border-[#EBE6D5] rounded-2xl p-3.5 shadow-[0_4px_0_#D9D4C3,0_6px_12px_rgba(0,0,0,0.1)] flex items-center justify-between gap-3 text-left">
-        <div className="flex items-center gap-3 w-full">
-          <div className="w-10 h-10 rounded-xl bg-[#FEF9E6] border border-[#E2DCBF] flex items-center justify-center shrink-0">
-            <Trophy size={20} className="text-amber-500 stroke-[2.5]" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] font-black text-amber-700 tracking-wider font-mono uppercase">Mevcut Seviye</div>
-            <div className="text-xs font-black text-[#2E3748] truncate mt-0.5">{getWarriorTitle(profile.dailyScore)}</div>
-            {(() => {
-              const progress = getLevelProgress(profile.dailyScore);
-              return (
-                <div className="w-full mt-1.5">
-                  <div className="w-full bg-black/10 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      style={{ width: `${progress.percent}%` }}
-                      className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full transition-all duration-1000 ease-out shadow-[0_0_6px_rgba(245,158,11,0.2)]"
-                    />
-                  </div>
-                  <div className="flex justify-between text-[8.5px] font-bold text-gray-500 font-mono mt-1">
-                    <span>{progress.currentLevelScore} Puan</span>
-                    <span className="text-amber-700 font-semibold">
-                      {progress.level < 5 ? `${progress.progressInLevel}/${progress.range} Puan` : 'Efsanevi Maks Seviye!'}
-                    </span>
-                    <span>{progress.level < 5 ? `${progress.nextLevelScore} Puan` : '∞'}</span>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
+      {/* Mini Stats Pill - Shrunk */}
+      <div className="flex justify-center items-center gap-2.5 text-[10px] font-medium text-[#FAF6E9]/80 bg-[#3D4756]/40 px-3 py-1 rounded-full border border-white/5 w-fit mx-auto my-0.5">
+        <span className="flex items-center gap-1"><Award size={11} className="text-amber-400" /> {profile.dailyScore} Puan</span>
+        <span className="text-white/10">|</span>
+        <span className="flex items-center gap-1"><Flame size={11} className="text-orange-400 animate-pulse" /> {profile.stats?.currentStreak || 0} Seri</span>
+        <span className="text-white/10">|</span>
+        <span className="flex items-center gap-1"><Swords size={11} className="text-blue-400" /> %{winRate} Galibiyet</span>
       </div>
 
       {/* Direct Challenge Notification */}
       {activeChallenges.length > 0 && (
-        <div className="bg-amber-500/10 border-2 border-dashed border-amber-500/30 p-3 rounded-2xl space-y-2 animate-pulse text-left relative overflow-hidden">
+        <div className="bg-amber-500/10 border border-dashed border-amber-500/30 p-2 rounded-xl space-y-1 animate-pulse text-left relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 font-mono flex items-center gap-1">
-              <Zap size={11} className="text-amber-500 fill-current animate-bounce" />
+            <span className="text-[9px] font-black uppercase tracking-wider text-amber-400 font-mono flex items-center gap-1">
+              <Zap size={10} className="text-amber-500 fill-current animate-bounce" />
               DÜELLO DAVETİ VAR!
             </span>
           </div>
-          <div className="flex items-center justify-between bg-slate-800/80 p-2.5 rounded-xl border border-amber-500/20">
+          <div className="flex items-center justify-between bg-slate-800/80 p-2 rounded-lg border border-amber-500/20">
             <div className="text-left max-w-[150px] truncate">
               <span className="font-black text-xs text-[#FAF6E9] block leading-tight">{activeChallenges[0].challenger.name}</span>
-              <span className="text-[9px] text-gray-400 block mt-0.5">{activeChallenges[0].wordLength} Harfli</span>
+              <span className="text-[8.5px] text-gray-400 block mt-0.5">{activeChallenges[0].wordLength} Harfli</span>
             </div>
             <div className="flex gap-1">
               <button
                 onClick={() => onDeclineChallenge?.(activeChallenges[0].id)}
-                className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-gray-300 text-[9.5px] font-bold rounded-lg transition"
+                className="px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-gray-300 text-[8.5px] font-bold rounded transition"
               >
                 Red
               </button>
               <button
                 onClick={() => onAcceptChallenge?.(activeChallenges[0].id)}
-                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 text-[9.5px] font-black rounded-lg transition shadow-sm"
+                className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-[8.5px] font-black rounded transition shadow-sm"
               >
                 Kabul
               </button>
@@ -884,22 +824,23 @@ export default function WelcomeScreen({
         </div>
       )}
 
-      {/* Main Play Action Button - 3D retro styled cream button */}
-      <div className="w-full flex flex-col gap-2">
+      {/* CARD 1: Main Play Action Button - 3D retro styled cream button */}
+      <div className="w-full flex flex-col gap-1.5" id="main-play-section">
         <button
           onClick={() => {
             setShowGameSetup(true);
             setSelectedTab('solo');
           }}
-          className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-base sm:text-lg py-4 px-6 rounded-2xl shadow-[0_5px_0_#D9D4C3,0_8px_15px_rgba(0,0,0,0.2)] hover:shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5] relative overflow-hidden"
+          className="w-full bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 hover:from-amber-300 hover:to-amber-300 active:scale-[0.98] active:translate-y-0.5 text-[#1E2532] py-3.5 px-5 rounded-xl shadow-[0_4px_0_#D97706,0_8px_15px_rgba(251,191,36,0.3)] hover:shadow-[0_3px_0_#D97706,0_6px_10px_rgba(251,191,36,0.2)] border-2 border-amber-200 transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer relative overflow-hidden ring-4 ring-amber-400/20"
+          style={{ textShadow: '0px 1px 2px rgba(255,255,255,0.4)' }}
         >
-          <Swords size={20} className="mr-3 text-[#2E3748] stroke-[2.5]" />
-          <span>OYUNA BAŞLA</span>
+          <Swords size={18} className="mr-2 text-[#1E2532] stroke-[3]" />
+          <span className="font-black tracking-[0.1em] drop-shadow-sm text-slate-900 text-sm sm:text-base">OYUNA BAŞLA</span>
         </button>
 
         {/* Matchmaking Queue Status */}
         {matchmakingStatus === 'queued' && (
-          <div className="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl flex items-center justify-between animate-fade-in mt-1">
+          <div className="bg-amber-500/10 border border-amber-500/30 p-2 rounded-lg flex items-center justify-between animate-fade-in mt-1">
             <div className="text-left">
               <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1.5 font-mono uppercase tracking-wide">
                 <span className="relative flex h-2 w-2">
@@ -908,13 +849,13 @@ export default function WelcomeScreen({
                 </span>
                 Eşleşme Aranıyor...
               </span>
-              <span className="text-[9.5px] text-gray-400 block mt-0.5">
+              <span className="text-[9px] text-gray-400 block mt-0.5">
                 {wordLength} Harf • {selectedMatchWords} Kelime
               </span>
             </div>
             <button
               onClick={() => onStartMatchmaking(selectedMatchWords)}
-              className="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition shadow"
+              className="px-2 py-0.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[8.5px] uppercase tracking-wider rounded transition shadow"
             >
               Çık
             </button>
@@ -922,28 +863,61 @@ export default function WelcomeScreen({
         )}
       </div>
 
-      {/* Günün Bulmacası (Daily Puzzle) Card */}
+      {/* CARD 2: Seviye Göstergesi Kartı (MaterialCardView) */}
+      <div className="w-full bg-[#FAF6E9] border border-[#EBE6D5] rounded-xl p-2.5 shadow-[0_3px_0_#D9D4C3,0_4px_8px_rgba(0,0,0,0.1)] flex items-center justify-between gap-2.5 text-left">
+        <div className="flex items-center gap-2.5 w-full">
+          <div className="w-8 h-8 rounded-lg bg-[#FEF9E6] border border-[#E2DCBF] flex items-center justify-center shrink-0">
+            <Trophy size={16} className="text-amber-500 stroke-[2.5]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[8.5px] font-black text-amber-700 tracking-wider font-mono uppercase">Mevcut Seviye</div>
+            <div className="text-[11px] font-black text-[#2E3748] truncate mt-0.5">{getWarriorTitle(profile.dailyScore)}</div>
+            {(() => {
+              const progress = getLevelProgress(profile.dailyScore);
+              return (
+                <div className="w-full mt-1">
+                  <div className="w-full bg-black/10 h-1.5 rounded-full overflow-hidden">
+                    <div 
+                      style={{ width: `${progress.percent}%` }}
+                      className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full transition-all duration-1000 ease-out shadow-[0_0_6px_rgba(245,158,11,0.2)]"
+                    />
+                  </div>
+                  <div className="flex justify-between text-[8px] font-bold text-gray-500 font-mono mt-0.5 leading-none">
+                    <span>{progress.currentLevelScore} P</span>
+                    <span className="text-amber-700 font-semibold">
+                      {progress.level < 5 ? `${progress.progressInLevel}/${progress.range} P` : 'Maks Seviye!'}
+                    </span>
+                    <span>{progress.level < 5 ? `${progress.nextLevelScore} P` : '∞'}</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      </div>
+
+      {/* CARD 3: Günün Bulmacası (Daily Puzzle) Card */}
       <div className="w-full">
         {isDailyPuzzleCompletedToday ? (
-          <div className="w-full relative overflow-hidden bg-[#FAF6E9] border border-amber-300 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-[0_4px_0_#D9D4C3,0_6px_12px_rgba(0,0,0,0.1)] text-left animate-fade-in">
+          <div className="w-full relative overflow-hidden bg-[#FAF6E9] border border-amber-300 rounded-xl p-2.5 flex items-center justify-between gap-2 shadow-[0_3px_0_#D9D4C3,0_4px_8px_rgba(0,0,0,0.1)] text-left animate-fade-in">
             <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/5 via-transparent to-yellow-500/5 pointer-events-none" />
-            <div className="flex items-center gap-3 min-w-0 z-10">
-              <div className="w-10 h-10 bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-white rounded-xl flex items-center justify-center border border-amber-300 shadow-sm shrink-0">
-                <Award size={20} className="stroke-[2.5]" />
+            <div className="flex items-center gap-2.5 min-w-0 z-10">
+              <div className="w-8 h-8 bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-white rounded-lg flex items-center justify-center border border-amber-300 shadow-sm shrink-0">
+                <Award size={16} className="stroke-[2.5]" />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[8px] font-black bg-amber-500/10 text-amber-700 border border-amber-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-mono">TAMAMLANDI</span>
-                  <h4 className="text-[10px] font-medium tracking-[0.15em] text-[#2E3748]/60 uppercase font-sans">Günün Bulmacası</h4>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[7.5px] font-black bg-amber-500/10 text-amber-700 border border-amber-500/20 px-1 py-0.5 rounded uppercase tracking-wider font-mono">TAMAMLANDI</span>
+                  <h4 className="text-[8.5px] font-bold tracking-[0.1em] text-[#2E3748]/60 uppercase font-sans">Günün Bulmacası</h4>
                 </div>
                 <p className="text-xs font-black text-[#2E3748] truncate mt-0.5">Bugünün kelimesini çözdün! 🎉</p>
-                <p className="text-[9px] text-amber-700 font-bold mt-0.5 flex items-center gap-1">
+                <p className="text-[8.5px] text-amber-700 font-bold mt-0.5 flex items-center gap-1">
                   <span>Sıfırlanma:</span>
                   <span className="font-mono text-amber-600">{timeLeftToReset}</span>
                 </p>
               </div>
             </div>
-            <div className="bg-[#FEF9E6] text-amber-700 border border-amber-400/45 rounded-xl px-2.5 py-1 text-[8px] font-mono font-black uppercase tracking-widest shrink-0 flex items-center gap-1">
+            <div className="bg-[#FEF9E6] text-amber-700 border border-amber-400/45 rounded-lg px-2 py-0.5 text-[8px] font-mono font-black uppercase tracking-widest shrink-0 flex items-center gap-0.5">
               <span className="w-1 h-1 rounded-full bg-amber-500 animate-ping" />
               <span>BİLGE</span>
             </div>
@@ -951,72 +925,72 @@ export default function WelcomeScreen({
         ) : (
           <button
             onClick={() => onStartDailyPuzzle?.()}
-            className="w-full relative group overflow-hidden bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] border border-[#EBE6D5] rounded-2xl p-3.5 flex items-center justify-between gap-3 text-left transition-all duration-300 shadow-[0_4px_0_#D9D4C3,0_6px_12px_rgba(0,0,0,0.1)] cursor-pointer"
+            className="w-full relative group overflow-hidden bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] border border-[#EBE6D5] rounded-xl p-2.5 flex items-center justify-between gap-2 text-left transition-all duration-300 shadow-[0_3px_0_#D9D4C3,0_4px_8px_rgba(0,0,0,0.1)] cursor-pointer"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-            <div className="flex items-center gap-3 min-w-0 z-10">
-              <div className="w-10 h-10 bg-[#FAF6E9] text-amber-600 rounded-xl flex items-center justify-center border border-[#E2DCBF] group-hover:scale-105 transition duration-300 shadow-sm shrink-0">
-                <Puzzle size={20} className="text-amber-600 animate-pulse" />
+            <div className="flex items-center gap-2.5 min-w-0 z-10">
+              <div className="w-8 h-8 bg-[#FAF6E9] text-amber-600 rounded-lg flex items-center justify-center border border-[#E2DCBF] group-hover:scale-105 transition duration-300 shadow-sm shrink-0">
+                <Puzzle size={16} className="text-amber-600 animate-pulse" />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[8px] font-black bg-amber-500/10 text-amber-700 border border-amber-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-mono">GÜNLÜK</span>
-                  <h4 className="text-[10px] font-medium tracking-[0.15em] text-[#2E3748]/60 uppercase font-sans">Günün Bulmacası</h4>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[7.5px] font-black bg-amber-500/10 text-amber-700 border border-amber-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-mono">GÜNLÜK</span>
+                  <h4 className="text-[8.5px] font-bold tracking-[0.15em] text-[#2E3748]/60 uppercase font-sans">Günün Bulmacası</h4>
                 </div>
                 <p className="text-xs font-black text-[#2E3748] truncate mt-0.5">{getDailyWordAndLength().length} Harfli Gizemli Kelime</p>
-                <p className="text-[9px] text-gray-500 mt-0.5 flex items-center gap-1">
-                  <span>Kalan Süre:</span>
+                <p className="text-[8.5px] text-gray-500 mt-0.5 flex items-center gap-1">
+                  <span>Kalan:</span>
                   <span className="font-mono text-amber-700 font-bold">{timeLeftToReset}</span>
                 </p>
               </div>
             </div>
-            <div className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-[10px] uppercase tracking-widest rounded-lg transition-all duration-200 shadow-sm flex items-center gap-1 shrink-0 group-hover:translate-x-1">
+            <div className="px-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-[9px] uppercase tracking-widest rounded-md transition-all duration-200 shadow-sm flex items-center gap-1 shrink-0 group-hover:translate-x-1">
               <span>Oyna</span>
-              <Play size={10} className="fill-current" />
+              <Play size={8} className="fill-current" />
             </div>
           </button>
         )}
       </div>
 
       {/* Beautiful Cream Action Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 w-full">
+      <div className="grid grid-cols-4 gap-2 w-full" id="bottom-buttons-grid">
         {/* Button 1: REKABET */}
         <button
           onClick={onOpenStats}
-          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer"
+          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 shadow-[0_3px_0_#D9D4C3,0_4px_8px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer"
         >
-          <Trophy size={24} className="stroke-[2.5]" />
-          <span className="text-[11px] font-black uppercase tracking-widest">REKABET</span>
+          <Trophy size={18} className="stroke-[2.5]" />
+          <span className="text-[9px] font-black uppercase tracking-wider">REKABET</span>
         </button>
 
         {/* Button 2: ARKADAŞLAR */}
         <button
           onClick={() => setShowFriendsModal(true)}
-          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer relative"
+          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 shadow-[0_3px_0_#D9D4C3,0_4px_8px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer relative"
         >
-          <Users size={24} className="stroke-[2.5]" />
-          <span className="text-[11px] font-black uppercase tracking-widest">ARKADAŞLAR</span>
+          <Users size={18} className="stroke-[2.5]" />
+          <span className="text-[9px] font-black uppercase tracking-wider">ARKADAŞ</span>
           {friendsList.some(f => lobbyPlayers.some(lp => lp.id === f.id)) && (
-            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse border-2 border-[#FAF6E9]" />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse border border-[#FAF6E9]" />
           )}
         </button>
 
         {/* Button 3: AYARLAR */}
         <button
           onClick={onOpenSettings}
-          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer"
+          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 shadow-[0_3px_0_#D9D4C3,0_4px_8px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer"
         >
-          <Sliders size={24} className="stroke-[2.5]" />
-          <span className="text-[11px] font-black uppercase tracking-widest">AYARLAR</span>
+          <Sliders size={18} className="stroke-[2.5]" />
+          <span className="text-[9px] font-black uppercase tracking-wider">AYARLAR</span>
         </button>
 
         {/* Button 4: KURALLAR */}
         <button
           onClick={() => setShowRulesModal(true)}
-          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-2xl p-4 flex flex-col items-center justify-center gap-2 shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer"
+          className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.97] text-[#2E3748] rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 shadow-[0_3px_0_#D9D4C3,0_4px_8px_rgba(0,0,0,0.15)] border border-[#EBE6D5] transition duration-150 cursor-pointer"
         >
-          <HelpCircle size={24} className="stroke-[2.5]" />
-          <span className="text-[11px] font-black uppercase tracking-widest">KURALLAR</span>
+          <HelpCircle size={18} className="stroke-[2.5]" />
+          <span className="text-[9px] font-black uppercase tracking-wider">KURALLAR</span>
         </button>
       </div>
 

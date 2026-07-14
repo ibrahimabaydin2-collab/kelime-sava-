@@ -91,22 +91,37 @@ function validateTurkishLinguistics(word: string, length: number): { valid: bool
     .replace(/ş/g, 's')
     .replace(/ü/g, 'u');
 
-  // 1. Check for valid characters: Turkish letters only (standard lower alphabet is a-z except q, w, x)
-  const validCharsRegex = /^[a-z]+$/;
+  // 1. Check for valid characters: Turkish letters only (No q, w, x allowed in Turkish)
+  const validCharsRegex = /^[abcdefghijklmnoprstuvyz]+$/;
   if (!validCharsRegex.test(normalized)) {
-    return { valid: false, reason: 'Kelime Türkçe alfabesinde bulunmayan geçersiz karakterler barındırıyor.' };
+    return { valid: false, reason: 'Kelime Türkçe alfabesinde bulunmayan geçersiz karakterler barındırıyor (q, w, x vb.).' };
   }
 
   // 1.1 Keyboard smash detector (reject common sequences of keys adjacent on keyboards)
   const keyboardSmashes = [
+    // 4+ character sequences
     'asdf', 'sdfg', 'dfgh', 'fghj', 'ghjk', 'hjkl',
     'qwer', 'wert', 'erty', 'rtyu', 'tyui', 'yuio', 'uiop',
     'zxcv', 'xcvb', 'cvbn', 'vbnm',
-    'asda', 'sada', 'dasa', 'fasa', 'ghjg', 'jklj', 'qweq', 'rewr'
+    'asda', 'sada', 'dasa', 'fasa', 'ghjg', 'jklj', 'qweq', 'rewr',
+    'fsaf', 'dsaf', 'asdfa', 'sadas', 'fdsaf', 'dsafd', 'fdsfd', 'dfgdf',
+    'ghjgh', 'hjklh', 'qwewe', 'werty', 'xcvxc', 'cvbnc', 'vbnmv',
+    // Common 3-character keyboard smashes (excluding tasdik with 'asd' and dert/sert/mert/ertesi with 'ert')
+    'rty', 'tyu', 'yui', 'uio', 'iop', 'dfg', 'fgh', 'ghj', 'hjk', 'jkl',
+    'qwe', 'xcv', 'cvb', 'vbn', 'bnm', 'asf', 'dsf', 'sdf', 'fgj', 'ghk', 'mnb'
   ];
   for (const smash of keyboardSmashes) {
     if (normalized.includes(smash)) {
       return { valid: false, reason: 'Anlamsız klavye tuşlaması veya ardışık harf grubu tespit edildi.' };
+    }
+  }
+
+  // 1.2 No consecutive duplicate consonants that never exist in Turkish
+  const rawLower = turkishLower(word);
+  const illegalDoubles = ['ğğ', 'jj', 'hh', 'vv', 'çç', 'şş'];
+  for (const illegal of illegalDoubles) {
+    if (rawLower.includes(illegal)) {
+      return { valid: false, reason: 'Türkçe fonetiğine aykırı ardışık çift sessiz harf kullanımı tespit edildi.' };
     }
   }
 
@@ -124,16 +139,49 @@ function validateTurkishLinguistics(word: string, length: number): { valid: bool
     }
   }
 
-  // 4. Consecutive consonants: maximum 4 consecutive consonants (e.g. "ekspres" has 4: "kspr").
-  const consecutiveConsonantsRegex = /[^aeiou]{5,}/;
-  if (consecutiveConsonantsRegex.test(normalized)) {
-    return { valid: false, reason: 'Türkçe hece yapısına aykırı ardışık sessiz harf grubu barındırıyor.' };
+  // 3.1 Repeating 2-letter pairs: (e.g., "asasas", "dfdfdf", "fgfgfg")
+  const repeatedPairsRegex = /(..)\1\1/;
+  if (repeatedPairsRegex.test(normalized)) {
+    return { valid: false, reason: 'Aynı harf çiftinin tekrarlanmasıyla oluşan anlamsız dizilim tespit edildi.' };
   }
 
-  // 5. Letter diversity: If length >= 3 and unique letters is 1 (e.g. "rrrrr" or "aaaaa"), it's definitely invalid
+  // 4. Consecutive consonants check (maximum 4 consecutive consonants in very rare whitelisted words like "ekspres", "elektrik")
+  const has4Consonants = /[^aeiou]{4,}/.test(normalized);
+  const consonantWhitelist4 = ['ekspres', 'elektrik'];
+  if (has4Consonants && !consonantWhitelist4.includes(normalized)) {
+    return { valid: false, reason: 'Türkçe hece ve telaffuz yapısına aykırı ardışık sessiz harf dizilimi.' };
+  }
+  // 5+ consecutive consonants is unconditionally invalid
+  if (/[^aeiou]{5,}/.test(normalized)) {
+    return { valid: false, reason: 'Türkçe hece yapısına tamamen aykırı aşırı sessiz harf yığılması.' };
+  }
+
+  // 4.1 Word starting with 3 consecutive consonants is invalid unless whitelisted (e.g. "stres", "strateji")
+  if (/^[^aeiou]{3,}/.test(normalized)) {
+    const starting3ConsonantsWhitelist = ['strateji', 'stres', 'strüktür', 'sprey', 'skleroz', 'sfenks'];
+    if (!starting3ConsonantsWhitelist.includes(normalized)) {
+      return { valid: false, reason: 'Türkçe kelime başlangıç kurallarına aykırı sessiz harf grubu.' };
+    }
+  }
+
+  // 4.2 No 3 consecutive vowels (no Turkish word has 3 consecutive vowels like "aia", "uoa", except very rare exclamations)
+  if (/[aeiou]{3,}/.test(normalized)) {
+    return { valid: false, reason: 'Türkçe fonetiğine aykırı ardışık sesli harf dizilimi.' };
+  }
+
+  // 5. Letter diversity ratio checks
   const uniqueChars = new Set(normalized.split(''));
-  if (uniqueChars.size === 1 && length >= 3) {
-    return { valid: false, reason: 'Tek bir harfin tekrarından oluşan bir kelime geçerli olamaz.' };
+  if (length === 4 && uniqueChars.size < 2) {
+    return { valid: false, reason: '4 harfli bir kelimede en az 2 farklı harf bulunmalıdır.' };
+  }
+  if (length === 5 && uniqueChars.size < 3) {
+    return { valid: false, reason: '5 harfli bir kelimede en az 3 farklı harf bulunmalıdır.' };
+  }
+  if (length === 6 && uniqueChars.size < 3) {
+    return { valid: false, reason: '6 harfli bir kelimede en az 3 farklı harf bulunmalıdır.' };
+  }
+  if (length >= 7 && uniqueChars.size < 4) {
+    return { valid: false, reason: '7 veya daha fazla harfli bir kelimede en az 4 farklı harf bulunmalıdır.' };
   }
 
   // 6. Minimum vowel count: For words of length >= 7, there must be at least 2 vowels (e.g. "ekspres" has 2, "sürpriz" has 2).
@@ -282,9 +330,13 @@ app.post('/api/validate-word', async (req, res) => {
     try {
       console.log(`[Validation Fallback] TDK API is unavailable. Using Gemini to validate word: "${normalized}"`);
       const prompt = `Lütfen "${normalized}" kelimesinin geçerli bir Türkçe kelime olup olmadığını (isim, fiil, sıfat vb.) kontrol et. 
-Klavye tuşlamaları (asd, asdf, jkl, qwe, asda, dfg vb.), rastgele yan yana gelen uyumsuz harfler veya uydurma kelimeler kesinlikle GEÇERSİZ (valid: false) olmalıdır. 
-Eğer kelime gerçek, anlamlı bir Türkçe kelime ise "valid" değerini true yap ve kısa bir Türkçe tanım ("definition") ekle.
-Kelime uydurmaysa veya klavye mıncıklaması ise "valid" değerini false yap.
+Klavye tuşlamaları (asd, asdf, jkl, qwe, asda, dfg, fgh, ghj, hjkl vb.), rastgele yan yana gelen uyumsuz harfler, yabancı/İngilizce kelimeler veya anlamsız uydurma sözcükler kesinlikle GEÇERSİZ (valid: false) olmalıdır. 
+
+Kurallar:
+1. Sadece TDK (Türk Dil Kurumu) sözlüğünde yer alan veya dilbilgisi kurallarına uygun biçimde türetilmiş, yaygın bilinen gerçek Türkçe kelimeleri onaylayabilirsin (valid: true).
+2. İngilizce kelimeleri, klavye mıncıklamalarını veya uydurma kelimeleri KESİNLİKLE GEÇERSİZ (valid: false) saymalısın.
+3. Kelime geçerliyse "definition" alanına kısa ve öz bir Türkçe anlam yaz. Kelime geçersizse "definition" alanına neden geçersiz olduğunu Türkçe olarak açıkla.
+4. En ufak bir şüphe durumunda kelimeyi GEÇERSİZ (valid: false) yap.
 
 Yanıtını SADECE aşağıdaki JSON yapısında döndür:
 {
@@ -297,7 +349,7 @@ Yanıtını SADECE aşağıdaki JSON yapısında döndür:
         contents: prompt,
         config: {
           responseMimeType: "application/json",
-          systemInstruction: "Sen Türkçe kelime doğrulama sistemisin. Görevin, verilen kelimenin uydurma veya klavye tuşlaması (gibberish/nonsense) olmayıp, gerçek bir Türkçe sözlük kelimesi olduğunu onaylamaktır. Sadece gerçek ve anlamlı kelimeleri onaylarsın. Sonuçları her zaman JSON olarak dönersin."
+          systemInstruction: "Sen son derece titiz, katı ve hata kabul etmeyen bir Türkçe Dil uzmanı ve TDK Sözlük denetçisisin. Görevin, verilen kelimenin klavye tuşlaması (gibberish/nonsense), uydurma veya yabancı bir kelime olmayıp, gerçek ve geçerli bir Türkçe sözlük kelimesi olduğunu %100 doğrulukla teyit etmektir. Şüpheli, uydurma veya anlamsız kelimeleri KESİNLİKLE onaylamazsın."
         }
       });
 

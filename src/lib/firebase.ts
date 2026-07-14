@@ -24,7 +24,8 @@ import {
   serverTimestamp,
   getDocFromCache,
   persistentLocalCache,
-  persistentMultipleTabManager
+  persistentMultipleTabManager,
+  memoryLocalCache
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { UserProfile } from '../types.js';
@@ -36,12 +37,24 @@ export const auth = getAuth(app);
 // Use the custom firestore database ID from firebase-applet-config.json if specified
 const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
 
-// Initialize Firestore with long polling and persistent offline cache
+// Check if localStorage is supported and accessible (can throw in sandboxed iframes)
+let usePersistentCache = false;
+try {
+  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+    window.localStorage.setItem('__fs_test_key', 'test');
+    window.localStorage.removeItem('__fs_test_key');
+    usePersistentCache = true;
+  }
+} catch (e) {
+  usePersistentCache = false;
+}
+
+// Initialize Firestore with long polling and persistent offline cache only if supported
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
+  localCache: usePersistentCache 
+    ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    : memoryLocalCache()
 }, dbId);
 
 /**
