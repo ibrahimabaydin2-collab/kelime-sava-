@@ -858,7 +858,7 @@ export default function SettingsModal({
         </div>
 
         {/* Sticky Footer (Kaydet ve Kapat) */}
-        <div className="flex-none px-6 py-4.5 border-t border-[#2E3754] bg-[#171E35] flex items-center justify-end gap-3 rounded-b-[2.2rem]">
+        <div className="flex-none px-6 py-4.5 border-t border-white/5 bg-black/15 flex items-center justify-end gap-3 rounded-b-[2.2rem]">
           <button
             onClick={() => {
               if (handleSaveProfile()) {

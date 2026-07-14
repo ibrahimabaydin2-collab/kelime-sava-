@@ -1086,7 +1086,7 @@ export default function App() {
 
   // Countdown timer logic
   useEffect(() => {
-    if (gameStatus !== 'playing' || isValidating || !hasEnteredGame || (gameMode === 'untimed' && !activeMatch)) {
+    if (gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch)) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
@@ -1106,7 +1106,7 @@ export default function App() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch]); // Resets interval on attempt submission or validation change or exit or gameMode change
+  }, [gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch, isDailyPuzzle]); // Resets interval on attempt submission or validation change or exit or gameMode change
 
   // Fetch direct definition for the target word when the game ends (won or lost)
   const fetchTargetWordDefinition = async (wordToFetch: string) => {
@@ -1180,6 +1180,11 @@ export default function App() {
     // Fetch definition for targetWord so the user can learn its meaning even on loss!
     if (targetWord) {
       fetchTargetWordDefinition(targetWord);
+    }
+
+    if (isDailyPuzzle) {
+      const { dateStr } = getDailyWordAndLength();
+      safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
     }
 
     // Increment gamesPlayed and reset streak
@@ -1332,13 +1337,17 @@ export default function App() {
       const hasWon = feedback.every((f) => f === 'green');
       let scoreAwarded = 0;
       if (hasWon) {
-        const attemptsCount = updatedAttempts.length;
-        scoreAwarded = calculateDynamicScore(wordLength, secondsLeft, attemptsCount, isDailyPuzzle);
-        
-        // Verification function to ensure scoring accuracy and reject invalid edge cases
-        if (!verifyScoringAccuracy(scoreAwarded)) {
-          console.warn(`Scoring verification failed for calculated score: ${scoreAwarded}. Falling back to 50.`);
-          scoreAwarded = 50;
+        if (isDailyPuzzle) {
+          scoreAwarded = 5;
+        } else {
+          const attemptsCount = updatedAttempts.length;
+          scoreAwarded = calculateDynamicScore(wordLength, secondsLeft, attemptsCount, isDailyPuzzle);
+          
+          // Verification function to ensure scoring accuracy and reject invalid edge cases
+          if (!verifyScoringAccuracy(scoreAwarded)) {
+            console.warn(`Scoring verification failed for calculated score: ${scoreAwarded}. Falling back to 50.`);
+            scoreAwarded = 50;
+          }
         }
       }
 
@@ -1966,7 +1975,7 @@ export default function App() {
         {/* Game Layout Wrapper */}
         <div className="w-full flex flex-col items-center justify-center gap-3 sm:gap-4 relative z-10">
           {/* Game Area Card */}
-          <div className="w-full max-w-md bg-[#2E3748] border border-[#3E485A] rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-between p-4 sm:p-6 min-h-[82vh] max-h-[82vh] h-[82vh] md:min-h-0 md:max-h-none md:h-auto gap-y-2 transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
+          <div className="w-full max-w-md bg-transparent md:bg-black/10 border-0 md:border md:border-[#3E485A]/25 rounded-[2.5rem] flex flex-col items-center justify-between p-4 sm:p-6 min-h-[82vh] max-h-[82vh] h-[82vh] md:min-h-0 md:max-h-none md:h-auto gap-y-2 transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -1983,7 +1992,7 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {(gameMode === 'timed' || activeMatch) ? (
+                  {(gameMode === 'timed' || activeMatch) && !isDailyPuzzle ? (
                     <>
                       <Hourglass size={16} className={`animate-spin ${secondsLeft <= 5 ? 'text-rose-500' : 'text-emerald-500'}`} />
                       <div className={`text-sm font-bold font-mono px-2 py-0.5 rounded-lg border ${

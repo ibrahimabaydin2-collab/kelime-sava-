@@ -53,7 +53,7 @@ export default function MissionsModal({
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" id="missions-modal-backdrop">
       <div 
-        className="bg-[#2E3748] border border-[#3E485A] rounded-[2.2rem] w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] transition-colors duration-200 text-white relative"
+        className="card-theme border border-[#3E485A]/30 rounded-[2.2rem] w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] transition-colors duration-200 relative"
         id="missions-modal-card"
       >
         {/* Glowing star */}

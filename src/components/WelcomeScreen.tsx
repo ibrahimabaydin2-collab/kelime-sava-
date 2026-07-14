@@ -168,59 +168,54 @@ export default function WelcomeScreen({
 
   // Determine dynamic inclusive player title based on dailyScore
   const getWarriorTitle = (score: number) => {
-    if (score < 25) return '1. Seviye: Kelime Kaşifi 🔍';
-    if (score < 75) return '2. Seviye: Hece Gezgini 🗺️';
-    if (score < 150) return '3. Seviye: Sözcük Mimarı 🧱';
-    if (score < 250) return '4. Seviye: Dil Sanatçısı 🎨';
-    return '5. Seviye: Efsanevi Kelime Bilgesi 👑';
+    const level = Math.floor(0.5 + Math.sqrt(0.25 + 0.08 * score));
+    let title = 'Kelime Kaşifi 🔍';
+    if (level === 1) title = 'Kelime Kaşifi 🔍';
+    else if (level === 2) title = 'Hece Gezgini 🗺️';
+    else if (level === 3) title = 'Sözcük Mimarı 🧱';
+    else if (level === 4) title = 'Dil Sanatçısı 🎨';
+    else if (level < 10) title = 'Usta Sözlükçü 📚';
+    else if (level < 20) title = 'Kelime Savaşçısı ⚔️';
+    else if (level < 50) title = 'Cümle Muhafızı 🛡️';
+    else if (level < 100) title = 'Edebiyat Şövalyesi 🎖️';
+    else if (level < 250) title = 'Leksikograf Şefi 🎓';
+    else if (level < 500) title = 'Dil Bilimci Profesör 🧠';
+    else title = 'Efsanevi Kelime Bilgesi 👑';
+
+    return `${level}. Seviye: ${title}`;
   };
 
   // Calculate detailed progress towards the next level
   const getLevelProgress = (score: number) => {
-    let currentLevelScore = 0;
-    let nextLevelScore = 25;
-    let level = 1;
-    let title = 'Kelime Kaşifi 🔍';
-
-    if (score < 25) {
-      currentLevelScore = 0;
-      nextLevelScore = 25;
-      level = 1;
-      title = 'Kelime Kaşifi 🔍';
-    } else if (score < 75) {
-      currentLevelScore = 25;
-      nextLevelScore = 75;
-      level = 2;
-      title = 'Hece Gezgini 🗺️';
-    } else if (score < 150) {
-      currentLevelScore = 75;
-      nextLevelScore = 150;
-      level = 3;
-      title = 'Sözcük Mimarı 🧱';
-    } else if (score < 250) {
-      currentLevelScore = 150;
-      nextLevelScore = 250;
-      level = 4;
-      title = 'Dil Sanatçısı 🎨';
-    } else {
-      currentLevelScore = 250;
-      nextLevelScore = 250;
-      level = 5;
-      title = 'Efsanevi Kelime Bilgesi 👑';
-    }
-
+    const level = Math.floor(0.5 + Math.sqrt(0.25 + 0.08 * score));
+    const currentLevelScore = 12.5 * (level * level - level);
+    const nextLevelScore = 12.5 * ((level + 1) * (level + 1) - (level + 1));
     const range = nextLevelScore - currentLevelScore;
     const progressInLevel = score - currentLevelScore;
     const percent = range > 0 ? Math.min(100, Math.max(0, (progressInLevel / range) * 100)) : 100;
 
+    // Derive title
+    let title = 'Kelime Kaşifi 🔍';
+    if (level === 1) title = 'Kelime Kaşifi 🔍';
+    else if (level === 2) title = 'Hece Gezgini 🗺️';
+    else if (level === 3) title = 'Sözcük Mimarı 🧱';
+    else if (level === 4) title = 'Dil Sanatçısı 🎨';
+    else if (level < 10) title = 'Usta Sözlükçü 📚';
+    else if (level < 20) title = 'Kelime Savaşçısı ⚔️';
+    else if (level < 50) title = 'Cümle Muhafızı 🛡️';
+    else if (level < 100) title = 'Edebiyat Şövalyesi 🎖️';
+    else if (level < 250) title = 'Leksikograf Şefi 🎓';
+    else if (level < 500) title = 'Dil Bilimci Profesör 🧠';
+    else title = 'Efsanevi Kelime Bilgesi 👑';
+
     return {
       level,
       title,
-      currentLevelScore,
-      nextLevelScore,
+      currentLevelScore: Math.round(currentLevelScore),
+      nextLevelScore: Math.round(nextLevelScore),
       percent,
-      progressInLevel,
-      range
+      progressInLevel: Math.round(progressInLevel),
+      range: Math.round(range)
     };
   };
 

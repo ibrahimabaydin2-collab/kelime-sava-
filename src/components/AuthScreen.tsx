@@ -326,7 +326,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
 
   if (pendingCredential) {
     return (
-      <div className="w-full max-w-md mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-5 animate-scale-up" id="auth-linking-card">
+      <div className="w-full max-w-md mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-6 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col gap-5 animate-scale-up" id="auth-linking-card">
         {/* Glows */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -443,7 +443,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
   }
 
   return (
-    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#2E3748] rounded-[2.5rem] border border-[#3E485A] p-6 sm:p-8 shadow-2xl relative overflow-hidden text-white flex flex-col gap-6 animate-scale-up" id="auth-screen-card">
+    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-6 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6 animate-scale-up" id="auth-screen-card">
       {/* Ambient glow inside the card */}
       <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />

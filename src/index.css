@@ -93,17 +93,17 @@
 }
 
 html.dark {
-  /* Dark Mode (Gece) Color Palette */
+  /* Dark Mode (Gece) Color Palette - Single solid pieces of uniform background */
   --bg-app-default: #1F2633;
-  --bg-app-sapphire: #1a2233;
-  --bg-app-forest: #162923;
-  --bg-app-amethyst: #221c2e;
-  --bg-app-nord: #212733;
+  --bg-app-sapphire: #1F2633;
+  --bg-app-forest: #1F2633;
+  --bg-app-amethyst: #1F2633;
+  --bg-app-nord: #1F2633;
 
-  --bg-card: #2E3748;
-  --bg-card-secondary: #1E2532;
-  --bg-card-item: #3D4756;
-  --border-card: #3E485A;
+  --bg-card: #1F2633;
+  --bg-card-secondary: #1F2633;
+  --bg-card-item: #242D3D;
+  --border-card: rgba(250, 246, 233, 0.06);
   
   --text-primary: #FAF6E9;
   --text-secondary: #FAF6E9;
