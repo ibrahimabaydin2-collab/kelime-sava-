@@ -1,12 +1,18 @@
 /**
- * Dynamically calculates the score based on word difficulty (length),
- * response speed (seconds left), and attempts used.
+ * Dynamically calculates the score based on the attempt count.
  * 
- * @param wordLength The length of the secret word (difficulty indicator)
- * @param secondsLeft The remaining time in seconds (speed indicator)
- * @param attemptCount The number of attempts used (accuracy indicator, 1 to 6)
- * @param isDaily Whether the game is in Daily Puzzle mode
- * @returns The calculated score (with a minimum guaranteed limit of 50 points)
+ * - Kelimeyi 1. denemede bilirse: 5 Puan
+ * - Kelimeyi 2. denemede bilirse: 4 Puan
+ * - Kelimeyi 3. denemede bilirse: 3 Puan
+ * - Kelimeyi 4. denemede bilirse: 2 Puan
+ * - Kelimeyi 5. veya 6. denemede bilirse: 1 Puan
+ * - Bir kelimeden alınabilecek maksimum puan 5 olmalıdır.
+ * 
+ * @param wordLength The length of the secret word (unused in new system)
+ * @param secondsLeft The remaining time in seconds (unused in new system)
+ * @param attemptCount The number of attempts used (1 to 6)
+ * @param isDaily Whether the game is in Daily Puzzle mode (always returns 5 points)
+ * @returns The calculated score (1 to 5 points)
  */
 export function calculateDynamicScore(
   wordLength: number,
@@ -14,28 +20,25 @@ export function calculateDynamicScore(
   attemptCount: number,
   isDaily: boolean = false
 ): number {
-  // 1. Difficulty: base score scaled by word length (e.g. 5 letters = 100, 6 letters = 120, etc.)
-  const baseDifficultyScore = wordLength * 20;
-
-  // 2. Speed Bonus: remaining time scaled (5 points per remaining second)
-  const speedBonus = Math.max(0, secondsLeft * 5);
-
-  // 3. Accuracy Modifier: deduct 15 points for each wrong attempt after the 1st
-  const accuracyDeduction = (attemptCount - 1) * 15;
-
-  // 4. Daily Puzzle Bonus: additional weight for the puzzle of the day
-  const dailyBonus = isDaily ? 35 : 0;
-
-  // Combined score
-  let calculatedScore = baseDifficultyScore + speedBonus - accuracyDeduction + dailyBonus;
-
-  // 5. Floor Limit: En Düşük Limit of 50 points is guaranteed for any correct answer
-  const minGuaranteedLimit = 50;
-  if (calculatedScore < minGuaranteedLimit) {
-    calculatedScore = minGuaranteedLimit;
+  if (isDaily) {
+    return 5;
   }
 
-  return Math.round(calculatedScore);
+  switch (attemptCount) {
+    case 1:
+      return 5;
+    case 2:
+      return 4;
+    case 3:
+      return 3;
+    case 4:
+      return 2;
+    case 5:
+    case 6:
+      return 1;
+    default:
+      return 1;
+  }
 }
 
 /**
@@ -44,6 +47,57 @@ export function calculateDynamicScore(
  */
 export function verifyScoringAccuracy(score: number): boolean {
   if (isNaN(score) || !isFinite(score)) return false;
-  // Score should be at least 50 (floor limit) and realistically not exceed 1000
-  return score >= 50 && score <= 1000;
+  // Score must be between 1 and 5 in the new system
+  return score >= 1 && score <= 5;
 }
+
+/**
+ * Calculates the cumulative XP (score) required to reach a specific level.
+ * Handles level up to 500 with a progressive, quadratic/exponential scale.
+ * 
+ * Levels 1 to 5 require exactly:
+ * - Level 1: 0 P
+ * - Level 2: 25 P
+ * - Level 3: 75 P
+ * - Level 4: 150 P
+ * - Level 5: 300 P
+ * 
+ * After Level 5, the XP requirement increases algorithmically up to Level 500.
+ */
+export function getXPForLevel(level: number): number {
+  if (level <= 1) return 0;
+  if (level === 2) return 25;
+  if (level === 3) return 75;
+  if (level === 4) return 150;
+  if (level === 5) return 300;
+
+  let totalXP = 300;
+  for (let l = 5; l < level; l++) {
+    // Progressive linear growth of the interval: 150, 200, 250, 300...
+    const increment = 50 * l;
+    totalXP += increment;
+  }
+  return totalXP;
+}
+
+/**
+ * Calculates the current level based on total accumulated score (XP).
+ * Limit capped at 500.
+ */
+export function getLevelForScore(score: number): number {
+  if (score < 25) return 1;
+  if (score < 75) return 2;
+  if (score < 150) return 3;
+  if (score < 300) return 4;
+
+  let level = 5;
+  while (level < 500) {
+    if (score < getXPForLevel(level + 1)) {
+      break;
+    }
+    level++;
+  }
+  return level;
+}
+
+

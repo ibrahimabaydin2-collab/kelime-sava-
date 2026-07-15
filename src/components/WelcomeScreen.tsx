@@ -10,6 +10,7 @@ import { UserProfile, LobbyPlayer, Challenge } from '../types.js';
 import { getBaseUrl } from '../utils/api.js';
 import { validateUsername } from '../utils/usernameValidation.js';
 import { getDailyWordAndLength } from '../data/wordlist.js';
+import { getXPForLevel, getLevelForScore } from '../utils/scoring.js';
 
 interface WelcomeScreenProps {
   profile: UserProfile;
@@ -168,7 +169,7 @@ export default function WelcomeScreen({
 
   // Determine dynamic inclusive player title based on dailyScore
   const getWarriorTitle = (score: number) => {
-    const level = Math.floor(0.5 + Math.sqrt(0.25 + 0.08 * score));
+    const level = getLevelForScore(score);
     let title = 'Kelime Kaşifi 🔍';
     if (level === 1) title = 'Kelime Kaşifi 🔍';
     else if (level === 2) title = 'Hece Gezgini 🗺️';
@@ -187,9 +188,9 @@ export default function WelcomeScreen({
 
   // Calculate detailed progress towards the next level
   const getLevelProgress = (score: number) => {
-    const level = Math.floor(0.5 + Math.sqrt(0.25 + 0.08 * score));
-    const currentLevelScore = 12.5 * (level * level - level);
-    const nextLevelScore = 12.5 * ((level + 1) * (level + 1) - (level + 1));
+    const level = getLevelForScore(score);
+    const currentLevelScore = getXPForLevel(level);
+    const nextLevelScore = getXPForLevel(level + 1);
     const range = nextLevelScore - currentLevelScore;
     const progressInLevel = score - currentLevelScore;
     const percent = range > 0 ? Math.min(100, Math.max(0, (progressInLevel / range) * 100)) : 100;
@@ -248,7 +249,7 @@ export default function WelcomeScreen({
 
   if (showGameSetup) {
     return (
-      <div className="w-full max-w-2xl mx-auto card-theme rounded-[2.5rem] border-2 p-8 sm:p-10 md:p-12 shadow-2xl relative overflow-hidden flex flex-col justify-center items-stretch gap-y-6 sm:gap-y-8 animate-scale-up" id="welcome-setup-page">
+      <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-5 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between gap-y-4 sm:gap-y-5 min-h-[82vh] md:min-h-0 md:max-h-none md:h-auto transition-all duration-200 text-white animate-scale-up" id="welcome-setup-page">
         {/* Decorative ambient glowing background rings */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-52 h-52 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -372,7 +373,7 @@ export default function WelcomeScreen({
                         }`}
                       >
                         <Globe size={13} className="stroke-[2.5]" />
-                        <span>TDK Aktif</span>
+                        <span>Yapay Zeka (Gemini)</span>
                       </button>
                       <button
                         onClick={() => onChangeDictionaryMode('no_validation')}
@@ -720,7 +721,7 @@ export default function WelcomeScreen({
       </div>
     </div>
   ) : (
-    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-3xl border p-4 sm:p-6 shadow-xl relative overflow-hidden flex flex-col justify-start gap-y-3 sm:gap-y-4 min-h-0" id="welcome-screen-root">
+    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-5 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between gap-y-4 sm:gap-y-5 min-h-[82vh] md:min-h-0 md:max-h-none md:h-auto transition-all duration-200 text-white animate-scale-up" id="welcome-screen-root">
       
       {/* Glowing 4-point star accent in bottom right */}
       <div className="absolute bottom-6 right-8 text-amber-100/20 animate-pulse select-none pointer-events-none">
@@ -871,9 +872,9 @@ export default function WelcomeScreen({
                   <div className="flex justify-between text-[8px] font-bold text-gray-500 font-mono mt-0.5 leading-none">
                     <span>{progress.currentLevelScore} P</span>
                     <span className="text-amber-700 font-semibold">
-                      {progress.level < 5 ? `${progress.progressInLevel}/${progress.range} P` : 'Maks Seviye!'}
+                      {progress.level < 500 ? `${progress.progressInLevel}/${progress.range} P` : 'Maks Seviye!'}
                     </span>
-                    <span>{progress.level < 5 ? `${progress.nextLevelScore} P` : '∞'}</span>
+                    <span>{progress.level < 500 ? `${progress.nextLevelScore} P` : '∞'}</span>
                   </div>
                 </div>
               );
@@ -998,7 +999,7 @@ export default function WelcomeScreen({
                   Nasıl Oynanır & Kurallar
                 </h3>
                 <p className="text-[10px] text-amber-100/50 font-mono font-bold uppercase mt-0.5">
-                  TDK KELİME SAVAŞI REHBERİ & PUANLAMA SİSTEMİ
+                  YAPAY ZEKA DESTEKLİ KELİME SAVAŞI REHBERİ & PUANLAMA SİSTEMİ
                 </p>
               </div>
               <button
@@ -1039,27 +1040,39 @@ export default function WelcomeScreen({
               <div className="bg-[#3D4756]/40 p-3.5 rounded-xl border border-white/5 space-y-2">
                 <div className="flex items-center gap-2 font-bold text-amber-300">
                   <Award size={14} />
-                  <span>2. Puanlama Sistemi</span>
+                  <span>2. Yeni Puanlama Sistemi</span>
                 </div>
                 <p className="text-[11px] leading-normal text-gray-300">
-                  Kelimeyi doğru bildiğinizde kazandığınız skor dinamik olarak hesaplanır:
+                  Kelimeyi çözdüğünüz deneme sayısına göre alacağınız puanlar şu şekildedir:
                 </p>
                 <div className="space-y-1.5 text-[11px] bg-black/20 p-2.5 rounded-lg text-gray-300 font-mono">
                   <div className="flex justify-between">
-                    <span>🌟 Taban Ödül:</span>
-                    <span className="text-[#FAF6E9] font-bold">+100 Puan</span>
+                    <span>🥇 1. Denemede Bilmek:</span>
+                    <span className="text-emerald-400 font-bold">+5 Puan</span>
                   </div>
                   <div className="flex justify-between border-t border-white/5 pt-1">
-                    <span>⏱️ Süre Bonusu:</span>
-                    <span className="text-emerald-400 font-bold">Kalan her saniye x 5 Puan</span>
+                    <span>🥈 2. Denemede Bilmek:</span>
+                    <span className="text-teal-400 font-bold">+4 Puan</span>
                   </div>
                   <div className="flex justify-between border-t border-white/5 pt-1">
-                    <span>🚫 Tahmin Cezası:</span>
-                    <span className="text-rose-400 font-bold">Her yanlış tahmin için -10 Puan</span>
+                    <span>🥉 3. Denemede Bilmek:</span>
+                    <span className="text-amber-400 font-bold">+3 Puan</span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/5 pt-1">
+                    <span>🧱 4. Denemede Bilmek:</span>
+                    <span className="text-orange-400 font-bold">+2 Puan</span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/5 pt-1">
+                    <span>👾 5 veya 6. Denemede Bilmek:</span>
+                    <span className="text-rose-400 font-bold">+1 Puan</span>
                   </div>
                   <div className="flex justify-between border-t border-white/5 pt-1 text-[10px] text-amber-300/80">
-                    <span>🛡️ En Düşük Limit:</span>
-                    <span>Doğru bildiğinizde en az 50 Puan garantidir!</span>
+                    <span>🛡️ Maksimum Limit:</span>
+                    <span>Bir kelimeden en fazla 5 Puan kazanılabilir!</span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/5 pt-1 text-[10px] text-yellow-400/90 font-bold">
+                    <span>☀️ Günlük Bulmaca Ödülü:</span>
+                    <span>Sabit 5 Savaş Puanı & Bilge Rozeti!</span>
                   </div>
                 </div>
               </div>
@@ -1075,15 +1088,15 @@ export default function WelcomeScreen({
                 </p>
               </div>
 
-              {/* Rule 4: TDK & Dil Kuralları Doğrulaması */}
+              {/* Rule 4: Yapay Zeka Kelime Doğrulaması */}
               <div className="bg-[#3D4756]/40 p-3.5 rounded-xl border border-white/5 space-y-1.5">
                 <div className="flex items-center gap-2 font-bold text-amber-300">
                   <ShieldAlert size={14} />
-                  <span>4. Akıllı Kelime Doğrulama</span>
+                  <span>4. Yapay Zeka Kelime Doğrulaması</span>
                 </div>
                 <p className="text-[11px] leading-normal text-gray-300">
-                  Rastgele harf tuşlanmasını önlemek için tüm kelimeler TDK (Türk Dil Kurumu) veri tabanı ile anlık doğrulanır. 
-                  İnternet kesildiğinde ise gelişmiş yapay zeka algoritmalı <strong className="text-white">Türkçe Hece ve Harf Uyumu Koruması</strong> devreye girerek geçerli Türkçe kelimeleri oynamaya devam etmenizi sağlar.
+                  Rastgele harf tuşlanmasını veya anlamsız girişleri önlemek için tüm kelimeler Google Gemini Yapay Zekası tarafından anlık doğrulanır. 
+                  İnternet kesildiğinde ise akıllı <strong className="text-white">Türkçe Hece ve Harf Uyumu Koruması</strong> devreye girerek geçerli Türkçe kelimeleri oynamaya devam etmenizi sağlar.
                 </p>
               </div>
 

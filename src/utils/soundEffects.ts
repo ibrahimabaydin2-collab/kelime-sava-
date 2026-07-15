@@ -251,28 +251,65 @@ export function playDefeatSound(enabled: boolean) {
 }
 
 /**
- * Play a high-pitched sharp beep warning sound for the countdown (son 5 saniye)
+ * Play a suspenseful, rhythmic and deep tick-tock/warning sound for the countdown (son 5 saniye)
  */
 export function playCountdownBeepSound(enabled: boolean, secondsLeft: number) {
   if (!enabled) return;
   const ctx = getAudioContext();
   if (!ctx) return;
 
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
+  const now = ctx.currentTime;
+  const isOdd = secondsLeft % 2 === 1;
 
-  osc.type = 'sine';
-  // Pitch rises as time is lower: 5 -> 800Hz, 4 -> 850Hz, 3 -> 900Hz, 2 -> 950Hz, 1 -> 1050Hz
-  const pitch = 800 + (6 - secondsLeft) * 50;
-  osc.frequency.setValueAtTime(pitch, ctx.currentTime);
+  if (isOdd) {
+    // "tik" - Woody, resonant mid-frequency click-thud for the clock tick
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(320, now);
+    osc1.frequency.exponentialRampToValueAtTime(70, now + 0.08);
 
-  // Short sharp beep
-  gain.gain.setValueAtTime(0.08, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+    gain1.gain.setValueAtTime(0.18, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
 
-  osc.connect(gain);
-  gain.connect(ctx.destination);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
 
-  osc.start();
-  osc.stop(ctx.currentTime + 0.15);
+    osc1.start();
+    osc1.stop(now + 0.12);
+
+    // Crisp high frequency transient layer for the "click"
+    const oscClick = ctx.createOscillator();
+    const gainClick = ctx.createGain();
+    
+    oscClick.type = 'sine';
+    oscClick.frequency.setValueAtTime(1600, now);
+    
+    gainClick.gain.setValueAtTime(0.03, now);
+    gainClick.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+    
+    oscClick.connect(gainClick);
+    gainClick.connect(ctx.destination);
+    
+    oscClick.start();
+    oscClick.stop(now + 0.02);
+  } else {
+    // "tak" - Deep, heavy bass thump for high-suspense heartbeat thud
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(140, now);
+    osc2.frequency.exponentialRampToValueAtTime(45, now + 0.15);
+
+    gain2.gain.setValueAtTime(0.28, now);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+
+    osc2.start();
+    osc2.stop(now + 0.22);
+  }
 }

@@ -73,27 +73,27 @@
                       color 300ms cubic-bezier(0.4, 0, 0.2, 1), 
                       box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Light Mode (Gündüz) Color Palette */
-  --bg-app-default: #F8FAFC;
-  --bg-app-sapphire: #F1F5F9;
-  --bg-app-forest: #F0FDF4;
-  --bg-app-amethyst: #FAF5FF;
-  --bg-app-nord: #EFF6FF;
+  /* Standard Theme Lock - Koyu Gri Tema */
+  --bg-app-default: #1F2633;
+  --bg-app-sapphire: #1F2633;
+  --bg-app-forest: #1F2633;
+  --bg-app-amethyst: #1F2633;
+  --bg-app-nord: #1F2633;
 
-  --bg-card: #FFFFFF;
-  --bg-card-secondary: #F1F5F9;
-  --bg-card-item: #E2E8F0;
-  --border-card: #E2E8F0;
+  --bg-card: #1F2633;
+  --bg-card-secondary: #1F2633;
+  --bg-card-item: #242D3D;
+  --border-card: rgba(250, 246, 233, 0.06);
   
-  --text-primary: #0F172A;
-  --text-secondary: #334155;
-  --text-muted: #64748B;
+  --text-primary: #FAF6E9;
+  --text-secondary: #FAF6E9;
+  --text-muted: #94A3B8;
   
-  --input-bg: #FFFFFF;
+  --input-bg: #242D4D;
 }
 
 html.dark {
-  /* Dark Mode (Gece) Color Palette - Single solid pieces of uniform background */
+  /* Dark Mode is identical to light mode now - ensuring total dark gray theme continuity */
   --bg-app-default: #1F2633;
   --bg-app-sapphire: #1F2633;
   --bg-app-forest: #1F2633;

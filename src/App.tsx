@@ -19,6 +19,7 @@ import WelcomeScreen from './components/WelcomeScreen.js';
 import GroupRace from './components/GroupRace.js';
 import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import AuthScreen from './components/AuthScreen.js';
+import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
 import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore } from './lib/firebase.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play } from 'lucide-react';
@@ -26,6 +27,7 @@ import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './dat
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/turkish.js';
 import { getApiUrl, getWsUrl } from './utils/api.js';
 import { calculateDynamicScore, verifyScoringAccuracy } from './utils/scoring.js';
+import { getCachedWord, setCachedWord } from './utils/wordCache.js';
 
 const INITIAL_STATS = {
   gamesPlayed: 0,
@@ -501,6 +503,7 @@ export default function App() {
   const [showLobbyModal, setShowLobbyModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showDefinitionModal, setShowDefinitionModal] = useState<boolean>(false);
+  const [unlockedBadgeToShow, setUnlockedBadgeToShow] = useState<Badge | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -1082,22 +1085,8 @@ export default function App() {
       length = dailyInfo.length;
       setWordLength(length);
     } else {
-      try {
-        const response = await fetch(getApiUrl('/api/random-word'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ length })
-        });
-        const data = await response.json();
-        if (data.word) {
-          picked = turkishUpper(data.word);
-        } else {
-          picked = getRandomWord(length);
-        }
-      } catch (e) {
-        console.warn('Could not retrieve random word from server, falling back to local wordlist:', e);
-        picked = getRandomWord(length);
-      }
+      // Choose target word instantly from the local curated wordlist to eliminate any network/roundtrip delay
+      picked = getRandomWord(length);
     }
 
     setTargetWord(picked);
@@ -1167,7 +1156,7 @@ export default function App() {
           return;
         }
       }
-      setWordDefinition('Bu kelimenin TDK tanımı otomatik olarak yüklenemedi.');
+      setWordDefinition('Bu kelimenin tanımı otomatik olarak yüklenemedi.');
     } catch (e) {
       console.error('Failed to fetch target word definition:', e);
       setWordDefinition('Tanım yüklenirken bağlantı hatası oluştu.');
@@ -1182,7 +1171,7 @@ export default function App() {
         <div className="w-full max-w-sm mx-auto p-4 bg-black/10 rounded-2xl border border-[#3E485A] flex items-center justify-center gap-2 animate-pulse py-4 text-center my-2">
           <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
           <span className="text-[10px] text-gray-400 font-medium tracking-wide font-sans">
-            Kelimenin TDK anlamı yükleniyor...
+            Yapay zeka anlamı yükleniyor...
           </span>
         </div>
       );
@@ -1195,15 +1184,15 @@ export default function App() {
       <div className={`w-full max-w-sm mx-auto p-4 bg-black/25 rounded-2xl border ${borderColorClass} text-left space-y-1.5 transition-all duration-300 shadow-md my-2`}>
         <div className="flex items-center justify-between">
           <span className={`text-[10px] font-black uppercase tracking-wider ${titleColorClass} font-mono flex items-center gap-1`}>
-            📖 TDK SÖZLÜK ANLAMI
+            📖 YAPAY ZEKA SÖZLÜK ANLAMI
           </span>
           <a
-            href={`https://sozluk.gov.tr/?ara=${encodeURIComponent(turkishLower(targetWord))}`}
+            href={`https://www.google.com/search?q=${encodeURIComponent(turkishLower(targetWord) + ' ne demek')}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[10px] font-bold text-amber-400 hover:underline flex items-center gap-0.5"
           >
-            TDK Resmi Sitesi ↗
+            Google'da Ara ↗
           </a>
         </div>
         <p className="text-[11px] text-gray-300 italic font-serif leading-relaxed">
@@ -1297,57 +1286,87 @@ export default function App() {
     try {
       let isValid = false;
       let definition = '';
+      let isConnectionError = false;
 
       if (dictionaryMode === 'no_validation') {
         isValid = true;
         definition = 'Doğrulama dışı serbest oyun modu.';
       } else {
-        // TDK Online validation with AbortController timeout to prevent UI hang in timed game
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 seconds timeout
-
-          const response = await fetch(getApiUrl('/api/validate-word'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ word: guess, length: wordLength }),
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-
-          if (response.ok) {
-            const data = await response.json();
-            isValid = data.valid;
-            definition = data.definition || '';
-          } else {
-            throw new Error('Server returned non-ok status');
-          }
-        } catch (fetchErr) {
-          console.warn('TDK API validation failed or timed out, falling back to local linguistic filters:', fetchErr);
-          
-          // First, check curated list
+        // 1. Check local persistent cache
+        const cached = getCachedWord(guess, wordLength);
+        if (cached) {
+          isValid = cached.valid;
+          definition = cached.definition;
+        } else {
+          // 2. FAST LOCAL CHECK: If it is in the curated list, it is definitely valid!
           const inCurated = isWordInCuratedList(guess, wordLength);
           if (inCurated) {
             isValid = true;
-            definition = 'Kelime çevrimdışı sözlük listesinde onaylandı.';
-            showToast('Bağlantı kesik: Kelime çevrimdışı sözlükle doğrulandı.', 'info');
+            definition = 'Türkçe sözlükte geçerli kelime.';
+            
+            // Asynchronously fetch the actual detailed Gemini definition in the background to avoid any blocking/lag!
+            fetch(getApiUrl('/api/validate-word'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ word: guess, length: wordLength })
+            })
+              .then(res => res.ok ? res.json() : null)
+              .then(data => {
+                if (data && data.valid) {
+                  setCachedWord(guess, wordLength, { valid: true, definition: data.definition || definition });
+                }
+              })
+              .catch(err => console.warn('Background definition fetch failed:', err));
+
           } else {
-            // Second, check heuristic linguistic validation to accept valid words even if offline!
+            // 3. Not in curated list. Let's do heuristic linguistic check first
             const linguisticCheck = validateTurkishLinguistics(guess, wordLength);
-            if (linguisticCheck.valid) {
-              isValid = true;
-              definition = 'TDK bağlantısı kurulamadı, ancak Türkçe hece ve harf yapısına göre onaylandı.';
-              showToast('Bağlantı kesik: Türkçe dil kurallarına göre kelime onaylandı.', 'info');
-            } else {
+            if (!linguisticCheck.valid) {
               isValid = false;
-              definition = linguisticCheck.reason || 'Türkçe hece ve harf yapısına uymayan kelime!';
+              definition = linguisticCheck.reason;
+              setCachedWord(guess, wordLength, { valid: false, definition: linguisticCheck.reason });
+            } else {
+              // 4. Query Gemini API backend since it is a potential new word
+              try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 seconds timeout
+
+                const response = await fetch(getApiUrl('/api/validate-word'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ word: guess, length: wordLength }),
+                  signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                  const data = await response.json();
+                  isValid = data.valid;
+                  definition = data.definition || '';
+                  setCachedWord(guess, wordLength, { valid: data.valid, definition: data.definition || '' });
+                } else {
+                  throw new Error('Server returned non-ok status');
+                }
+              } catch (fetchErr) {
+                console.warn('Yapay Zeka validation failed or timed out:', fetchErr);
+                isConnectionError = true;
+                
+                // Second offline backup
+                isValid = true;
+                definition = 'Kelime anlamı şu anda yüklenemedi ancak kelime geçerlidir.';
+                showToast('Bağlantı hatası oluştu. Çevrimdışı kurallarla onaylandı.', 'info');
+              }
             }
           }
         }
       }
 
       if (!isValid) {
-        showToast(definition || 'Bu kelime sözlükte bulunamadı!', 'error');
+        if (isConnectionError) {
+          showToast('Bağlantı hatası oluştu.', 'error');
+        } else {
+          showToast('Kelime sözlükte bulunamadı.', 'error');
+        }
         playErrorSound(settings.soundEnabled);
         setIsValidating(false);
         return;
@@ -1501,13 +1520,18 @@ export default function App() {
   // Profile Badges unlocking
   const unlockBadge = (id: string) => {
     setProfile((prev) => {
+      let newlyUnlocked: Badge | null = null;
       const badges = prev.badges.map((b) => {
         if (b.id === id && !b.unlockedAt) {
           showToast(`🏆 YENİ ROZET KAZANILDI: ${b.title}!`, 'success');
-          return { ...b, unlockedAt: new Date().toISOString() };
+          newlyUnlocked = { ...b, unlockedAt: new Date().toISOString() };
+          return newlyUnlocked;
         }
         return b;
       });
+      if (newlyUnlocked) {
+        setUnlockedBadgeToShow(newlyUnlocked);
+      }
       return { ...prev, badges };
     });
   };
@@ -2019,7 +2043,7 @@ export default function App() {
         {/* Game Layout Wrapper */}
         <div className="w-full flex flex-col items-center justify-center gap-3 sm:gap-4 relative z-10">
           {/* Game Area Card */}
-          <div className="w-full max-w-md bg-transparent md:bg-black/10 border-0 md:border md:border-[#3E485A]/25 rounded-[2.5rem] flex flex-col items-center justify-between p-4 sm:p-6 min-h-[82vh] max-h-[82vh] h-[82vh] md:min-h-0 md:max-h-none md:h-auto gap-y-2 transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
+          <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-5 sm:p-8 shadow-2xl flex flex-col items-center justify-between min-h-[82vh] md:min-h-0 md:max-h-none md:h-auto gap-y-2 transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -2491,7 +2515,7 @@ export default function App() {
             <div className="relative z-10 text-left space-y-4">
               <div className="flex items-center gap-2 border-b border-[#3E485A] pb-3 mr-6">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-amber-400 font-mono flex items-center gap-1">
-                  📖 TDK KELİME ANLAMI
+                  📖 YAPAY ZEKA KELİME ANLAMI
                 </span>
               </div>
 
@@ -2512,7 +2536,7 @@ export default function App() {
               ) : (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-200 italic font-serif leading-relaxed px-1">
-                    "{wordDefinition || 'Bu kelimenin TDK tanımı otomatik olarak yüklenemedi.'}"
+                    "{wordDefinition || 'Bu kelimenin tanımı otomatik olarak yüklenemedi.'}"
                   </p>
                   
                   {/* If there was an error, show a retry button */}
@@ -2528,12 +2552,12 @@ export default function App() {
                   
                   <div className="pt-2 border-t border-[#3E485A]/30 flex justify-end">
                     <a
-                      href={`https://sozluk.gov.tr/?ara=${encodeURIComponent(turkishLower(targetWord))}`}
+                      href={`https://www.google.com/search?q=${encodeURIComponent(turkishLower(targetWord) + ' ne demek')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs font-bold text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer"
                     >
-                      Resmi Site ↗
+                      Google'da Ara ↗
                     </a>
                   </div>
                 </div>
@@ -2599,6 +2623,13 @@ export default function App() {
           onUpdateProfile={handleUpdateProfile}
         />
       )}
+
+      {/* Badge Unlocked Popup Animation */}
+      <BadgeUnlockedModal
+        badge={unlockedBadgeToShow}
+        onClose={() => setUnlockedBadgeToShow(null)}
+        soundEnabled={settings.soundEnabled}
+      />
 
       {/* Custom Premium Confirmation Modal */}
       {confirmModal.isOpen && (

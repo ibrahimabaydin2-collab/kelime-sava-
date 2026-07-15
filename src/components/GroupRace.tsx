@@ -8,6 +8,7 @@ import { UserProfile } from '../types.js';
 import { getRandomWord, isWordInCuratedList } from '../data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from '../utils/turkish.js';
 import { getApiUrl } from '../utils/api.js';
+import { getCachedWord, setCachedWord } from '../utils/wordCache.js';
 import { 
   collection, doc, setDoc, getDoc, updateDoc, onSnapshot, 
   deleteDoc
@@ -388,21 +389,21 @@ export default function GroupRace({
           const botId = `bot_${i}_${Math.random().toString(36).substr(2, 5)}`;
           const botRef = doc(db, 'rooms', roomId, 'players', botId);
           
-          // Allocate bots into difficulty tiers based on index
+          // Allocate bots into difficulty tiers based on index (Nerfed to a humane level)
           let speedFactor = 1.0;
           let targetSolveAttempt = 4;
           if (i < 5) {
             // Usta (Pro)
-            speedFactor = 1.4 + Math.random() * 0.4;
-            targetSolveAttempt = Math.random() > 0.08 ? Math.floor(Math.random() * 3) + 2 : 0;
+            speedFactor = 0.7 + Math.random() * 0.25;
+            targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 3) + 3 : 0;
           } else if (i < 13) {
             // Standart (Average)
-            speedFactor = 0.9 + Math.random() * 0.3;
-            targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 3) + 3 : 0;
+            speedFactor = 0.45 + Math.random() * 0.25;
+            targetSolveAttempt = Math.random() > 0.25 ? Math.floor(Math.random() * 3) + 4 : 0;
           } else {
             // Acemi (Novice)
-            speedFactor = 0.4 + Math.random() * 0.3;
-            targetSolveAttempt = Math.random() > 0.3 ? Math.floor(Math.random() * 3) + 4 : 0;
+            speedFactor = 0.2 + Math.random() * 0.15;
+            targetSolveAttempt = Math.random() > 0.45 ? Math.floor(Math.random() * 2) + 5 : 0;
           }
 
           await setDoc(botRef, {
@@ -425,23 +426,9 @@ export default function GroupRace({
         }
       }
 
-      // 2. Choose first word
+      // 2. Choose first word instantly from the local curated wordlist to eliminate startup lag
       const length = 5;
       let pickedWord = getRandomWord(length);
-
-      try {
-        const response = await fetch(getApiUrl('/api/random-word'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ length })
-        });
-        const data = await response.json();
-        if (data.word) {
-          pickedWord = turkishUpper(data.word);
-        }
-      } catch (e) {
-        console.warn('Online room word fetch error:', e);
-      }
 
       // 3. Update room status to playing
       const roomRef = doc(db, 'rooms', roomId);
@@ -720,14 +707,14 @@ export default function GroupRace({
         };
 
         if (p.isBot) {
-          // Re-randomize bot targets for the new word size based on active count index
+          // Re-randomize bot targets for the new word size based on active count index (Nerfed to a humane level)
           let targetSolveAttempt = 4;
           if (i < 5) {
-            targetSolveAttempt = Math.random() > 0.08 ? Math.floor(Math.random() * 3) + 2 : 0;
-          } else if (i < 13) {
             targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 3) + 3 : 0;
+          } else if (i < 13) {
+            targetSolveAttempt = Math.random() > 0.25 ? Math.floor(Math.random() * 3) + 4 : 0;
           } else {
-            targetSolveAttempt = Math.random() > 0.3 ? Math.floor(Math.random() * 3) + 4 : 0;
+            targetSolveAttempt = Math.random() > 0.45 ? Math.floor(Math.random() * 2) + 5 : 0;
           }
           updateData.targetSolveAttempt = targetSolveAttempt;
         }
@@ -738,18 +725,6 @@ export default function GroupRace({
       const nextRoundNum = currentRound + 1;
       const nextWordLength = nextRoundNum === 2 ? 6 : nextRoundNum === 3 ? 7 : 8;
       let newWord = getRandomWord(nextWordLength);
-
-      try {
-        const response = await fetch(getApiUrl('/api/random-word'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ length: nextWordLength })
-        });
-        const data = await response.json();
-        if (data.word) newWord = turkishUpper(data.word);
-      } catch (e) {
-        console.warn('Online random word fetch fail:', e);
-      }
 
       const roomRef = doc(db, 'rooms', roomId);
       await updateDoc(roomRef, {
@@ -856,19 +831,19 @@ export default function GroupRace({
         let targetSolveAttempt = 4;
         
         if (!isUser) {
-          // Allocate bots into tiers:
+          // Allocate bots into tiers (Nerfed to a humane level):
           if (index < 5) {
             // Usta (Pro)
-            speedFactor = 1.4 + Math.random() * 0.4; // 1.4 to 1.8
-            targetSolveAttempt = Math.random() > 0.08 ? Math.floor(Math.random() * 3) + 2 : 0; // Solves 2-4 or rarely fails
+            speedFactor = 0.7 + Math.random() * 0.25; // 0.7 to 0.95
+            targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 3) + 3 : 0; // Solves 3-5 or rarely fails
           } else if (index < 13) {
             // Standart (Average)
-            speedFactor = 0.9 + Math.random() * 0.3; // 0.9 to 1.2
-            targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 3) + 3 : 0; // Solves 3-5 or fails
+            speedFactor = 0.45 + Math.random() * 0.25; // 0.45 to 0.7
+            targetSolveAttempt = Math.random() > 0.25 ? Math.floor(Math.random() * 3) + 4 : 0; // Solves 4-6 or fails
           } else {
             // Acemi (Novice)
-            speedFactor = 0.4 + Math.random() * 0.3; // 0.4 to 0.7
-            targetSolveAttempt = Math.random() > 0.3 ? Math.floor(Math.random() * 3) + 4 : 0; // Solves 4-6 or fails frequently
+            speedFactor = 0.2 + Math.random() * 0.15; // 0.2 to 0.35
+            targetSolveAttempt = Math.random() > 0.45 ? Math.floor(Math.random() * 2) + 5 : 0; // Solves 5-6 or fails frequently
           }
         }
         
@@ -910,40 +885,25 @@ export default function GroupRace({
     setPhase('playing');
     setLiveLogs([{ time: '00:00', text: `🚩 Tur ${roundNum} Başladı! ${nextWordLength} harfli gizemli kelimeyi en hızlı bulan üst tura çıkar.` }]);
 
-    // Fetch word from API or fallback
-    try {
-      const response = await fetch(getApiUrl('/api/random-word'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ length: nextWordLength })
-      });
-      const data = await response.json();
-      if (data.word) {
-        setTargetWord(turkishUpper(data.word));
-      } else {
-        setTargetWord(getRandomWord(nextWordLength));
-      }
-    } catch (e) {
-      setTargetWord(getRandomWord(nextWordLength));
-    }
+    setTargetWord(getRandomWord(nextWordLength));
 
     // Initialize competitor states for this round
     setCompetitors((prev) => {
       return prev.map((c, index) => {
         if (c.eliminated) return c;
         
-        // Re-randomize bot targets for the new word based on tiers
+        // Re-randomize bot targets for the new word based on tiers (Nerfed to a humane level)
         let targetSolveAttempt = 4;
         if (!c.isUser) {
           if (index < 5) {
             // Usta
-            targetSolveAttempt = Math.random() > 0.08 ? Math.floor(Math.random() * 3) + 2 : 0;
+            targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 3) + 3 : 0;
           } else if (index < 13) {
             // Standart
-            targetSolveAttempt = Math.random() > 0.15 ? Math.floor(Math.random() * 3) + 3 : 0;
+            targetSolveAttempt = Math.random() > 0.25 ? Math.floor(Math.random() * 3) + 4 : 0;
           } else {
             // Acemi
-            targetSolveAttempt = Math.random() > 0.3 ? Math.floor(Math.random() * 3) + 4 : 0;
+            targetSolveAttempt = Math.random() > 0.45 ? Math.floor(Math.random() * 2) + 5 : 0;
           }
         }
 
@@ -1245,45 +1205,70 @@ export default function GroupRace({
 
     setIsValidating(true);
     let isValid = false;
+    let isConnectionError = false;
 
     if (dictionaryMode === 'no_validation') {
       isValid = true;
     } else {
-      // Check server validation with timeout to avoid hanging during live Group Race rounds
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 seconds timeout
-
-        const response = await fetch(getApiUrl('/api/validate-word'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ word: currentGuess, length: wordLength }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const data = await response.json();
-          isValid = data.valid;
-        } else {
-          throw new Error('Server returned non-ok status');
-        }
-      } catch (e) {
-        console.warn('GroupRace TDK API validation failed or timed out, using offline fallbacks:', e);
-        
-        // First check curated list
+      // 1. Check local persistent cache
+      const cached = getCachedWord(currentGuess, wordLength);
+      if (cached) {
+        isValid = cached.valid;
+      } else {
+        // 2. FAST LOCAL CHECK: Validate instantly if in curated list
         if (isWordInCuratedList(currentGuess, wordLength)) {
           isValid = true;
+          // Cache it locally
+          setCachedWord(currentGuess, wordLength, { 
+            valid: true, 
+            definition: 'Türkçe sözlükte geçerli kelime.' 
+          });
         } else {
-          // Second check heuristic linguistic rules
+          // 3. Not in curated list. Let's do heuristic linguistic check first
           const linguisticCheck = validateTurkishLinguistics(currentGuess, wordLength);
-          isValid = linguisticCheck.valid;
+          if (!linguisticCheck.valid) {
+            isValid = false;
+            setCachedWord(currentGuess, wordLength, { valid: false, definition: linguisticCheck.reason });
+          } else {
+            // 4. Fetch server validation with timeout
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 seconds timeout
+
+              const response = await fetch(getApiUrl('/api/validate-word'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ word: currentGuess, length: wordLength }),
+                signal: controller.signal
+              });
+              clearTimeout(timeoutId);
+
+              if (response.ok) {
+                const data = await response.json();
+                isValid = data.valid;
+                setCachedWord(currentGuess, wordLength, { valid: data.valid, definition: data.definition || '' });
+              } else {
+                throw new Error('Server returned non-ok status');
+              }
+            } catch (e) {
+              console.warn('GroupRace Yapay Zeka validation failed or timed out:', e);
+              isConnectionError = true;
+              
+              // Heuristic fallback
+              isValid = true;
+              showToast('Bağlantı hatası oluştu. Çevrimdışı kurallarla onaylandı.', 'info');
+            }
+          }
         }
       }
     }
 
     if (!isValid) {
-      showToast('Bu kelime sözlükte bulunamadı!', 'error');
+      if (isConnectionError) {
+        showToast('Bağlantı hatası oluştu.', 'error');
+      } else {
+        showToast('Kelime sözlükte bulunamadı.', 'error');
+      }
       setIsValidating(false);
       return;
     }

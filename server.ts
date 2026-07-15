@@ -208,7 +208,98 @@ app.post('/api/random-word', (req, res) => {
   res.json({ word });
 });
 
-// Endpoint to validate if a word is in TDK using Gemini API
+// Helper function to validate and get definition with Gemini AI
+async function validateAndGetDefinitionWithGemini(normalized: string, wordLength: number): Promise<{ valid: boolean; definition: string }> {
+  const upperWord = turkishUpper(normalized);
+  const lowerWord = turkishLower(normalized);
+  const prettyWord = upperWord.charAt(0) + upperWord.slice(1).toLocaleLowerCase('tr-TR');
+
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn('[Gemini SDK] GEMINI_API_KEY is not defined, returning fallback.');
+    const inCurated = isWordInCuratedList(normalized, wordLength);
+    if (inCurated) {
+      return { 
+        valid: true, 
+        definition: 'Türkçe sözlükte kayıtlı geçerli bir sözcüktür.' 
+      };
+    }
+    const linguisticCheck = validateTurkishLinguistics(normalized, wordLength);
+    if (linguisticCheck.valid) {
+      return { 
+        valid: true, 
+        definition: 'Yazımı Türkçe dil kurallarına uygun kelime.' 
+      };
+    }
+    return { valid: false, definition: 'Doğrulama yapılamadı.' };
+  }
+
+  try {
+    const prompt = `Lütfen "${upperWord}" (küçük harfle "${lowerWord}") kelimesini kontrol et.
+    
+    ÖNEMLİ VE KESİN KURALLAR:
+    1. Kelime Türkçe dilinde gerçekte var olan, anlamlı ve TDK sözlüğünde bulunan bir kelime mi? (Veya gerçek bir Türkçe kelimenin kurallı çekimi/çoğul hali mi?)
+    2. Türkçe telaffuz ve fonetik kurallarına uysa dahi uydurulmuş, uydurma, uydurulmuş olan ve gerçekte Türkçe sözlükte bulunmayan kelimeleri (Örneğin: "yutro", "tasme", "lahbe", "türbeç" vb.) KESİNLİKLE GEÇERSİZ (valid: false) say.
+    3. Eğer kelime gerçek ve geçerliyse, tanım (definition) alanına SADECE ve SADECE kelimenin GERÇEK Türkçe sözlük anlamını yaz. Kesinlikle "Türkçe sözlükte yer alan bir sözcüktür", "kelime sistem listesinde onaylandı" veya "geçerli Türkçe kelimedir" gibi teknik/jenerik ifadeler yazma. Kelimenin doğrudan net sözlük tanımını döndür.
+    4. Eğer kelime geçersiz ise, neden geçersiz olduğunu belirten kısa bir açıklama yaz (Örn: "Türkçe sözlükte yer almayan, uydurma bir sözcüktür.").
+    
+    Yanıtını SADECE aşağıdaki JSON formatında döndür (başka hiçbir metin veya markdown etiketi ekleme):
+    {
+      "valid": boolean,
+      "definition": "Kelimenin gerçek sözlük tanımı (geçerliyse) veya geçersizlik gerekçesi (geçersizse)."
+    }`;
+
+    const geminiResponse = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        systemInstruction: "Sen uzman bir Türk Dil Kurumu (TDK) sözlük ve Türkçe dilbilgisi uzmanısın. Görevin, verilen kelimenin Türkçe dilinde gerçekte var olan, anlamlı ve sözlükte karşılığı olan bir sözcük (veya bunun kurallı bir çekimi, çoğul hali ya birleşik yapısı) olduğunu doğrulamaktır. Türkçe fonetik yapısına uysa bile uydurulmuş, uydurma olan, gerçekte dilde hiçbir anlam taşımayan ya da sözlükte bulunmayan kelimeleri (örneğin: 'yutro', 'tasme', 'gülbe', 'lahbe' gibi uydurmaları) KESİNLİKLE geçersiz (valid: false) saymalısın. Doğrulanan kelimenin tanımını yaparken 'Türkçe sözlükte yer alan bir sözcüktür' gibi teknik/jenerik mesajlar KESİNLİKLE yazmamalısın. Doğrudan kelimenin gerçek sözlük karşılığı olan tanımını yazmalısın."
+      }
+    });
+
+    if (geminiResponse && geminiResponse.text) {
+      let rawText = geminiResponse.text.trim();
+      // Robust markdown JSON tag removal
+      if (rawText.startsWith('```')) {
+        rawText = rawText.replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
+      }
+      const geminiData = JSON.parse(rawText);
+      if (typeof geminiData.valid === 'boolean') {
+        return {
+          valid: geminiData.valid,
+          definition: geminiData.definition || (geminiData.valid ? 'Türkçe sözlükte geçerli kelime.' : 'Geçersiz Türkçe kelime.')
+        };
+      }
+    }
+  } catch (geminiErr: any) {
+    console.warn(`[Gemini API Offline/Billing Limit]: falling back to local dictionaries. Details: ${geminiErr?.message || geminiErr}`);
+  }
+
+  // Final fallback if Gemini call fails: Check curated list
+  const inCurated = isWordInCuratedList(normalized, wordLength);
+  if (inCurated) {
+    return { 
+      valid: true, 
+      definition: 'Türkçe sözlükte kayıtlı geçerli bir sözcüktür.' 
+    };
+  }
+
+  // Second offline backup: check heuristic linguistics
+  const linguisticCheck = validateTurkishLinguistics(normalized, wordLength);
+  if (linguisticCheck.valid) {
+    return {
+      valid: true,
+      definition: 'Yazımı Türkçe dil kurallarına uygun kelime.'
+    };
+  }
+
+  return {
+    valid: false,
+    definition: 'Doğrulama servisi şu anda yanıt vermiyor veya kelime geçersiz.'
+  };
+}
+
+// Endpoint to validate if a word is valid using Gemini API
 app.post('/api/validate-word', async (req, res) => {
   try {
     const { word, length } = req.body;
@@ -223,16 +314,7 @@ app.post('/api/validate-word', async (req, res) => {
       return res.json({ valid: false, reason: 'Harf sayısı uyuşmuyor' });
     }
 
-    // 1. Check curated list
-    const inCurated = isWordInCuratedList(normalized, wordLength);
-    if (inCurated) {
-      return res.json({
-        valid: true,
-        definition: 'Özenle seçilmiş kelime listemizde mevcut.'
-      });
-    }
-
-    // 1.5 Heuristic linguistic validation (blocks keyboard smash, repetitive letters like rrrrr before cache or API calls)
+    // 1. Heuristic linguistic validation (blocks keyboard smash, repetitive letters like rrrrr before cache or API calls)
     const linguisticCheck = validateTurkishLinguistics(normalized, wordLength);
     if (!linguisticCheck.valid) {
       return res.json({
@@ -244,7 +326,18 @@ app.post('/api/validate-word', async (req, res) => {
     // 2. Check cache
     const cacheKey = `${normalized}_${wordLength}`;
     if (wordCache[cacheKey]) {
-      return res.json(wordCache[cacheKey]);
+      const cached = wordCache[cacheKey];
+      const isGeneric = cached.definition && (
+        cached.definition.includes('sözlükte yer alan') ||
+        cached.definition.includes('hece yapısına uygun') ||
+        cached.definition.includes('sistem listesinde') ||
+        cached.definition.includes('doğrulandı') ||
+        cached.definition.includes('geçerli bir sözcüktür') ||
+        cached.definition.length < 5
+      );
+      if (!isGeneric || !cached.valid) {
+        return res.json(cached);
+      }
     }
 
     // 2.1 Check Firestore Database
@@ -253,154 +346,47 @@ app.post('/api/validate-word', async (req, res) => {
       const wordSnap = await getDoc(wordDocRef);
       if (wordSnap.exists()) {
         const dbData = wordSnap.data();
-        const dbResult = {
-          valid: dbData.valid,
-          definition: dbData.definition || ''
-        };
-        wordCache[cacheKey] = dbResult;
-        console.log(`[Database Hit] Word "${normalized}" found in database:`, dbResult);
-        return res.json(dbResult);
+        const isGeneric = dbData.definition && (
+          dbData.definition.includes('sözlükte yer alan') ||
+          dbData.definition.includes('hece yapısına uygun') ||
+          dbData.definition.includes('sistem listesinde') ||
+          dbData.definition.includes('doğrulandı') ||
+          dbData.definition.includes('geçerli bir sözcüktür') ||
+          dbData.definition.length < 5
+        );
+        if (!isGeneric || !dbData.valid) {
+          const dbResult = {
+            valid: dbData.valid,
+            definition: dbData.definition || ''
+          };
+          wordCache[cacheKey] = dbResult;
+          console.log(`[Database Hit] Word "${normalized}" found in database:`, dbResult);
+          return res.json(dbResult);
+        }
       }
     } catch (dbErr) {
       console.warn('Firestore database read failed:', dbErr);
     }
 
-    // 2.2 Direct official TDK GTS API verification on the exact word
+    // 3. Directly validate with Gemini API
+    const geminiResult = await validateAndGetDefinitionWithGemini(normalized, wordLength);
+    wordCache[cacheKey] = geminiResult;
+
+    // Automatically save to database
     try {
-      const lowercaseWord = turkishLower(normalized);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for GTS stability
-
-      const tdkResponse = await fetch(`https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lowercaseWord)}`, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-      clearTimeout(timeoutId);
-      
-      if (tdkResponse.ok) {
-        const tdkData = await tdkResponse.json() as any;
-        
-        if (Array.isArray(tdkData) && tdkData.length > 0) {
-          let definition = 'TDK Sözlüğünde mevcut.';
-          try {
-            const meanings = tdkData[0].anlim_goster ? tdkData[0].anlamlarListe : tdkData[0].anlamlarListe;
-            if (Array.isArray(meanings) && meanings.length > 0) {
-              definition = meanings[0].anlam || 'TDK Sözlüğünde mevcut.';
-            }
-          } catch (e) {
-            // Ignore meaning parse errors
-          }
-          const tdkResult = {
-            valid: true,
-            definition
-          };
-          wordCache[cacheKey] = tdkResult;
-
-          // AUTOMATICALLY SAVE TO FIRESTORE DATABASE!
-          try {
-            const wordDocRef = doc(db, 'dictionary', normalized);
-            await setDoc(wordDocRef, {
-              word: normalized,
-              valid: true,
-              definition,
-              createdAt: new Date().toISOString()
-            });
-            console.log(`[Database Save] Saved valid word "${normalized}" to database with definition: "${definition}".`);
-          } catch (saveErr) {
-            console.error('Failed to save valid word to Firestore:', saveErr);
-          }
-
-          return res.json(tdkResult);
-        } else {
-          const notFoundResult = {
-            valid: false,
-            definition: 'Bu kelime TDK sözlüğünde bulunamadı.'
-          };
-          wordCache[cacheKey] = notFoundResult;
-          return res.json(notFoundResult);
-        }
-      }
-    } catch (tdkErr) {
-      console.warn('TDK GTS API Request failed or timed out:', tdkErr);
+      const wordDocRef = doc(db, 'dictionary', normalized);
+      await setDoc(wordDocRef, {
+        word: normalized,
+        valid: geminiResult.valid,
+        definition: geminiResult.definition,
+        createdAt: new Date().toISOString()
+      }, { merge: true });
+      console.log(`[Database Save] Saved word "${normalized}" (valid: ${geminiResult.valid}) to database.`);
+    } catch (saveErr) {
+      console.error('Failed to save word to Firestore:', saveErr);
     }
 
-    // 3. Fallback to Gemini AI Validation if TDK API is offline, down, or blocked
-    try {
-      console.log(`[Validation Fallback] TDK API is unavailable. Using Gemini to validate word: "${normalized}"`);
-      const prompt = `Lütfen "${normalized}" kelimesinin geçerli bir Türkçe kelime olup olmadığını (isim, fiil, sıfat vb.) kontrol et. 
-Klavye tuşlamaları (asd, asdf, jkl, qwe, asda, dfg, fgh, ghj, hjkl vb.), rastgele yan yana gelen uyumsuz harfler, yabancı/İngilizce kelimeler veya anlamsız uydurma sözcükler kesinlikle GEÇERSİZ (valid: false) olmalıdır. 
-
-Kurallar:
-1. Sadece TDK (Türk Dil Kurumu) sözlüğünde yer alan veya dilbilgisi kurallarına uygun biçimde türetilmiş, yaygın bilinen gerçek Türkçe kelimeleri onaylayabilirsin (valid: true).
-2. İngilizce kelimeleri, klavye mıncıklamalarını veya uydurma kelimeleri KESİNLİKLE GEÇERSİZ (valid: false) saymalısın.
-3. Kelime geçerliyse "definition" alanına kısa ve öz bir Türkçe anlam yaz. Kelime geçersizse "definition" alanına neden geçersiz olduğunu Türkçe olarak açıkla.
-4. En ufak bir şüphe durumunda kelimeyi GEÇERSİZ (valid: false) yap.
-
-Yanıtını SADECE aşağıdaki JSON yapısında döndür:
-{
-  "valid": boolean,
-  "definition": "Kelimelerin anlamı veya geçersiz olma sebebi"
-}`;
-
-      const geminiResponse = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          systemInstruction: "Sen son derece titiz, katı ve hata kabul etmeyen bir Türkçe Dil uzmanı ve TDK Sözlük denetçisisin. Görevin, verilen kelimenin klavye tuşlaması (gibberish/nonsense), uydurma veya yabancı bir kelime olmayıp, gerçek ve geçerli bir Türkçe sözlük kelimesi olduğunu %100 doğrulukla teyit etmektir. Şüpheli, uydurma veya anlamsız kelimeleri KESİNLİKLE onaylamazsın."
-        }
-      });
-
-      if (geminiResponse && geminiResponse.text) {
-        const geminiData = JSON.parse(geminiResponse.text.trim());
-        if (typeof geminiData.valid === 'boolean') {
-          const geminiResult = {
-            valid: geminiData.valid,
-            definition: geminiData.definition || (geminiData.valid ? 'Türkçe dil kurallarına uygun kelime.' : 'Geçersiz Türkçe kelime.')
-          };
-          console.log(`[Gemini Fallback Result] Word: "${normalized}", Valid: ${geminiResult.valid}, Def: ${geminiResult.definition}`);
-          wordCache[cacheKey] = geminiResult;
-
-          // AUTOMATICALLY SAVE TO FIRESTORE IF GEMINI DEEMS VALID!
-          if (geminiResult.valid) {
-            try {
-              const wordDocRef = doc(db, 'dictionary', normalized);
-              await setDoc(wordDocRef, {
-                word: normalized,
-                valid: true,
-                definition: geminiResult.definition,
-                createdAt: new Date().toISOString()
-              });
-              console.log(`[Database Save - Gemini] Saved valid word "${normalized}" to database with definition: "${geminiResult.definition}".`);
-            } catch (saveErr) {
-              console.error('Failed to save valid word to Firestore:', saveErr);
-            }
-          }
-
-          return res.json(geminiResult);
-        }
-      }
-    } catch (geminiErr) {
-      console.error('[Gemini Fallback ERROR]:', geminiErr);
-    }
-
-    // 4. Absolute offline fallback if both TDK and Gemini fail
-    const finalOfflineCheck = isWordInCuratedList(normalized, wordLength);
-    if (finalOfflineCheck) {
-      const fallbackResult = {
-        valid: true,
-        definition: 'Kelime çevrimdışı sözlük listesinde onaylandı.'
-      };
-      wordCache[cacheKey] = fallbackResult;
-      return res.json(fallbackResult);
-    }
-
-    return res.json({
-      valid: false,
-      definition: 'Bağlantı kurulamadı ve kelime Türkçe sözlüğünde bulunamadı!'
-    });
+    return res.json(geminiResult);
   } catch (error: any) {
     console.error('[Word Validation ERROR]:', error?.message || error);
     res.json({
@@ -410,7 +396,7 @@ Yanıtını SADECE aşağıdaki JSON yapısında döndür:
   }
 });
 
-// Endpoint to fetch direct definition of any target word from TDK API
+// Endpoint to fetch direct definition of any target word from Gemini AI
 app.post('/api/get-definition', async (req, res) => {
   try {
     const { word } = req.body;
@@ -423,7 +409,18 @@ app.post('/api/get-definition', async (req, res) => {
 
     // Check if we have cached this definition
     if (wordCache[cacheKey]) {
-      return res.json(wordCache[cacheKey]);
+      const cached = wordCache[cacheKey];
+      const isGeneric = cached.definition && (
+        cached.definition.includes('sözlükte yer alan') ||
+        cached.definition.includes('hece yapısına uygun') ||
+        cached.definition.includes('sistem listesinde') ||
+        cached.definition.includes('doğrulandı') ||
+        cached.definition.includes('geçerli bir sözcüktür') ||
+        cached.definition.length < 5
+      );
+      if (!isGeneric) {
+        return res.json(cached);
+      }
     }
 
     // Check Firestore Database
@@ -433,139 +430,52 @@ app.post('/api/get-definition', async (req, res) => {
       if (wordSnap.exists()) {
         const dbData = wordSnap.data();
         if (dbData.valid && dbData.definition) {
-          const dbResult = { valid: true, definition: dbData.definition };
-          wordCache[cacheKey] = dbResult;
-          console.log(`[Database Hit - Definition] Word "${normalized}" found in database:`, dbResult);
-          return res.json(dbResult);
+          const isGeneric = dbData.definition && (
+            dbData.definition.includes('sözlükte yer alan') ||
+            dbData.definition.includes('hece yapısına uygun') ||
+            dbData.definition.includes('sistem listesinde') ||
+            dbData.definition.includes('doğrulandı') ||
+            dbData.definition.includes('geçerli bir sözcüktür') ||
+            dbData.definition.length < 5
+          );
+          if (!isGeneric) {
+            const dbResult = { valid: true, definition: dbData.definition };
+            wordCache[cacheKey] = dbResult;
+            console.log(`[Database Hit - Definition] Word "${normalized}" found in database:`, dbResult);
+            return res.json(dbResult);
+          }
         }
       }
     } catch (dbErr) {
       console.warn('Firestore database read for definition failed:', dbErr);
     }
 
-    const lowercaseWord = turkishLower(normalized);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for TDK stability
-      const tdkResponse = await fetch(`https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lowercaseWord)}`, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-      clearTimeout(timeoutId);
-
-      if (tdkResponse.ok) {
-        const tdkData = await tdkResponse.json() as any;
-        if (Array.isArray(tdkData) && tdkData.length > 0) {
-          let definition = '';
-          try {
-            const meanings = tdkData[0].anlamlarListe;
-            if (Array.isArray(meanings) && meanings.length > 0) {
-              // Combine up to 3 meanings for a rich definition
-              definition = meanings.slice(0, 3).map((m: any, idx: number) => {
-                const prefix = m.anlam_ozelliklerListe && m.anlam_ozelliklerListe[0]?.tam_adi 
-                  ? `(${m.anlam_ozelliklerListe[0].tam_adi}) ` 
-                  : '';
-                return `${idx + 1}. ${prefix}${m.anlam}`;
-              }).join(' ');
-            }
-          } catch (e) {
-            // Fallback
-          }
-
-          if (!definition) {
-            definition = 'TDK Sözlüğünde mevcut.';
-          }
-
-          const result = { valid: true, definition };
-          wordCache[cacheKey] = result;
-
-          // Save definition back to Firestore dictionary!
-          try {
-            const wordDocRef = doc(db, 'dictionary', normalized);
-            await setDoc(wordDocRef, {
-              word: normalized,
-              valid: true,
-              definition,
-              createdAt: new Date().toISOString()
-            }, { merge: true });
-            console.log(`[Database Save - Definition] Saved/Updated definition for "${normalized}" in database.`);
-          } catch (saveErr) {
-            console.error('Failed to save word definition to Firestore:', saveErr);
-          }
-
-          return res.json(result);
-        }
-      }
-    } catch (tdkErr) {
-      console.warn('TDK GTS API Request failed for get-definition, falling back to Gemini:', tdkErr);
-    }
-
-    // Fallback to Gemini AI to generate / fetch the word's definition
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        console.log(`[Definition Fallback] TDK API is unavailable or word not found. Using Gemini to get definition for: "${normalized}"`);
-        const prompt = `Lütfen "${normalized}" kelimesinin Türkçe sözlük anlamını (tanımını) bul veya oluştur.
-Eğer kelime geçerli bir Türkçe kelime ise, kısa, net ve doğru bir Türkçe tanım yaz. 
-Eğer kelime geçersiz veya uydurma ise, bunu belirt.
-
-Yanıtını SADECE aşağıdaki JSON yapısında döndür:
-{
-  "valid": boolean,
-  "definition": "Kelimenin Türkçe tanımı veya açıklaması"
-}`;
-
-        const geminiResponse = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            systemInstruction: "Sen bir Türkçe sözlük asistanısın. Görevin, verilen kelimenin doğru ve net Türkçe tanımını sağlamaktır. Yanıtları her zaman JSON biçiminde dönersin."
-          }
-        });
-
-        if (geminiResponse && geminiResponse.text) {
-          const geminiData = JSON.parse(geminiResponse.text.trim());
-          if (geminiData.definition) {
-            const geminiResult = {
-              valid: geminiData.valid !== false,
-              definition: geminiData.definition
-            };
-            
-            wordCache[cacheKey] = geminiResult;
-
-            // Save definition back to Firestore dictionary!
-            try {
-              const wordDocRef = doc(db, 'dictionary', normalized);
-              await setDoc(wordDocRef, {
-                word: normalized,
-                valid: geminiResult.valid,
-                definition: geminiResult.definition,
-                createdAt: new Date().toISOString()
-              }, { merge: true });
-              console.log(`[Database Save - Definition Gemini] Saved definition for "${normalized}" to database.`);
-            } catch (saveErr) {
-              console.error('Failed to save Gemini definition to Firestore:', saveErr);
-            }
-
-            return res.json(geminiResult);
-          }
-        }
-      } catch (geminiErr) {
-        console.error('[Gemini Definition Fallback ERROR]:', geminiErr);
-      }
-    } else {
-      console.warn('[Gemini SDK] GEMINI_API_KEY is not defined, skipping Gemini definition fallback.');
-    }
-
-    // Friendly offline/standard definition fallback instead of error message
-    const friendlyFallback = {
-      valid: true,
-      definition: `"${normalized}" kelimesi, özenle seçilmiş Türkçe kelime listemizde onaylanmış geçerli bir kelimedir.`
+    // Retrieve via Gemini AI (since it's a target word, force valid: true validation behavior)
+    const geminiResult = await validateAndGetDefinitionWithGemini(normalized, normalized.length);
+    
+    // Ensure the returned target word definition structure is valid
+    const finalResult = {
+      valid: true, // Target words are always valid in game contexts
+      definition: geminiResult.definition || 'Türkçe kelime anlamı yüklenemedi.'
     };
-    wordCache[cacheKey] = friendlyFallback;
-    return res.json(friendlyFallback);
+
+    wordCache[cacheKey] = finalResult;
+
+    // Save definition back to Firestore dictionary!
+    try {
+      const wordDocRef = doc(db, 'dictionary', normalized);
+      await setDoc(wordDocRef, {
+        word: normalized,
+        valid: true,
+        definition: finalResult.definition,
+        createdAt: new Date().toISOString()
+      }, { merge: true });
+      console.log(`[Database Save - Definition] Saved definition for "${normalized}" to database.`);
+    } catch (saveErr) {
+      console.error('Failed to save word definition to Firestore:', saveErr);
+    }
+
+    return res.json(finalResult);
   } catch (error: any) {
     console.error('[Get Definition ERROR]:', error);
     res.json({
