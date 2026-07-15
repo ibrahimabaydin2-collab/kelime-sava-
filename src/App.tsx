@@ -20,7 +20,7 @@ import GroupRace from './components/GroupRace.js';
 import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import AuthScreen from './components/AuthScreen.js';
 import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
-import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore } from './lib/firebase.js';
+import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser } from './lib/firebase.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './data/wordlist.js';
@@ -389,9 +389,13 @@ export default function App() {
   const [letterStatuses, setLetterStatuses] = useState<{ [key: string]: 'green' | 'orange' | 'grey' }>({});
 
   // Welcome Screen & Dictionary Mode State
-  const [hasEnteredGame, setHasEnteredGame] = useState<boolean>(() => {
-    return safeLocalStorage.getItem('kelimesavasi_entered') === 'true';
-  });
+  const [hasEnteredGame, setHasEnteredGame] = useState<boolean>(false);
+
+  // Force sign out on initial load so the user always starts fresh at the login screen
+  useEffect(() => {
+    signOutUser().catch(err => console.error('Initial signOutUser failed:', err));
+  }, []);
+
   const [dictionaryMode, setDictionaryMode] = useState<'tdk_online' | 'no_validation'>(() => {
     const saved = safeLocalStorage.getItem('kelimesavasi_dict_mode');
     return saved === 'no_validation' ? 'no_validation' : 'tdk_online';
@@ -2001,9 +2005,9 @@ export default function App() {
         )}
 
         {/* Game Layout Wrapper */}
-        <div className="w-full flex flex-col items-center justify-center gap-3 sm:gap-4 relative z-10">
+        <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-2 sm:gap-4 relative z-10">
           {/* Game Area Card */}
-          <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-5 sm:p-8 shadow-2xl flex flex-col items-center justify-between min-h-[82vh] md:min-h-0 md:max-h-none md:h-auto gap-y-2 transition-all duration-200 relative overflow-hidden text-white" id="game-area-card">
+          <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-3.5 sm:p-6 shadow-2xl flex flex-col items-center justify-between flex-1 min-h-0 overflow-y-auto scrollbar-thin gap-y-2 transition-all duration-200 relative text-white" id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />

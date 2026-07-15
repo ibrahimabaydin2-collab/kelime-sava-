@@ -219,6 +219,14 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
     setIsTouched(true);
     setFirebaseError(null);
 
+    // 1. GİRİŞ KONTROLÜ: Anonim giriş (misafir olarak oyna) butonuna tıklandığında, eğer kullanıcı adı kutusu boşsa, kullanıcıya 'Lütfen önce bir kullanıcı adı giriniz' şeklinde bir uyarı (alert) göster ve girişi engelle.
+    if (mode === 'guest') {
+      if (!username.trim()) {
+        alert('Lütfen önce bir kullanıcı adı giriniz');
+        return;
+      }
+    }
+
     // Validate based on mode
     if (mode === 'guest' || mode === 'register') {
       const uErr = validateUsername(username, lobbyPlayers);
@@ -672,7 +680,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         {/* Action Button */}
         <button
           type="submit"
-          disabled={loading || (mode === 'guest' && !username.trim()) || (mode === 'register' && (!username.trim() || !email || !password)) || (mode === 'login' && (!email || !password)) || !!usernameError || !!passwordError}
+          disabled={loading || (mode === 'register' && (!username.trim() || !email || !password)) || (mode === 'login' && (!email || !password)) || (mode !== 'guest' && !!usernameError) || !!passwordError}
           className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-sm py-4 px-6 rounded-2xl shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] disabled:opacity-50 disabled:pointer-events-none transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5] mt-4"
         >
           {loading ? (
