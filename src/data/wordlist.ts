@@ -1,4 +1,5 @@
 import { turkishUpper, turkishLower } from '../utils/turkish';
+import { populerKelimeler } from './populer_kelimeler';
 
 export const COMMON_TURKISH_WORDS: { [key: number]: string[] } = {
   3: ["aba","abd","abu","ace","acı","açı","ada","adi","afi","aft","agu","ağa","ağı","aha","ahi","ahu","ait","aka","akı","aks","akü","ala","âlâ","alg","ali","alo","alp","alt","ama","âmâ","ana","anı","ani","ant","ara","arı","ari","ark","arp","arş","art","arz","asa","ası","asi","ask","ast","aşı","aşk","ata","ate","ati","aut","aya","ayı","ayn","aza","azı","baç","bad","bağ","bal","ban","bap","bar","bas","baş","bat","bav","bay","baz","bed","bej","bek","bel","ben","beş","bet","bey","bez","bin","bir","bit","biz","boa","bok","bol","bom","bop","bor","boş","bot","boy","boz","böğ","bön","bre","bul","bun","but","buz","bük","büz","cağ","cam","can","car","caz","cem","cep","cer","cet","cık","cıs","cız","cif","cim","cin","cip","cop","cuk","cup","cüz","çağ","çak","çal","çam","çan","çap","çar","çat","çav","çay","çeç","çek","çığ","çın","çıt","çiğ","çil","çim","çin","çip","çir","çis","çiş","çit","çiy","çok","çor","çöl","çöp","çöz","çul","çük","çüş","dağ","dal","dam","dar","dav","daz","def","deh","dek","dem","dev","dış","dik","dil","din","dip","diş","diz","dok","don","doz","döl","döş","dua","dul","dun","duş","dut","duy","dük","dün","düş","düz","ebe","ece","eda","ede","edi","efe","ege","ego","eğe","eke","eko","ekü","ela","epe","erg","erk","eti","evç","eza","fak","fal","fan","far","fas","faş","fay","faz","fek","fel","fen","fer","fes","fır","fiğ","fil","fin","fiş","fit","flu","fob","fok","fol","fon","fos","fön","ful","fut","füg","gaf","gâh","gak","gam","gar","gaz","geç","gem","gen","gez","gık","gır","giz","gol","göç","gök","göl","gön","göt","göz","gri","gut","güç","gül","güm","gün","gür","güz","hab","hac","haç","had","haf","hah","hak","hâk","hal","hâl","ham","han","hap","har","has","hat","hav","hay","haz","hem","hep","her","hey","hık","hır","hız","hiç","hin","his","hiş","hit","hol","hop","hor","hoş","höl","höt","huğ","hun","huş","huy","hür","ıra","ırk","ırz","ısı","ifa","ika","iki","ila","ile","ilk","ima","inç","ini","iri","irs","isa","ita","iti","iye","iyi","jel","jen","jet","jig","jön","jul","jüt","kaç","kâh","kak","kal","kam","kâm","kan","kap","kâp","kar","kâr","kas","kaş","kat","kav","kay","kaz","kek","kel","kem","kep","ker","kes","keş","ket","kez","kıç","kığ","kıl","kın","kır","kış","kıt","kız","kik","kil","kim","kin","kip","kir","kit","koç","kod","kof","kok","kol","kom","kor","kot","kov","koy","koz","kök","kör","kös","köy","köz","kul","kum","kup","kur","kuş","kut","kuz","küf","kül","küp","kür","küs","küt","laf","lak","lal","lam","lâm","lan","lap","lav","laz","leb","lef","leh","lep","leş","ley","lığ","lif","lig","lim","lir","loğ","lok","lop","lor","loş","lot","lök","löp","lös","lup","lük","lüp","maç","mai","mal","mas","maş","mat","meç","men","met","mey","mıh","mil","mim","mir","mis","mit","mor","mum","muş","mut","muz","nal","nam","nan","nar","nâr","nas","naz","nem","net","nev","ney","nim","niş","nom","not","nuh","nur","oba","oda","oha","oje","ole","oma","ona","ons","ora","org","ova","oya","öcü","öge","öhö","öke","ölü","örf","örk","örs","örü","öte","öze","pah","pak","pal","pas","pat","pay","peç","pek","pes","peş","pey","pır","pıt","piç","pik","pil","pim","pir","pis","pof","pog","pop","pos","pot","poy","poz","pöç","pöf","puf","pul","pus","put","püf","pür","rab","raf","ram","ray","ret","rey","rıh","rol","rom","rot","ruf","ruh","ruj","rum","run","rus","ruz","sac","saç","saf","sağ","sah","sak","sal","sam","san","sap","sav","say","saz","sek","sel","sem","sen","ser","ses","set","sığ","sık","sır","sif","sik","sim","sin","sis","sit","siz","ski","sof","sol","som","son","sos","soy","sör","söz","suç","sup","sur","sut","süs","süt","şad","şah","şak","şal","şan","şap","şat","şaz","şeb","şef","şek","şem","şen","şer","şeş","şet","şev","şey","şık","şıp","şia","şif","şii","şip","şiş","şok","şom","şor","şov","şua","şuh","şut","tab","taç","tak","tal","tam","tan","tar","tas","taş","tat","tav","tay","tef","tek","tel","tem","ten","ter","tez","tığ","tık","tın","tıp","tır","tıs","tik","tim","tin","tip","tiz","tok","tol","ton","top","tor","tos","toy","toz","tör","tös","töz","tuğ","tuh","tul","tun","tur","tuş","tut","tuz","tüf","tüh","tül","tüm","tün","tüp","tür","tüy","uca","udi","ula","ulu","umu","uzo","üre","üst","ütü","üye","vah","van","var","vat","vay","vaz","vın","vız","yad","yâd","yağ","yak","yal","yan","yar","yâr","yas","yaş","yat","yay","yaz","yeğ","yek","yel","yem","yen","yer","yıl","yır","yiv","yoğ","yok","yol","yom","yoz","yön","yuf","yuh","yük","yün","yüz","zaç","zağ","zam","zan","zar","zat","zem","zen","zer","zıh","zıp","zıt"],
@@ -28,9 +29,9 @@ Object.values(COMMON_TURKISH_WORDS).forEach((list) => {
   });
 });
 
-// Returns a random word from the curated list of specified length
+// Returns a random word from the popular list of specified length
 export function getRandomWord(length: number): string {
-  const words = CLEANED_TURKISH_WORDS[length] || CLEANED_TURKISH_WORDS[5];
+  const words = populerKelimeler[length] || [];
   if (!words || words.length === 0) {
     const fallbackWords: { [key: number]: string[] } = {
       3: ['ana', 'arı', 'ara', 'bal', 'çay', 'dağ', 'iyi', 'kar', 'koç', 'şef', 'tek', 'tuz', 'yaz', 'yol', 'zor'],
@@ -71,8 +72,8 @@ export function getDailyWordAndLength(): { word: string; length: number; dateStr
   // Using modulo 4 gives values 0..3, so adding 3 gives 3, 4, 5, 6
   const length = 3 + (hash % 4);
 
-  // Get words of this length
-  const list = CLEANED_TURKISH_WORDS[length] || [];
+  // Get words of this length from the popular list
+  const list = populerKelimeler[length] || [];
   let word = 'SAVAŞ';
   if (list.length > 0) {
     const wordIndex = hash % list.length;
