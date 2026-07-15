@@ -741,7 +741,7 @@ const setupWebSocket = (server: any) => {
                   id: matchId,
                   wordLength: challenge.wordLength,
                   targetWord,
-                  matchWordsCount: 1,
+                  matchWordsCount: 3,
                   currentRound: 1,
                   roundsWon: {
                     [challenge.challengerId]: 0,
@@ -777,7 +777,7 @@ const setupWebSocket = (server: any) => {
                   matchId,
                   targetWord,
                   wordLength: challenge.wordLength,
-                  matchWordsCount: 1,
+                  matchWordsCount: 3,
                   currentRound: 1,
                   roundsWon: {
                     [challenge.challengerId]: 0,
@@ -796,7 +796,7 @@ const setupWebSocket = (server: any) => {
                   matchId,
                   targetWord,
                   wordLength: challenge.wordLength,
-                  matchWordsCount: 1,
+                  matchWordsCount: 3,
                   currentRound: 1,
                   roundsWon: {
                     [challenge.challengerId]: 0,

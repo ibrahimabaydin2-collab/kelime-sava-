@@ -941,6 +941,10 @@ export default function App() {
               } else {
                 showToast('Maçı rakibin kazandı. Daha hızlı olmalısın!', 'error');
               }
+
+              // Redirect directly back to the "Oyun Kurma Paneli" (Lobby) page
+              setActiveMatch(null);
+              setHasEnteredGame(false);
               break;
             }
 
@@ -1117,7 +1121,7 @@ export default function App() {
 
   // Countdown timer logic
   useEffect(() => {
-    if (gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch)) {
+    if (gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || activeMatch || (gameMode === 'untimed' && !activeMatch)) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
@@ -1732,9 +1736,15 @@ export default function App() {
   const opponent = activeMatch ? Object.values(activeMatch.players).find(p => (p as any).name !== profile.name) as any : null;
 
   return (
-    <div className={`h-[100dvh] max-h-[100dvh] overflow-hidden flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
+    <div className={`h-screen max-h-screen overflow-hidden flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
+      {/* Safe Space for Future Top Banner Ad */}
+      <div className="h-10 sm:h-12 w-full shrink-0 flex items-center justify-center border-b border-[#3E485A]/15 bg-black/35 text-[#FAF6E9]/40 font-mono text-[9px] tracking-widest select-none uppercase" id="top-ad-placeholder">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 opacity-50 animate-pulse" />
+        REKLAM ALANI
+      </div>
+
       {/* Main Container */}
-      <main className="flex-1 flex flex-col items-center justify-center py-1.5 sm:py-4 px-1.5 sm:px-4 max-w-full md:max-w-[95vw] lg:max-w-[90vw] w-full mx-auto relative overflow-hidden">
+      <main className="flex-1 flex flex-col items-center justify-center py-1 sm:py-3 px-1.5 sm:px-4 max-w-full md:max-w-[95vw] lg:max-w-[90vw] w-full mx-auto relative overflow-hidden">
         {/* Toast Notification */}
         {toast && (
           <div className={`fixed top-20 z-50 left-1/2 transform -translate-x-1/2 px-4 py-2.5 rounded-xl border flex items-center gap-2.5 text-xs sm:text-sm font-semibold shadow-lg transition duration-200 animate-slide-in ${
@@ -2024,7 +2034,7 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {(gameMode === 'timed' || activeMatch) && !isDailyPuzzle ? (
+                  {gameMode === 'timed' && !activeMatch && !isDailyPuzzle ? (
                     <>
                       <Hourglass size={16} className={`animate-spin ${secondsLeft <= 5 ? 'text-rose-500' : 'text-emerald-500'}`} />
                       <div className={`text-sm font-bold font-mono px-2 py-0.5 rounded-lg border ${
@@ -2647,6 +2657,12 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Safe Space for Future Bottom Banner Ad */}
+      <div className="h-12 sm:h-14 w-full shrink-0 flex items-center justify-center border-t border-[#3E485A]/15 bg-black/35 text-[#FAF6E9]/40 font-mono text-[9px] tracking-widest select-none uppercase mt-auto" id="bottom-ad-placeholder">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 opacity-50 animate-pulse" />
+        REKLAM ALANI
+      </div>
     </div>
   );
 }
