@@ -10,6 +10,8 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './src/lib/firebase.js';
 import { getRandomWord, isWordInCuratedList } from './src/data/wordlist.js';
 import { turkishUpper, turkishLower } from './src/utils/turkish.js';
+import nspell from 'nspell';
+import dictionaryTr from 'dictionary-tr';
 
 dotenv.config();
 
@@ -208,98 +210,59 @@ app.post('/api/random-word', (req, res) => {
   res.json({ word });
 });
 
-// Helper function to validate and get definition with Gemini AI
-async function validateAndGetDefinitionWithGemini(normalized: string, wordLength: number): Promise<{ valid: boolean; definition: string }> {
-  const upperWord = turkishUpper(normalized);
-  const lowerWord = turkishLower(normalized);
-  const prettyWord = upperWord.charAt(0) + upperWord.slice(1).toLocaleLowerCase('tr-TR');
+// Initialize the professional spellchecker with dictionary-tr
+let spellchecker: any = null;
+try {
+  const nspellDict = {
+    aff: Buffer.from((dictionaryTr as any).aff),
+    dic: Buffer.from((dictionaryTr as any).dic)
+  };
+  spellchecker = (nspell as any)(nspellDict);
+  console.log('[Spellchecker] Local Turkish spellchecker initialized successfully.');
+} catch (err) {
+  console.error('[Spellchecker Error] Failed to initialize local spellchecker:', err);
+}
 
-  if (!process.env.GEMINI_API_KEY) {
-    console.warn('[Gemini SDK] GEMINI_API_KEY is not defined, returning fallback.');
-    const inCurated = isWordInCuratedList(normalized, wordLength);
-    if (inCurated) {
-      return { 
-        valid: true, 
-        definition: 'Türkçe sözlükte kayıtlı geçerli bir sözcüktür.' 
-      };
-    }
-    const linguisticCheck = validateTurkishLinguistics(normalized, wordLength);
-    if (linguisticCheck.valid) {
-      return { 
-        valid: true, 
-        definition: 'Yazımı Türkçe dil kurallarına uygun kelime.' 
-      };
-    }
-    return { valid: false, definition: 'Doğrulama yapılamadı.' };
-  }
+// En sade kelime doğrulama fonksiyonu (Türkçe küçük harf çevrimi + spellchecker kontrolü)
+function checkWordWithSpellchecker(word: string): boolean {
+  if (!spellchecker) return false;
+  const lowerWord = word.trim().toLocaleLowerCase('tr-TR');
+  return spellchecker.correct(lowerWord);
+}
 
-  try {
-    const prompt = `Lütfen "${upperWord}" (küçük harfle "${lowerWord}") kelimesini kontrol et.
-    
-    ÖNEMLİ VE KESİN KURALLAR:
-    1. Kelime Türkçe dilinde gerçekte var olan, anlamlı ve TDK sözlüğünde bulunan bir kelime mi? (Veya gerçek bir Türkçe kelimenin kurallı çekimi/çoğul hali mi?)
-    2. Türkçe telaffuz ve fonetik kurallarına uysa dahi uydurulmuş, uydurma, uydurulmuş olan ve gerçekte Türkçe sözlükte bulunmayan kelimeleri (Örneğin: "yutro", "tasme", "lahbe", "türbeç" vb.) KESİNLİKLE GEÇERSİZ (valid: false) say.
-    3. Eğer kelime gerçek ve geçerliyse, tanım (definition) alanına SADECE ve SADECE kelimenin GERÇEK Türkçe sözlük anlamını yaz. Kesinlikle "Türkçe sözlükte yer alan bir sözcüktür", "kelime sistem listesinde onaylandı" veya "geçerli Türkçe kelimedir" gibi teknik/jenerik ifadeler yazma. Kelimenin doğrudan net sözlük tanımını döndür.
-    4. Eğer kelime geçersiz ise, neden geçersiz olduğunu belirten kısa bir açıklama yaz (Örn: "Türkçe sözlükte yer almayan, uydurma bir sözcüktür.").
-    
-    Yanıtını SADECE aşağıdaki JSON formatında döndür (başka hiçbir metin veya markdown etiketi ekleme):
-    {
-      "valid": boolean,
-      "definition": "Kelimenin gerçek sözlük tanımı (geçerliyse) veya geçersizlik gerekçesi (geçersizse)."
-    }`;
-
-    const geminiResponse = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        systemInstruction: "Sen uzman bir Türk Dil Kurumu (TDK) sözlük ve Türkçe dilbilgisi uzmanısın. Görevin, verilen kelimenin Türkçe dilinde gerçekte var olan, anlamlı ve sözlükte karşılığı olan bir sözcük (veya bunun kurallı bir çekimi, çoğul hali ya birleşik yapısı) olduğunu doğrulamaktır. Türkçe fonetik yapısına uysa bile uydurulmuş, uydurma olan, gerçekte dilde hiçbir anlam taşımayan ya da sözlükte bulunmayan kelimeleri (örneğin: 'yutro', 'tasme', 'gülbe', 'lahbe' gibi uydurmaları) KESİNLİKLE geçersiz (valid: false) saymalısın. Doğrulanan kelimenin tanımını yaparken 'Türkçe sözlükte yer alan bir sözcüktür' gibi teknik/jenerik mesajlar KESİNLİKLE yazmamalısın. Doğrudan kelimenin gerçek sözlük karşılığı olan tanımını yazmalısın."
-      }
-    });
-
-    if (geminiResponse && geminiResponse.text) {
-      let rawText = geminiResponse.text.trim();
-      // Robust markdown JSON tag removal
-      if (rawText.startsWith('```')) {
-        rawText = rawText.replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
-      }
-      const geminiData = JSON.parse(rawText);
-      if (typeof geminiData.valid === 'boolean') {
-        return {
-          valid: geminiData.valid,
-          definition: geminiData.definition || (geminiData.valid ? 'Türkçe sözlükte geçerli kelime.' : 'Geçersiz Türkçe kelime.')
-        };
-      }
-    }
-  } catch (geminiErr: any) {
-    console.warn(`[Gemini API Offline/Billing Limit]: falling back to local dictionaries. Details: ${geminiErr?.message || geminiErr}`);
-  }
-
-  // Final fallback if Gemini call fails: Check curated list
-  const inCurated = isWordInCuratedList(normalized, wordLength);
+// Core hybrid validation function
+async function validateWordHybrid(word: string): Promise<{ valid: boolean; definition: string }> {
+  // 1. Türkçe kurallarına göre küçük harfe çevir
+  const lowerWord = word.trim().toLocaleLowerCase('tr-TR');
+  
+  // 2. İlk olarak bu kelimeyi bizim yerel kelime listemizde ara. Eğer yerel listede varsa doğrudan geçerli say ve internete hiç sorma.
+  const inCurated = isWordInCuratedList(lowerWord, lowerWord.length);
   if (inCurated) {
-    return { 
-      valid: true, 
-      definition: 'Türkçe sözlükte kayıtlı geçerli bir sözcüktür.' 
-    };
-  }
-
-  // Second offline backup: check heuristic linguistics
-  const linguisticCheck = validateTurkishLinguistics(normalized, wordLength);
-  if (linguisticCheck.valid) {
+    console.log(`[Hybrid Validation] Word "${lowerWord}" found in local list. Directly VALID.`);
     return {
       valid: true,
-      definition: 'Yazımı Türkçe dil kurallarına uygun kelime.'
+      definition: 'Yerel kelime listesinde kayıtlı geçerli bir Türkçe sözcüktür.'
+    };
+  }
+  
+  // 3. Yerel listede yoksa, local spellchecker (yazım denetleyici) ile doğrula
+  const isValid = checkWordWithSpellchecker(lowerWord);
+  if (isValid) {
+    console.log(`[Hybrid Validation] Word "${lowerWord}" is VALID according to local spellchecker.`);
+    return {
+      valid: true,
+      definition: 'Yazım denetimi tarafından onaylanmış geçerli bir Türkçe sözcüktür.'
     };
   }
 
+  console.log(`[Hybrid Validation] Word "${lowerWord}" is INVALID according to local spellchecker.`);
   return {
     valid: false,
-    definition: 'Doğrulama servisi şu anda yanıt vermiyor veya kelime geçersiz.'
+    definition: 'Kelime Türkçe sözlükte bulunamadı.'
   };
 }
 
-// Endpoint to validate if a word is valid using Gemini API
+// Endpoint to validate if a word is valid
 app.post('/api/validate-word', async (req, res) => {
   try {
     const { word, length } = req.body;
@@ -307,6 +270,8 @@ app.post('/api/validate-word', async (req, res) => {
       return res.status(400).json({ error: 'Word is required' });
     }
 
+    // 1. Türkçe kurallarına göre küçük harfe çevir
+    const lowerWord = word.trim().toLocaleLowerCase('tr-TR');
     const normalized = turkishUpper(word.trim());
     const wordLength = Number(length) || normalized.length;
 
@@ -314,7 +279,7 @@ app.post('/api/validate-word', async (req, res) => {
       return res.json({ valid: false, reason: 'Harf sayısı uyuşmuyor' });
     }
 
-    // 1. Heuristic linguistic validation (blocks keyboard smash, repetitive letters like rrrrr before cache or API calls)
+    // 1.1 Heuristic linguistic validation (blocks keyboard smash, repetitive letters like rrrrr before cache or API calls)
     const linguisticCheck = validateTurkishLinguistics(normalized, wordLength);
     if (!linguisticCheck.valid) {
       return res.json({
@@ -323,70 +288,64 @@ app.post('/api/validate-word', async (req, res) => {
       });
     }
 
-    // 2. Check cache
+    // 2. İlk olarak bu kelimeyi bizim yerel kelime listemizde ara. Eğer yerel listede varsa doğrudan geçerli say ve internete hiç sorma.
+    const inCurated = isWordInCuratedList(lowerWord, wordLength);
+    if (inCurated) {
+      console.log(`[Hybrid Validation - Route] Word "${lowerWord}" found in local list. Directly VALID.`);
+      return res.json({
+        valid: true,
+        definition: 'Yerel kelime listesinde kayıtlı geçerli bir Türkçe sözcüktür.'
+      });
+    }
+
+    // 3. Eğer yerel listede yoksa, local spellchecker öncesi Cache / Firestore kontrol et
     const cacheKey = `${normalized}_${wordLength}`;
     if (wordCache[cacheKey]) {
-      const cached = wordCache[cacheKey];
-      const isGeneric = cached.definition && (
-        cached.definition.includes('sözlükte yer alan') ||
-        cached.definition.includes('hece yapısına uygun') ||
-        cached.definition.includes('sistem listesinde') ||
-        cached.definition.includes('doğrulandı') ||
-        cached.definition.includes('geçerli bir sözcüktür') ||
-        cached.definition.length < 5
-      );
-      if (!isGeneric || !cached.valid) {
-        return res.json(cached);
-      }
+      return res.json(wordCache[cacheKey]);
     }
 
-    // 2.1 Check Firestore Database
+    // Check Firestore Database
     try {
       const wordDocRef = doc(db, 'dictionary', normalized);
-      const wordSnap = await getDoc(wordDocRef);
-      if (wordSnap.exists()) {
+      const wordSnap = await Promise.race([
+        getDoc(wordDocRef),
+        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 2000))
+      ]);
+      if (wordSnap && wordSnap.exists()) {
         const dbData = wordSnap.data();
-        const isGeneric = dbData.definition && (
-          dbData.definition.includes('sözlükte yer alan') ||
-          dbData.definition.includes('hece yapısına uygun') ||
-          dbData.definition.includes('sistem listesinde') ||
-          dbData.definition.includes('doğrulandı') ||
-          dbData.definition.includes('geçerli bir sözcüktür') ||
-          dbData.definition.length < 5
-        );
-        if (!isGeneric || !dbData.valid) {
-          const dbResult = {
-            valid: dbData.valid,
-            definition: dbData.definition || ''
-          };
-          wordCache[cacheKey] = dbResult;
-          console.log(`[Database Hit] Word "${normalized}" found in database:`, dbResult);
-          return res.json(dbResult);
-        }
+        const dbResult = {
+          valid: dbData.valid,
+          definition: dbData.definition || ''
+        };
+        wordCache[cacheKey] = dbResult;
+        console.log(`[Database Hit] Word "${normalized}" found in database:`, dbResult);
+        return res.json(dbResult);
       }
     } catch (dbErr) {
-      console.warn('Firestore database read failed:', dbErr);
+      console.warn('Firestore database read failed/timed out:', dbErr);
     }
 
-    // 3. Directly validate with Gemini API
-    const geminiResult = await validateAndGetDefinitionWithGemini(normalized, wordLength);
-    wordCache[cacheKey] = geminiResult;
+    // 4. Local spellchecker (yazım denetleyici) sorgusu
+    const validationResult = await validateWordHybrid(normalized);
+    wordCache[cacheKey] = validationResult;
 
-    // Automatically save to database
+    // Automatically save to database (non-blocking in background)
     try {
       const wordDocRef = doc(db, 'dictionary', normalized);
-      await setDoc(wordDocRef, {
+      setDoc(wordDocRef, {
         word: normalized,
-        valid: geminiResult.valid,
-        definition: geminiResult.definition,
+        valid: validationResult.valid,
+        definition: validationResult.definition,
         createdAt: new Date().toISOString()
-      }, { merge: true });
-      console.log(`[Database Save] Saved word "${normalized}" (valid: ${geminiResult.valid}) to database.`);
+      }, { merge: true }).catch(saveErr => {
+        console.error('Failed to save word to Firestore in background:', saveErr);
+      });
+      console.log(`[Database Save] Queued word "${normalized}" (valid: ${validationResult.valid}) to save in background.`);
     } catch (saveErr) {
       console.error('Failed to save word to Firestore:', saveErr);
     }
 
-    return res.json(geminiResult);
+    return res.json(validationResult);
   } catch (error: any) {
     console.error('[Word Validation ERROR]:', error?.message || error);
     res.json({
@@ -396,7 +355,7 @@ app.post('/api/validate-word', async (req, res) => {
   }
 });
 
-// Endpoint to fetch direct definition of any target word from Gemini AI
+// Endpoint to fetch direct definition of any target word
 app.post('/api/get-definition', async (req, res) => {
   try {
     const { word } = req.body;
@@ -405,72 +364,56 @@ app.post('/api/get-definition', async (req, res) => {
     }
 
     const normalized = turkishUpper(word.trim());
+    const lowerWord = word.trim().toLocaleLowerCase('tr-TR');
     const cacheKey = `definition_${normalized}`;
 
-    // Check if we have cached this definition
+    // Check cache
     if (wordCache[cacheKey]) {
-      const cached = wordCache[cacheKey];
-      const isGeneric = cached.definition && (
-        cached.definition.includes('sözlükte yer alan') ||
-        cached.definition.includes('hece yapısına uygun') ||
-        cached.definition.includes('sistem listesinde') ||
-        cached.definition.includes('doğrulandı') ||
-        cached.definition.includes('geçerli bir sözcüktür') ||
-        cached.definition.length < 5
-      );
-      if (!isGeneric) {
-        return res.json(cached);
-      }
+      return res.json(wordCache[cacheKey]);
     }
 
-    // Check Firestore Database
+    // Check Firestore
     try {
       const wordDocRef = doc(db, 'dictionary', normalized);
-      const wordSnap = await getDoc(wordDocRef);
-      if (wordSnap.exists()) {
+      const wordSnap = await Promise.race([
+        getDoc(wordDocRef),
+        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 2000))
+      ]);
+      if (wordSnap && wordSnap.exists()) {
         const dbData = wordSnap.data();
-        if (dbData.valid && dbData.definition) {
-          const isGeneric = dbData.definition && (
-            dbData.definition.includes('sözlükte yer alan') ||
-            dbData.definition.includes('hece yapısına uygun') ||
-            dbData.definition.includes('sistem listesinde') ||
-            dbData.definition.includes('doğrulandı') ||
-            dbData.definition.includes('geçerli bir sözcüktür') ||
-            dbData.definition.length < 5
-          );
-          if (!isGeneric) {
-            const dbResult = { valid: true, definition: dbData.definition };
-            wordCache[cacheKey] = dbResult;
-            console.log(`[Database Hit - Definition] Word "${normalized}" found in database:`, dbResult);
-            return res.json(dbResult);
-          }
+        if (dbData.definition) {
+          const dbResult = { valid: true, definition: dbData.definition };
+          wordCache[cacheKey] = dbResult;
+          console.log(`[Database Hit - Definition] Word "${normalized}" found in database:`, dbResult);
+          return res.json(dbResult);
         }
       }
     } catch (dbErr) {
-      console.warn('Firestore database read for definition failed:', dbErr);
+      console.warn('Firestore database read for definition failed/timed out:', dbErr);
     }
 
-    // Retrieve via Gemini AI (since it's a target word, force valid: true validation behavior)
-    const geminiResult = await validateAndGetDefinitionWithGemini(normalized, normalized.length);
+    // Retrieve via hybrid validation
+    const validationResult = await validateWordHybrid(normalized);
     
-    // Ensure the returned target word definition structure is valid
     const finalResult = {
       valid: true, // Target words are always valid in game contexts
-      definition: geminiResult.definition || 'Türkçe kelime anlamı yüklenemedi.'
+      definition: validationResult.definition || 'Türkçe kelime anlamı yüklenemedi.'
     };
 
     wordCache[cacheKey] = finalResult;
 
-    // Save definition back to Firestore dictionary!
+    // Save definition back to Firestore dictionary (non-blocking in background)
     try {
       const wordDocRef = doc(db, 'dictionary', normalized);
-      await setDoc(wordDocRef, {
+      setDoc(wordDocRef, {
         word: normalized,
         valid: true,
         definition: finalResult.definition,
         createdAt: new Date().toISOString()
-      }, { merge: true });
-      console.log(`[Database Save - Definition] Saved definition for "${normalized}" to database.`);
+      }, { merge: true }).catch(saveErr => {
+        console.error('Failed to save word definition to Firestore in background:', saveErr);
+      });
+      console.log(`[Database Save - Definition] Queued definition for "${normalized}" to save in background.`);
     } catch (saveErr) {
       console.error('Failed to save word definition to Firestore:', saveErr);
     }

@@ -1341,9 +1341,15 @@ export default function App() {
 
                 if (response.ok) {
                   const data = await response.json();
-                  isValid = data.valid;
-                  definition = data.definition || '';
-                  setCachedWord(guess, wordLength, { valid: data.valid, definition: data.definition || '' });
+                  let valResult = data.valid;
+                  const defText = data.definition || '';
+                  const lowerDef = defText.toLowerCase();
+                  if (lowerDef.includes('error') || lowerDef.includes('bulunamadı') || lowerDef.includes('bulunamadi')) {
+                    valResult = false;
+                  }
+                  isValid = valResult;
+                  definition = defText;
+                  setCachedWord(guess, wordLength, { valid: valResult, definition: defText });
                 } else {
                   throw new Error('Server returned non-ok status');
                 }

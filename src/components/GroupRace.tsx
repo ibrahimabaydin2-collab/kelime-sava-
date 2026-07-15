@@ -1245,8 +1245,14 @@ export default function GroupRace({
 
               if (response.ok) {
                 const data = await response.json();
-                isValid = data.valid;
-                setCachedWord(currentGuess, wordLength, { valid: data.valid, definition: data.definition || '' });
+                let valResult = data.valid;
+                const defText = data.definition || '';
+                const lowerDef = defText.toLowerCase();
+                if (lowerDef.includes('error') || lowerDef.includes('bulunamadı') || lowerDef.includes('bulunamadi')) {
+                  valResult = false;
+                }
+                isValid = valResult;
+                setCachedWord(currentGuess, wordLength, { valid: valResult, definition: defText });
               } else {
                 throw new Error('Server returned non-ok status');
               }
