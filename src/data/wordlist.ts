@@ -30,7 +30,24 @@ Object.values(COMMON_TURKISH_WORDS).forEach((list) => {
 });
 
 // Returns a random word from the popular list of specified length
-export function getRandomWord(length: number): string {
+export const EASY_WORDS_LEVEL_1: { [key: number]: string[] } = {
+  3: ['ana', 'arı', 'ara', 'bal', 'çay', 'dağ', 'iyi', 'kar', 'koç', 'şef', 'tek', 'tuz', 'yaz', 'yol', 'son', 'sol', 'sağ', 'süt', 'gül', 'göz', 'gök', 'dil', 'diş', 'baş', 'beş', 'bir', 'biz', 'sen', 'var', 'yok', 'muz', 'dut'],
+  4: ['açık', 'adım', 'alan', 'altı', 'anne', 'baba', 'baca', 'bacı', 'dere', 'deve', 'dolu', 'dost', 'dört', 'duru', 'gemi', 'gece', 'geri', 'gibi', 'kedi', 'kuzu', 'kutu', 'kuru', 'masa', 'mavi', 'okul', 'ordu', 'orta', 'oyun', 'para', 'sarı', 'soru', 'taze', 'uçak', 'uyku', 'uzak', 'uzun', 'yeni', 'yeşil'],
+  5: ['kalem', 'kitap', 'büyük', 'küçük', 'yeşil', 'beyaz', 'siyah', 'kırmızı', 'limon', 'çocuk', 'insan', 'dünya', 'hayat', 'zaman', 'sabah', 'akşam', 'güzel', 'çorba', 'ekmek', 'meyve', 'sebze', 'dolap', 'kaşık', 'çatal', 'tabak', 'bardak', 'sokak', 'şehir', 'deniz', 'güneş', 'bulut', 'yağmur', 'rüzgar', 'bahçe', 'çiçek', 'ağaç'],
+  6: ['adalet', 'akıllı', 'bardak', 'başarı', 'defter', 'eldiven', 'fincan', 'gözlük', 'hayvan', 'karpuz', 'koltuk', 'makas', 'peynir', 'resim', 'sinema', 'tavşan', 'yaprak', 'yemek', 'yıldız', 'yolcu'],
+  7: ['arkadaş', 'belediye', 'hastane', 'merhaba', 'çikolata', 'pencere', 'oyuncak', 'öğrenci', 'telefon', 'bisiklet'],
+  8: ['bilgisayar', 'güzellik', 'telefon', 'temizlik', 'öğretmen', 'kütüphane', 'kelebek']
+};
+
+export function getRandomWord(length: number, isLevel1?: boolean): string {
+  if (isLevel1) {
+    const easyList = EASY_WORDS_LEVEL_1[length];
+    if (easyList && easyList.length > 0) {
+      const word = easyList[Math.floor(Math.random() * easyList.length)];
+      return turkishUpper(word);
+    }
+  }
+
   const words = populerKelimeler[length] || [];
   if (!words || words.length === 0) {
     const fallbackWords: { [key: number]: string[] } = {

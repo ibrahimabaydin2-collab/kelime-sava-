@@ -26,7 +26,7 @@ import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, H
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/turkish.js';
 import { getApiUrl, getWsUrl, validateWordClientSide } from './utils/api.js';
-import { calculateDynamicScore, verifyScoringAccuracy } from './utils/scoring.js';
+import { calculateDynamicScore, verifyScoringAccuracy, getLevelForScore } from './utils/scoring.js';
 import { getCachedWord, setCachedWord } from './utils/wordCache.js';
 
 const INITIAL_STATS = {
@@ -1094,7 +1094,8 @@ export default function App() {
       setWordLength(length);
     } else {
       // Choose target word instantly from the local curated wordlist to eliminate any network/roundtrip delay
-      picked = getRandomWord(length);
+      const isLevel1 = getLevelForScore(profile.dailyScore) === 1;
+      picked = getRandomWord(length, isLevel1);
     }
 
     setTargetWord(picked);
@@ -1380,35 +1381,48 @@ export default function App() {
         }
       }
 
-      if (hasWon) {
-        setGameStatus('won');
-        if (targetWord) {
-          fetchTargetWordDefinition(targetWord);
+      if (activeMatch) {
+        if (hasWon) {
+          showToast(`DOĞRU BİLDİNİZ! +${scoreAwarded} Puan. Sıradaki kelimeye geçiliyor...`, 'success');
+          playEnterSound(settings.soundEnabled);
+          syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded);
+        } else if (updatedAttempts.length >= 6) {
+          showToast(`6 denemede bulamadın! Sıradaki kelimeye geçiliyor... Doğru kelime: ${targetWord}`, 'error');
+          playDefeatSound(settings.soundEnabled);
+          syncMatchState(updatedAttempts, updatedAttempts.length, true, false, 0);
         } else {
-          setWordDefinition(definition || 'Kelime başarılı bir şekilde çözüldü.');
+          setSecondsLeft(20);
+          playEnterSound(settings.soundEnabled);
+          syncMatchState(updatedAttempts, updatedAttempts.length, false, false, 0);
         }
-        if (isDailyPuzzle) {
-          showToast(`☀️ GÜNLÜK BULMACA TAMAMLANDI! +${scoreAwarded} Puan & 'Günlük Bilge' Rozeti!`, 'success');
-        } else {
-          showToast(`TEBRİKLER! Kelimeyi doğru bildiniz! +${scoreAwarded} Puan`, 'success');
-        }
-        triggerVictoryCelebration(settings.soundEnabled);
-        
-        // Update user statistics & milestones
-        handleGameWin(updatedAttempts.length, scoreAwarded);
-      } else if (updatedAttempts.length >= 6) {
-        handleGameLoss();
       } else {
-        // Continue playing, reset timer back to 20s
-        setSecondsLeft(20);
-        if (gameMode === 'timed' && !isDailyPuzzle) {
-          showToast('Deneme kabul edildi. Süre sıfırlandı!', 'success');
+        if (hasWon) {
+          setGameStatus('won');
+          if (targetWord) {
+            fetchTargetWordDefinition(targetWord);
+          } else {
+            setWordDefinition(definition || 'Kelime başarılı bir şekilde çözüldü.');
+          }
+          if (isDailyPuzzle) {
+            showToast(`☀️ GÜNLÜK BULMACA TAMAMLANDI! +${scoreAwarded} Puan & 'Günlük Bilge' Rozeti!`, 'success');
+          } else {
+            showToast(`TEBRİKLER! Kelimeyi doğru bildiniz! +${scoreAwarded} Puan`, 'success');
+          }
+          triggerVictoryCelebration(settings.soundEnabled);
+          
+          // Update user statistics & milestones
+          handleGameWin(updatedAttempts.length, scoreAwarded);
+        } else if (updatedAttempts.length >= 6) {
+          handleGameLoss();
+        } else {
+          // Continue playing, reset timer back to 20s
+          setSecondsLeft(20);
+          if (gameMode === 'timed' && !isDailyPuzzle) {
+            showToast('Deneme kabul edildi. Süre sıfırlandı!', 'success');
+          }
+          playEnterSound(settings.soundEnabled);
         }
-        playEnterSound(settings.soundEnabled);
       }
-
-      // Sync state if in real-time battle
-      syncMatchState(updatedAttempts, updatedAttempts.length, hasWon || updatedAttempts.length >= 6, hasWon, scoreAwarded);
 
     } catch (e) {
       console.error('Failed to validate word', e);
@@ -2015,9 +2029,9 @@ export default function App() {
         )}
 
         {/* Game Layout Wrapper */}
-        <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-1.5 sm:gap-2 relative z-10">
+        <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-0.5 sm:gap-1 relative z-10">
           {/* Game Area Card */}
-          <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2rem] border border-[#3E485A]/30 p-3 sm:p-4 shadow-2xl flex flex-col items-center justify-between flex-1 min-h-0 overflow-hidden gap-y-1.5 transition-all duration-200 relative text-white" id="game-area-card">
+          <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[1.5rem] border border-[#3E485A]/30 p-2 sm:p-3 shadow-2xl flex flex-col items-center justify-between flex-1 min-h-0 overflow-hidden gap-y-0.5 transition-all duration-200 relative text-white" id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -2069,6 +2083,11 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {/* Spacer A */}
+          {gameStatus === 'playing' && (
+            <div className="flex-1 min-h-[0.25rem] sm:min-h-[0.5rem]" />
+          )}
 
           {/* Letter Grid */}
           <GameBoard
@@ -2214,9 +2233,14 @@ export default function App() {
             </div>
           )}
 
+          {/* Spacer B */}
+          {gameStatus === 'playing' && (
+            <div className="flex-1 min-h-[0.25rem] sm:min-h-[0.5rem]" />
+          )}
+
           {/* Loading validation block */}
           {isValidating && (
-            <div className="text-xs text-gray-400 dark:text-gray-500 animate-pulse font-mono flex items-center gap-1.5 py-1">
+            <div className="text-xs text-gray-400 dark:text-gray-500 animate-pulse font-mono flex items-center gap-1.5 py-1 shrink-0">
               <RotateCcw className="animate-spin" size={12} />
               Sözlük doğrulaması yapılıyor...
             </div>
@@ -2236,6 +2260,11 @@ export default function App() {
               }}
               onSubmit={submitGuess}
             />
+          )}
+
+          {/* Spacer C */}
+          {gameStatus === 'playing' && (
+            <div className="flex-1 min-h-[0.25rem] sm:min-h-[0.5rem]" />
           )}
 
           {/* Virtual Keyboard */}

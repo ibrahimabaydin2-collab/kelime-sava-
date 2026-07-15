@@ -33,11 +33,11 @@ export default function Keyboard({
   const rows = keyboardLayout === 'F' ? fRows : qRows;
 
   const getKeyClass = (char: string) => {
-    const base = 'flex-1 h-[clamp(1.4rem,3.4vh,2.4rem)] rounded-lg text-xs sm:text-sm md:text-base font-black flex items-center justify-center transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-sm';
+    const base = 'flex-1 h-[clamp(2.4rem,5.4vh,4.0rem)] rounded-xl text-base sm:text-lg md:text-xl font-black flex items-center justify-center transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-sm';
     const status = letterStatuses[char.toLocaleUpperCase('tr-TR')];
 
     if (char === 'ENTER' || char === 'SIL') {
-      return `${base} bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 hover:from-slate-300 hover:to-slate-400 dark:hover:from-slate-600 dark:hover:to-slate-700 text-slate-800 dark:text-slate-100 text-[10px] sm:text-xs px-2 border border-slate-300 dark:border-slate-600`;
+      return `${base} bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 hover:from-slate-300 hover:to-slate-400 dark:hover:from-slate-600 dark:hover:to-slate-700 text-slate-800 dark:text-slate-100 text-xs sm:text-sm px-2.5 sm:px-3 border border-slate-300 dark:border-slate-600`;
     }
 
     // Dynamic styles based on boardTheme
@@ -76,10 +76,10 @@ export default function Keyboard({
   };
 
   return (
-    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto px-0.5 sm:px-1 mt-1 mb-0">
-      <div className="flex flex-col gap-[clamp(0.12rem,0.6vh,0.3rem)]">
+    <div className="w-full max-w-lg sm:max-w-xl md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto px-1 sm:px-1.5 mt-0 mb-5 sm:mb-7 shrink-0">
+      <div className="flex flex-col gap-1 sm:gap-1.5">
         {rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex justify-center gap-[clamp(0.12rem,0.6vw,0.3rem)]">
+          <div key={rowIndex} className="flex justify-center gap-1 sm:gap-1.5">
             {row.map((char) => {
               const isAction = char === 'ENTER' || char === 'SIL';
               return (
