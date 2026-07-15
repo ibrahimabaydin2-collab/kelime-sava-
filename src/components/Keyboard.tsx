@@ -33,7 +33,7 @@ export default function Keyboard({
   const rows = keyboardLayout === 'F' ? fRows : qRows;
 
   const getKeyClass = (char: string) => {
-    const base = 'flex-1 h-[clamp(2.4rem,5.8vh,4rem)] rounded-xl text-sm sm:text-base font-black flex items-center justify-center transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-sm';
+    const base = 'flex-1 h-[clamp(1.9rem,4.4vh,3.1rem)] rounded-lg text-xs sm:text-sm md:text-base font-black flex items-center justify-center transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-sm';
     const status = letterStatuses[char.toLocaleUpperCase('tr-TR')];
 
     if (char === 'ENTER' || char === 'SIL') {
@@ -76,10 +76,10 @@ export default function Keyboard({
   };
 
   return (
-    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto px-0.5 sm:px-2 mt-2">
-      <div className="flex flex-col gap-[clamp(0.2rem,0.9vh,0.5rem)]">
+    <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto px-0.5 sm:px-1 mt-1 mb-0">
+      <div className="flex flex-col gap-[clamp(0.12rem,0.6vh,0.3rem)]">
         {rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex justify-center gap-[clamp(0.15rem,0.9vw,0.4rem)]">
+          <div key={rowIndex} className="flex justify-center gap-[clamp(0.12rem,0.6vw,0.3rem)]">
             {row.map((char) => {
               const isAction = char === 'ENTER' || char === 'SIL';
               return (

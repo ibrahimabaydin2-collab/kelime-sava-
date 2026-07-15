@@ -40,21 +40,21 @@ export default function GameBoard({
   // Determine dynamic cell sizing based on word length to scale perfectly on mobile devices
   const getCellSizeClass = () => {
     if (wordLength === 3) {
-      return 'w-[clamp(2.6rem,min(14vw,9.5vh),5.5rem)] h-[clamp(2.6rem,min(14vw,9.5vh),5.5rem)] text-2xl sm:text-3xl md:text-4xl border-[3px] rounded-xl';
+      return 'w-[clamp(2.3rem,min(12vw,8vh),4.8rem)] h-[clamp(2.3rem,min(12vw,8vh),4.8rem)] text-xl sm:text-2xl md:text-3xl border-[2.5px] rounded-xl';
     }
     if (wordLength === 4) {
-      return 'w-[clamp(2.3rem,min(12vw,9vh),5rem)] h-[clamp(2.3rem,min(12vw,9vh),5rem)] text-xl sm:text-2xl md:text-3xl border-[3px] rounded-xl';
+      return 'w-[clamp(2rem,min(10.5vw,7.5vh),4.4rem)] h-[clamp(2rem,min(10.5vw,7.5vh),4.4rem)] text-lg sm:text-xl md:text-2xl border-[2.5px] rounded-xl';
     }
     if (wordLength === 5) {
-      return 'w-[clamp(2rem,min(10vw,8.5vh),4.5rem)] h-[clamp(2rem,min(10vw,8.5vh),4.5rem)] text-lg sm:text-xl md:text-2xl border-[2.5px] rounded-xl';
+      return 'w-[clamp(1.8rem,min(9vw,7vh),4rem)] h-[clamp(1.8rem,min(9vw,7vh),4rem)] text-base sm:text-lg md:text-xl border-[2px] rounded-xl';
     }
     if (wordLength === 6) {
-      return 'w-[clamp(1.8rem,min(8.5vw,8vh),4rem)] h-[clamp(1.8rem,min(8.5vw,8vh),4rem)] text-base sm:text-lg md:text-xl border-[2px] sm:border-[2.5px] rounded-lg';
+      return 'w-[clamp(1.6rem,min(8vw,6.5vh),3.5rem)] h-[clamp(1.6rem,min(8vw,6.5vh),3.5rem)] text-sm sm:text-base md:text-lg border-[2px] rounded-lg';
     }
     if (wordLength === 7) {
-      return 'w-[clamp(1.6rem,min(7.5vw,7.5vh),3.5rem)] h-[clamp(1.6rem,min(7.5vw,7.5vh),3.5rem)] text-sm sm:text-base md:text-lg border-[1.5px] sm:border-[2px] rounded-md sm:rounded-lg';
+      return 'w-[clamp(1.4rem,min(7vw,6vh),3.1rem)] h-[clamp(1.4rem,min(7vw,6vh),3.1rem)] text-xs sm:text-sm md:text-base border-[1.5px] rounded-md sm:rounded-lg';
     }
-    return 'w-[clamp(1.5rem,min(6.5vw,7vh),3.2rem)] h-[clamp(1.5rem,min(6.5vw,7vh),3.2rem)] text-xs sm:text-sm md:text-base border-[1.5px] sm:border-[2px] rounded-md sm:rounded-lg';
+    return 'w-[clamp(1.3rem,min(6vw,5.5vh),2.8rem)] h-[clamp(1.3rem,min(6vw,5.5vh),2.8rem)] text-[11px] sm:text-xs md:text-sm border-[1.5px] rounded-md sm:rounded-lg';
   };
 
   // Determine cell classes based on status
@@ -105,14 +105,14 @@ export default function GameBoard({
   };
 
   return (
-    <div className="flex flex-col gap-[clamp(0.2rem,1.2vh,0.5rem)] my-3 items-center justify-center overflow-x-auto w-full px-2">
+    <div className="flex flex-col gap-[clamp(0.12rem,0.6vh,0.35rem)] my-1.5 items-center justify-center overflow-x-auto w-full px-2">
       {rows.map((row, rowIndex) => {
         const isSubmitted = rowIndex < attempts.length;
         const isActive = rowIndex === attempts.length && !isCompleted;
         const wordChars = row.word.split('');
 
         return (
-          <div key={rowIndex} className="flex gap-[clamp(0.2rem,1.2vw,0.5rem)]">
+          <div key={rowIndex} className="flex gap-[clamp(0.12rem,0.6vw,0.35rem)]">
             {wordChars.map((char, charIndex) => {
               const feedback = row.feedback?.[charIndex];
               const cellClass = getCellClass(char, charIndex, isSubmitted, feedback);

@@ -273,7 +273,7 @@ export default function WelcomeScreen({
 
   if (showGameSetup) {
     return (
-      <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-5 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between gap-y-4 sm:gap-y-5 min-h-[82vh] md:min-h-0 md:max-h-none md:h-auto transition-all duration-200 text-white animate-scale-up" id="welcome-setup-page">
+      <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2rem] border border-[#3E485A]/30 p-4 sm:p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between gap-y-2.5 h-full max-h-full transition-all duration-200 text-white animate-scale-up" id="welcome-setup-page">
         {/* Decorative ambient glowing background rings */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-52 h-52 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -286,95 +286,95 @@ export default function WelcomeScreen({
         </div>
 
         {/* Header section with back button and centered title */}
-        <div className="w-full flex flex-col md:grid md:grid-cols-5 items-center gap-4 border-b border-[#3E485A]/40 pb-6 relative z-10" id="setup-header-section">
+        <div className="w-full flex flex-col md:grid md:grid-cols-5 items-center gap-2 border-b border-[#3E485A]/40 pb-2.5 relative z-10" id="setup-header-section">
           <div className="md:col-span-1 w-full flex justify-start">
             <button
               onClick={() => setShowGameSetup(false)}
-              className="flex items-center gap-1.5 text-xs font-black uppercase bg-[#FAF6E9] hover:bg-[#F3EFE0] active:bg-[#EBE6D5] text-[#2E3748] px-4 py-2 rounded-xl border border-[#EBE6D5] shadow-md transition-all active:scale-95 cursor-pointer"
+              className="flex items-center gap-1 text-xs font-black uppercase bg-[#FAF6E9] hover:bg-[#F3EFE0] active:bg-[#EBE6D5] text-[#2E3748] px-3 py-1.5 rounded-xl border border-[#EBE6D5] shadow-md transition-all active:scale-95 cursor-pointer"
               id="setup-back-btn"
             >
-              <ArrowLeft size={13} className="stroke-[2.5]" />
+              <ArrowLeft size={12} className="stroke-[2.5]" />
               <span>Geri Dön</span>
             </button>
           </div>
           
-          <div className="md:col-span-3 flex flex-col items-center justify-center gap-1 text-center">
-            <div className="flex items-center justify-center gap-3">
-              <Swords className="w-6 h-6 text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)] animate-pulse" />
-              <h1 className="text-xl sm:text-2xl font-light font-serif tracking-[0.2em] text-[#FAF6E9] uppercase drop-shadow-md leading-none">
+          <div className="md:col-span-3 flex flex-col items-center justify-center gap-0.5 text-center">
+            <div className="flex items-center justify-center gap-2">
+              <Swords className="w-5 h-5 text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)] animate-pulse" />
+              <h1 className="text-lg sm:text-xl font-light font-serif tracking-[0.2em] text-[#FAF6E9] uppercase drop-shadow-md leading-none">
                 KELİME SAVAŞI
               </h1>
             </div>
-            <div className="h-0.5 w-16 bg-gradient-to-r from-transparent via-amber-400/40 to-transparent mt-1.5" />
-            <span className="text-[10px] font-mono font-bold tracking-[0.2em] text-amber-200/50 uppercase mt-1">OYUN KURMA PANELİ</span>
+            <div className="h-0.5 w-12 bg-gradient-to-r from-transparent via-amber-400/40 to-transparent mt-1" />
+            <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-amber-200/50 uppercase mt-0.5">OYUN KURMA PANELİ</span>
           </div>
 
           <div className="hidden md:block md:col-span-1" />
         </div>
 
         {/* Setup Content */}
-        <div className="space-y-6 relative z-10" id="action-settings-card">
-          <div className="space-y-5" id="game-setup-wizard">
+        <div className="space-y-3 relative z-10 flex-1 flex flex-col justify-between min-h-0" id="action-settings-card">
+          <div className="space-y-3 flex-1 flex flex-col justify-between min-h-0" id="game-setup-wizard">
             
             {/* Giant Premium Mode Cards */}
-            <div className="grid grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-3 gap-2">
               {/* Solo Card */}
               <button
                 onClick={() => setSelectedTab('solo')}
-                className={`py-6 px-3 rounded-[2rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-3 text-center cursor-pointer active:scale-95 hover:scale-[1.03] ${
+                className={`py-2.5 px-2 rounded-[1.2rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer active:scale-95 hover:scale-[1.02] ${
                   selectedTab === 'solo'
-                    ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] font-black shadow-[0_10px_20px_rgba(250,246,233,0.15)] ring-4 ring-emerald-400/35'
+                    ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] font-black shadow-[0_5px_10px_rgba(250,246,233,0.15)] ring-2 ring-emerald-400/35'
                     : 'bg-[#3D4756]/40 text-[#FAF6E9]/80 border-white/5 hover:bg-[#3D4756]/70'
                 }`}
               >
-                <Puzzle className={`w-8 h-8 ${selectedTab === 'solo' ? 'text-emerald-600' : 'text-emerald-400'}`} />
-                <span className="text-xs sm:text-sm font-black uppercase tracking-wider leading-none">SOLO PRATİK</span>
+                <Puzzle className={`w-5 h-5 ${selectedTab === 'solo' ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider leading-none">SOLO PRATİK</span>
               </button>
 
               {/* PvP Card */}
               <button
                 onClick={() => setSelectedTab('pvp')}
-                className={`py-6 px-3 rounded-[2rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-3 text-center cursor-pointer active:scale-95 hover:scale-[1.03] ${
+                className={`py-2.5 px-2 rounded-[1.2rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer active:scale-95 hover:scale-[1.02] ${
                   selectedTab === 'pvp'
-                    ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] font-black shadow-[0_10px_20px_rgba(250,246,233,0.15)] ring-4 ring-amber-400/20'
+                    ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] font-black shadow-[0_5px_10px_rgba(250,246,233,0.15)] ring-2 ring-amber-400/20'
                     : 'bg-[#3D4756]/40 text-[#FAF6E9]/80 border-white/5 hover:bg-[#3D4756]/70'
                 }`}
               >
-                <Swords className={`w-8 h-8 ${selectedTab === 'pvp' ? 'text-amber-600' : 'text-amber-400'}`} />
-                <span className="text-xs sm:text-sm font-black uppercase tracking-wider leading-none">CANLI DÜELLO</span>
+                <Swords className={`w-5 h-5 ${selectedTab === 'pvp' ? 'text-amber-600' : 'text-amber-400'}`} />
+                <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider leading-none">CANLI DÜELLO</span>
               </button>
 
               {/* Group Card */}
               {onStartGroupRace && (
                 <button
                   onClick={() => setSelectedTab('group')}
-                  className={`py-6 px-3 rounded-[2rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-3 text-center cursor-pointer active:scale-95 hover:scale-[1.03] ${
+                  className={`py-2.5 px-2 rounded-[1.2rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer active:scale-95 hover:scale-[1.02] ${
                     selectedTab === 'group'
-                      ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] font-black shadow-[0_10px_20px_rgba(250,246,233,0.15)] ring-4 ring-amber-400/20'
+                      ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] font-black shadow-[0_5px_10px_rgba(250,246,233,0.15)] ring-2 ring-amber-400/20'
                       : 'bg-[#3D4756]/40 text-[#FAF6E9]/80 border-white/5 hover:bg-[#3D4756]/70'
                   }`}
                 >
-                  <Trophy className={`w-8 h-8 ${selectedTab === 'group' ? 'text-amber-600' : 'text-amber-400'}`} />
-                  <span className="text-xs sm:text-sm font-black uppercase tracking-wider leading-none">GRUP YARIŞI</span>
+                  <Trophy className={`w-5 h-5 ${selectedTab === 'group' ? 'text-amber-600' : 'text-amber-400'}`} />
+                  <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider leading-none">GRUP YARIŞI</span>
                 </button>
               )}
             </div>
 
             {/* Parameter Controls specific to selected mode with enlarged fonts and cream highlights */}
             {selectedTab !== 'group' ? (
-              <div className="space-y-5 bg-[#3D4756]/30 p-5 sm:p-6 rounded-[2rem] border border-white/5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="space-y-3 bg-[#3D4756]/30 p-4 sm:p-4.5 rounded-[1.5rem] border border-white/5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Word Length Selector */}
-                  <div className="space-y-2 text-left">
-                    <span className="text-[10px] font-black text-amber-300/80 font-mono tracking-wider uppercase block">HARF SAYISI SEÇİMİ</span>
-                    <div className="grid grid-cols-6 gap-1.5 p-1 bg-black/35 rounded-xl border border-white/5">
+                  <div className="space-y-1.5 text-left">
+                    <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase block">HARF SAYISI SEÇİMİ</span>
+                    <div className="grid grid-cols-6 gap-1 p-0.5 bg-black/35 rounded-xl border border-white/5">
                       {[3, 4, 5, 6, 7, 8].map((len) => (
                         <button
                           key={len}
                           onClick={() => onChangeWordLength(len)}
-                          className={`py-2 rounded-lg text-sm font-black transition-all duration-200 active:scale-90 ${
+                          className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 active:scale-90 ${
                             wordLength === len
-                              ? 'bg-[#FAF6E9] text-[#2E3748] shadow-md ring-2 ring-amber-400/20'
+                              ? 'bg-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
                               : 'text-[#FAF6E9]/75 hover:bg-white/5 hover:text-white'
                           }`}
                         >
@@ -385,29 +385,29 @@ export default function WelcomeScreen({
                   </div>
 
                   {/* Dictionary Mode Selector */}
-                  <div className="space-y-2 text-left">
-                    <span className="text-[10px] font-black text-amber-300/80 font-mono tracking-wider uppercase block">SÖZLÜK MODU</span>
-                    <div className="grid grid-cols-2 gap-1.5 bg-black/35 p-1 rounded-xl border border-white/5">
+                  <div className="space-y-1.5 text-left">
+                    <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase block">SÖZLÜK MODU</span>
+                    <div className="grid grid-cols-2 gap-1 bg-black/35 p-0.5 rounded-xl border border-white/5">
                       <button
                         onClick={() => onChangeDictionaryMode('tdk_online')}
-                        className={`py-2 rounded-lg text-sm font-black transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 ${
+                        className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-95 ${
                           dictionaryMode === 'tdk_online'
-                            ? 'bg-[#FAF6E9] text-[#2E3748] shadow-md ring-2 ring-amber-400/20'
+                            ? 'bg-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
                             : 'text-[#FAF6E9]/75 hover:bg-white/5 hover:text-white'
                         }`}
                       >
-                        <Globe size={13} className="stroke-[2.5]" />
+                        <Globe size={11} className="stroke-[2.5]" />
                         <span>Sözlük Modu</span>
                       </button>
                       <button
                         onClick={() => onChangeDictionaryMode('no_validation')}
-                        className={`py-2 rounded-lg text-sm font-black transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 ${
+                        className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-95 ${
                           dictionaryMode === 'no_validation'
-                            ? 'bg-[#FAF6E9] text-[#2E3748] shadow-md ring-2 ring-amber-400/20'
+                            ? 'bg-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
                             : 'text-[#FAF6E9]/75 hover:bg-white/5 hover:text-white'
                         }`}
                       >
-                        <ShieldAlert size={13} className="stroke-[2.5]" />
+                        <ShieldAlert size={11} className="stroke-[2.5]" />
                         <span>Serbest</span>
                       </button>
                     </div>
@@ -416,95 +416,95 @@ export default function WelcomeScreen({
 
                 {/* Mode-specific secondary settings */}
                 {selectedTab === 'solo' ? (
-                  <div className="space-y-2 text-left border-t border-white/5 pt-4">
-                    <span className="text-[10px] font-black text-amber-300/80 font-mono tracking-wider uppercase flex items-center gap-1">
-                      <Zap size={12} className="text-amber-400 animate-pulse fill-amber-400/20" /> SÜRE VE ZAMAN KURALI
+                  <div className="space-y-1.5 text-left border-t border-white/5 pt-2">
+                    <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase flex items-center gap-1">
+                      <Zap size={10} className="text-amber-400 animate-pulse fill-amber-400/20" /> SÜRE VE ZAMAN KURALI
                     </span>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => onChangeGameMode('timed')}
-                        className={`py-3 px-4 rounded-xl text-sm font-black transition-all duration-200 flex items-center justify-center gap-2.5 border active:scale-95 cursor-pointer ${
+                        className={`py-1.5 px-3 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 border active:scale-95 cursor-pointer ${
                           gameMode === 'timed'
-                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-md ring-2 ring-amber-400/20'
+                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
                             : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
                         }`}
                       >
-                        <span>⏱️ Süreli Oyun (20 sn)</span>
+                        <span>⏱️ Süreli (20 sn)</span>
                       </button>
                       <button
                         onClick={() => onChangeGameMode('untimed')}
-                        className={`py-3 px-4 rounded-xl text-sm font-black transition-all duration-200 flex items-center justify-center gap-2.5 border active:scale-95 cursor-pointer ${
+                        className={`py-1.5 px-3 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 border active:scale-95 cursor-pointer ${
                           gameMode === 'untimed'
-                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-md ring-2 ring-amber-400/20'
+                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
                             : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
                         }`}
                       >
-                        <span>♾️ Süresiz Oyun</span>
+                        <span>♾️ Süresiz</span>
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2 text-left border-t border-white/5 pt-4">
-                    <span className="text-[10px] font-black text-amber-300/80 font-mono tracking-wider uppercase flex items-center gap-1">
-                      <Swords size={12} className="text-amber-400" /> DÜELLO SÜRESİNCEKİ TUR SAYISI
+                  <div className="space-y-1.5 text-left border-t border-white/5 pt-2">
+                    <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase flex items-center gap-1">
+                      <Swords size={10} className="text-amber-400" /> DÜELLO SÜRESİNCEKİ TUR SAYISI
                     </span>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => setSelectedMatchWords(3)}
-                        className={`py-3 rounded-xl text-sm font-black transition-all duration-200 flex items-center justify-center gap-2 border active:scale-95 cursor-pointer ${
+                        className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1 border active:scale-95 cursor-pointer ${
                           selectedMatchWords === 3
-                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-md ring-2 ring-amber-400/20'
+                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
                             : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
                         }`}
                       >
-                        <span>3 Kelime (Hızlı Savaş)</span>
+                        <span>3 Kelime (Hızlı)</span>
                       </button>
                       <button
                         onClick={() => setSelectedMatchWords(5)}
-                        className={`py-3 rounded-xl text-sm font-black transition-all duration-200 flex items-center justify-center gap-2 border active:scale-95 cursor-pointer ${
+                        className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1 border active:scale-95 cursor-pointer ${
                           selectedMatchWords === 5
-                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-md ring-2 ring-amber-400/20'
+                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
                             : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
                         }`}
                       >
-                        <span>5 Kelime (Uzun Savaş)</span>
+                        <span>5 Kelime (Uzun)</span>
                       </button>
                     </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="space-y-5 bg-[#3D4756]/35 p-5 sm:p-6 rounded-[2rem] border border-white/10 animate-scale-up text-left relative overflow-hidden shadow-2xl">
+              <div className="space-y-3 bg-[#3D4756]/35 p-4 rounded-[1.5rem] border border-white/10 animate-scale-up text-left relative overflow-hidden shadow-2xl">
                 <div className="absolute top-0 right-0 -translate-y-8 translate-x-8 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
                 
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  <span className="text-[10px] font-black text-amber-300 font-mono tracking-wider uppercase">
+                  <span className="text-[9px] font-black text-amber-300 font-mono tracking-wider uppercase">
                     Grup Yarışı Oyun Modunu Seçin
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Option 1: Çevrimiçi Savaş */}
                   <button
                     onClick={() => {
                       onStartGroupRace && onStartGroupRace('online');
                       setShowGameSetup(false);
                     }}
-                    className="group bg-[#1E2532]/90 hover:bg-[#1E2532] border border-white/5 hover:border-emerald-500/50 rounded-[1.5rem] p-4 text-left transition-all duration-300 hover:shadow-[0_4px_25px_rgba(16,185,129,0.15)] active:scale-[0.98] cursor-pointer relative overflow-hidden"
+                    className="group bg-[#1E2532]/90 hover:bg-[#1E2532] border border-white/5 hover:border-emerald-500/50 rounded-[1.2rem] p-2.5 text-left transition-all duration-300 hover:shadow-[0_4px_25px_rgba(16,185,129,0.15)] active:scale-[0.98] cursor-pointer relative overflow-hidden"
                   >
                     <div className="absolute top-0 right-0 -translate-y-4 translate-x-4 w-12 h-12 bg-emerald-500/5 group-hover:bg-emerald-500/10 rounded-full blur-lg transition duration-300"></div>
-                    <div className="flex items-center gap-3.5 relative z-10">
-                      <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400 group-hover:scale-110 group-hover:text-emerald-300 transition duration-300 shadow-inner shrink-0 animate-fade-in">
-                        <Globe size={20} className="stroke-[2.5]" />
+                    <div className="flex items-center gap-2.5 relative z-10">
+                      <div className="p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400 group-hover:scale-110 group-hover:text-emerald-300 transition duration-300 shadow-inner shrink-0 animate-fade-in">
+                        <Globe size={16} className="stroke-[2.5]" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-extrabold text-[#FAF6E9] group-hover:text-emerald-300 transition duration-300 flex items-center gap-1.5">
+                        <h4 className="text-xs font-extrabold text-[#FAF6E9] group-hover:text-emerald-300 transition duration-300 flex items-center gap-1.5 leading-tight">
                           Çevrimiçi Savaş
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                         </h4>
-                        <p className="text-[10px] text-slate-400 font-medium leading-normal mt-0.5">
-                          Arkadaşlarınızla oda kodu ile canlı bağlanıp düello yapın.
+                        <p className="text-[9px] text-slate-400 font-medium leading-normal mt-0.5">
+                          Oda kodu ile canlı bağlanıp düello yapın.
                         </p>
                       </div>
                     </div>
@@ -516,19 +516,19 @@ export default function WelcomeScreen({
                       onStartGroupRace && onStartGroupRace('offline');
                       setShowGameSetup(false);
                     }}
-                    className="group bg-[#1E2532]/90 hover:bg-[#1E2532] border border-white/5 hover:border-amber-500/50 rounded-[1.5rem] p-4 text-left transition-all duration-300 hover:shadow-[0_4px_25px_rgba(245,158,11,0.15)] active:scale-[0.98] cursor-pointer relative overflow-hidden"
+                    className="group bg-[#1E2532]/90 hover:bg-[#1E2532] border border-white/5 hover:border-amber-500/50 rounded-[1.2rem] p-2.5 text-left transition-all duration-300 hover:shadow-[0_4px_25px_rgba(245,158,11,0.15)] active:scale-[0.98] cursor-pointer relative overflow-hidden"
                   >
                     <div className="absolute top-0 right-0 -translate-y-4 translate-x-4 w-12 h-12 bg-amber-500/5 group-hover:bg-amber-500/10 rounded-full blur-lg transition duration-300"></div>
-                    <div className="flex items-center gap-3.5 relative z-10">
-                      <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-400 group-hover:scale-110 group-hover:text-amber-300 transition duration-300 shadow-inner shrink-0 animate-fade-in">
-                        <Bot size={20} className="stroke-[2.5]" />
+                    <div className="flex items-center gap-2.5 relative z-10">
+                      <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-400 group-hover:scale-110 group-hover:text-amber-300 transition duration-300 shadow-inner shrink-0 animate-fade-in">
+                        <Bot size={16} className="stroke-[2.5]" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-extrabold text-[#FAF6E9] group-hover:text-amber-300 transition duration-300">
+                        <h4 className="text-xs font-extrabold text-[#FAF6E9] group-hover:text-amber-300 transition duration-300 leading-tight">
                           Yapay Zekaya Karşı
                         </h4>
-                        <p className="text-[10px] text-slate-400 font-medium leading-normal mt-0.5">
-                          19 akıllı bota karşı bekleme süresi olmadan hemen oynayın.
+                        <p className="text-[9px] text-slate-400 font-medium leading-normal mt-0.5">
+                          19 akıllı bota karşı hemen oynayın.
                         </p>
                       </div>
                     </div>
@@ -538,21 +538,21 @@ export default function WelcomeScreen({
             )}
 
             {/* Sleek Dark Info Panel */}
-            <div className="bg-black/35 border border-white/5 rounded-2xl p-4 text-left space-y-1 relative overflow-hidden" id="mode-info-panel">
+            <div className="bg-black/35 border border-white/5 rounded-2xl p-3 text-left space-y-0.5 relative overflow-hidden" id="mode-info-panel">
               <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
-                {selectedTab === 'solo' && <Zap size={40} />}
-                {selectedTab === 'pvp' && <Swords size={40} />}
-                {selectedTab === 'group' && <Trophy size={40} />}
+                {selectedTab === 'solo' && <Zap size={30} />}
+                {selectedTab === 'pvp' && <Swords size={30} />}
+                {selectedTab === 'group' && <Trophy size={30} />}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest font-mono">
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-[9px] font-black text-amber-300 uppercase tracking-widest font-mono">
                   {selectedTab === 'solo' && 'SOLO PRATİK MODU AÇIKLAMASI'}
                   {selectedTab === 'pvp' && 'CANLI DÜELLO MODU AÇIKLAMASI'}
                   {selectedTab === 'group' && 'GRUP YARIŞI MODU AÇIKLAMASI'}
                 </span>
               </div>
-              <p className="text-xs text-gray-300 leading-relaxed font-sans">
+              <p className="text-[11px] text-gray-300 leading-snug font-sans">
                 {selectedTab === 'solo' && 'Kendi başınıza pratik yapıp kendinizi test edin! Süreli veya süresiz oynayarak kelime haznenizi genişletin ve yeni rekorlara koşun.'}
                 {selectedTab === 'pvp' && 'Canlı rakiplerle kıyasıya rekabet edin! Aynı gizli kelimeyi en az denemede ve en kısa sürede çözerek liderlik sıralamasında yükselin.'}
                 {selectedTab === 'group' && 'Arkadaşlarınızla aynı oda koduyla canlı bağlanın! Kimin daha hızlı ve usta bir kelime bükücü olduğunu herkese kanıtlayın.'}
@@ -566,10 +566,10 @@ export default function WelcomeScreen({
                   onStartSoloGame();
                   setShowGameSetup(false);
                 }}
-                className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-base sm:text-lg py-4 px-6 rounded-2xl shadow-[0_5px_0_#D9D4C3,0_8px_15px_rgba(0,0,0,0.2)] transition-all flex items-center justify-center uppercase tracking-widest cursor-pointer border border-[#EBE6D5]"
+                className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] text-[#2E3748] font-black text-xs sm:text-sm py-2.5 px-4 rounded-xl shadow-[0_3px_0_#D9D4C3,0_5px_10px_rgba(0,0,0,0.15)] transition-all flex items-center justify-center uppercase tracking-widest cursor-pointer border border-[#EBE6D5] mb-0"
                 id="start-solo-btn"
               >
-                <Puzzle size={18} className="text-emerald-600 mr-2.5 stroke-[2.5] fill-emerald-600/15" />
+                <Puzzle size={14} className="text-emerald-600 mr-2 stroke-[2.5] fill-emerald-600/15" />
                 <span>Solo Oyununu Başlat</span>
               </button>
             )}
@@ -581,20 +581,19 @@ export default function WelcomeScreen({
                   setShowGameSetup(false);
                 }}
                 disabled={matchmakingStatus === 'queued' || !isOnline}
-                className={`w-full font-black text-base sm:text-lg py-4 px-6 rounded-2xl active:scale-[0.98] active:translate-y-0.5 transition-all flex items-center justify-center uppercase tracking-widest cursor-pointer border-2 ${
+                className={`w-full font-black text-xs sm:text-sm py-2.5 px-4 rounded-xl active:scale-[0.98] transition-all flex items-center justify-center uppercase tracking-widest cursor-pointer border-2 mb-0 ${
                   !isOnline
                     ? 'bg-black/20 text-gray-500 border-white/5 cursor-not-allowed opacity-60'
                     : matchmakingStatus === 'queued'
                     ? 'bg-amber-500 text-slate-950 border-amber-400 animate-pulse'
-                    : 'bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border-[#EBE6D5] shadow-[0_5px_0_#D9D4C3,0_8px_15px_rgba(0,0,0,0.2)]'
+                    : 'bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border-[#EBE6D5] shadow-[0_3px_0_#D9D4C3,0_5px_10px_rgba(0,0,0,0.15)]'
                 }`}
                 id="start-pvp-btn"
               >
-                <Swords size={18} className={`mr-2.5 stroke-[2.5] ${matchmakingStatus === 'queued' ? 'animate-bounce' : 'text-[#2E3748]'}`} />
+                <Swords size={14} className={`mr-2 stroke-[2.5] ${matchmakingStatus === 'queued' ? 'animate-bounce' : 'text-[#2E3748]'}`} />
                 <span>{matchmakingStatus === 'queued' ? 'Aranıyor...' : 'Canlı Düelloyu Başlat'}</span>
               </button>
             )}
-
 
           </div>
         </div>

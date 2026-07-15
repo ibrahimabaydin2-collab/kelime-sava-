@@ -2005,15 +2005,15 @@ export default function App() {
         )}
 
         {/* Game Layout Wrapper */}
-        <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-2 sm:gap-4 relative z-10">
+        <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-1.5 sm:gap-2 relative z-10">
           {/* Game Area Card */}
-          <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-3.5 sm:p-6 shadow-2xl flex flex-col items-center justify-between flex-1 min-h-0 overflow-y-auto scrollbar-thin gap-y-2 transition-all duration-200 relative text-white" id="game-area-card">
+          <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2rem] border border-[#3E485A]/30 p-3 sm:p-4 shadow-2xl flex flex-col items-center justify-between flex-1 min-h-0 overflow-hidden gap-y-1.5 transition-all duration-200 relative text-white" id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
 
           {/* Top Timer & Attempts Tracker */}
-          <div className="w-full flex justify-between items-center mb-4 px-2 border-b border-[#3E485A] pb-3 relative z-10">
+          <div className="w-full flex justify-between items-center mb-2 px-1 border-b border-[#3E485A]/40 pb-2 relative z-10">
             {gameStatus === 'playing' ? (
               <>
                 <div className="flex items-center gap-2">
