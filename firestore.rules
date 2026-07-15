@@ -17,5 +17,9 @@ service cloud.firestore {
     match /dictionary/{word} {
       allow read, write: if true;
     }
+
+    match /daily_puzzles/{docId} {
+      allow read, write: if true;
+    }
   }
 }

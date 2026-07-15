@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 import { WebSocketServer, WebSocket } from 'ws';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './src/lib/firebase.js';
-import { getRandomWord, isWordInCuratedList } from './src/data/wordlist.js';
+import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './src/data/wordlist.js';
 import { turkishUpper, turkishLower } from './src/utils/turkish.js';
 import axios from 'axios';
 
@@ -207,6 +207,87 @@ app.post('/api/random-word', (req, res) => {
   const wordLength = Number(length) || 5;
   const word = getRandomWord(wordLength);
   res.json({ word });
+});
+
+// GET Daily Puzzle Status
+app.get('/api/daily-puzzle', async (req, res) => {
+  try {
+    const { deviceId } = req.query;
+    if (!deviceId || typeof deviceId !== 'string') {
+      return res.status(400).json({ error: 'deviceId is required' });
+    }
+
+    const { dateStr } = getDailyWordAndLength();
+    const rawIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    const ip = String(rawIp).replace(/[^a-zA-Z0-9]/g, '_');
+
+    // Look up device-based document
+    const deviceDocRef = doc(db, 'daily_puzzles', `${dateStr}_${deviceId}`);
+    const deviceDocSnap = await getDoc(deviceDocRef);
+
+    if (deviceDocSnap.exists()) {
+      return res.json(deviceDocSnap.data());
+    }
+
+    // Fallback: look up IP-based document
+    if (ip) {
+      const ipDocRef = doc(db, 'daily_puzzles', `${dateStr}_${ip}`);
+      const ipDocSnap = await getDoc(ipDocRef);
+      if (ipDocSnap.exists()) {
+        return res.json(ipDocSnap.data());
+      }
+    }
+
+    // No existing attempts found, return clean initial state
+    return res.json({
+      dateStr,
+      attempts: [],
+      solved: false,
+      failed: false
+    });
+  } catch (error) {
+    console.error('Error fetching daily puzzle:', error);
+    res.status(500).json({ error: 'Günlük bulmaca verisi alınamadı.' });
+  }
+});
+
+// POST Save Daily Puzzle Progress
+app.post('/api/daily-puzzle', async (req, res) => {
+  try {
+    const { deviceId, attempts, solved, failed } = req.body;
+    if (!deviceId || typeof deviceId !== 'string') {
+      return res.status(400).json({ error: 'deviceId is required' });
+    }
+
+    const { dateStr } = getDailyWordAndLength();
+    const rawIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    const ip = String(rawIp).replace(/[^a-zA-Z0-9]/g, '_');
+
+    const dailyState = {
+      dateStr,
+      deviceId,
+      ipAddress: String(rawIp),
+      attempts: attempts || [],
+      solved: !!solved,
+      failed: !!failed,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Save to deviceId doc
+    const deviceDocRef = doc(db, 'daily_puzzles', `${dateStr}_${deviceId}`);
+    await setDoc(deviceDocRef, dailyState);
+
+    // Save to IP doc for cheat/exploit protection
+    if (ip) {
+      const ipDocRef = doc(db, 'daily_puzzles', `${dateStr}_${ip}`);
+      await setDoc(ipDocRef, dailyState);
+    }
+
+    res.json({ success: true, dailyState });
+  } catch (error) {
+    console.error('Error saving daily puzzle progress:', error);
+    res.status(500).json({ error: 'Günlük bulmaca ilerlemesi kaydedilemedi.' });
+  }
 });
 
 // Core hybrid validation function
@@ -543,6 +624,7 @@ const matches = new Map<string, {
   matchWordsCount?: number;
   currentRound?: number;
   roundsWon?: { [id: string]: number };
+  roundsPlayed?: { [id: string]: number };
   players: {
     [id: string]: {
       name: string;
@@ -747,6 +829,10 @@ const setupWebSocket = (server: any) => {
                     [challenge.challengerId]: 0,
                     [challenge.challengedId]: 0
                   },
+                  roundsPlayed: {
+                    [challenge.challengerId]: 1,
+                    [challenge.challengedId]: 1
+                  },
                   players: {
                     [challenge.challengerId]: {
                       name: challenge.challengerName,
@@ -874,11 +960,17 @@ const setupWebSocket = (server: any) => {
                   if (!match.roundsWon) {
                     match.roundsWon = {};
                   }
+                  if (!match.roundsPlayed) {
+                    match.roundsPlayed = {};
+                  }
                   
                   // Initialize scores for all players in match if not present
                   for (const pId of Object.keys(match.players)) {
                     if (match.roundsWon[pId] === undefined) {
                       match.roundsWon[pId] = 0;
+                    }
+                    if (match.roundsPlayed[pId] === undefined) {
+                      match.roundsPlayed[pId] = 1;
                     }
                   }
 
@@ -887,8 +979,11 @@ const setupWebSocket = (server: any) => {
                     match.roundsWon[playerId] = (match.roundsWon[playerId] || 0) + 1;
                   }
 
+                  // Increment roundsPlayed for this player
+                  match.roundsPlayed[playerId] = (match.roundsPlayed[playerId] || 1) + 1;
+
                   const playerWordsCount = match.roundsWon[playerId] || 0;
-                  const targetWordsLimit = match.matchWordsCount || 3;
+                  const targetWordsLimit = Number(match.matchWordsCount || 3);
 
                   // 2. Check if this player has reached the win limit
                   if (won && playerWordsCount >= targetWordsLimit) {
@@ -936,7 +1031,7 @@ const setupWebSocket = (server: any) => {
                         matchId,
                         targetWord: nextTargetWord,
                         roundsWon: match.roundsWon,
-                        currentRound: playerWordsCount + 1 // Next round index
+                        currentRound: match.roundsPlayed[playerId] || (playerWordsCount + 1) // Next round index
                       }));
                     }
 
@@ -1064,6 +1159,10 @@ const setupWebSocket = (server: any) => {
                   roundsWon: {
                     [playerId]: 0,
                     [opponentId]: 0
+                  },
+                  roundsPlayed: {
+                    [playerId]: 1,
+                    [opponentId]: 1
                   },
                   players: {
                     [playerId]: {

@@ -60,6 +60,21 @@
         "createdAt": { "type": "string" }
       },
       "required": ["word", "valid"]
+    },
+    "DailyPuzzleState": {
+      "title": "DailyPuzzleState",
+      "description": "Persisted attempts and status for the Daily Puzzle",
+      "type": "object",
+      "properties": {
+        "dateStr": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "attempts": { "type": "array" },
+        "solved": { "type": "boolean" },
+        "failed": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["dateStr", "attempts", "solved", "failed"]
     }
   },
   "firestore": {
@@ -78,6 +93,10 @@
     "/dictionary/{word}": {
       "schema": "DictionaryWord",
       "description": "Cached word definitions and validity status"
+    },
+    "/daily_puzzles/{docId}": {
+      "schema": "DailyPuzzleState",
+      "description": "Daily puzzle persistence for exploit prevention"
     }
   }
 }

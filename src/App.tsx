@@ -20,7 +20,7 @@ import GroupRace from './components/GroupRace.js';
 import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import AuthScreen from './components/AuthScreen.js';
 import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
-import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser } from './lib/firebase.js';
+import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser, fetchUserProfileByDeviceId, deleteUserProfile, signInAsGuest } from './lib/firebase.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './data/wordlist.js';
@@ -166,10 +166,52 @@ const safeLocalStorage = {
     } catch (e) {
       console.warn('localStorage setItem blocked/unavailable:', e);
     }
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
+      }
+    } catch (e) {
+      console.warn('localStorage removeItem blocked/unavailable:', e);
+    }
   }
 };
 
+function generateDeviceFingerprint(): string {
+  if (typeof window === 'undefined') return 'server';
+  const nav = (window.navigator || {}) as any;
+  const scr = (window.screen || {}) as any;
+  const userAgent = nav.userAgent || '';
+  const language = nav.language || '';
+  const screenWidth = scr.width || 0;
+  const screenHeight = scr.height || 0;
+  const colorDepth = scr.colorDepth || 0;
+  
+  // Combine factors to build a fingerprint
+  const rawFingerprint = `${userAgent}|${language}|${screenWidth}x${screenHeight}|${colorDepth}`;
+  
+  // Deterministic 32-bit hash
+  let hash = 0;
+  for (let i = 0; i < rawFingerprint.length; i++) {
+    const char = rawFingerprint.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  
+  return 'fp_' + Math.abs(hash).toString(36);
+}
+
 export default function App() {
+  const [deviceId] = useState<string>(() => {
+    let id = safeLocalStorage.getItem('kelimesavasi_device_id');
+    if (!id) {
+      id = generateDeviceFingerprint();
+      safeLocalStorage.setItem('kelimesavasi_device_id', id);
+    }
+    return id;
+  });
+
   // Theme & Menu State
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const saved = safeLocalStorage.getItem('darkMode');
@@ -587,27 +629,71 @@ export default function App() {
 
         if (user) {
           setFirebaseUser(user);
-          // Fetch profile from Firestore (with built-in 4s timeout)
-          const dbProfile = await fetchUserProfile(user.uid);
-          if (active) {
-            if (dbProfile) {
-              setProfile(dbProfile);
-              safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(dbProfile));
-            } else {
-              // If no doc in firestore, sync current profile state
-              const updatedProfile = {
-                ...profile,
-                id: user.uid,
-                nameSet: true
-              };
-              setProfile(updatedProfile);
-              await saveUserProfileToFirestore(updatedProfile);
-              safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+          // Check if we have a pending restoration profile
+          const pendingRestorationJson = safeLocalStorage.getItem('pending_restoration_profile');
+          if (pendingRestorationJson) {
+            const restoredProfile = JSON.parse(pendingRestorationJson);
+            // Move/Create the restored profile to the new authenticated uid
+            const updatedProfile = {
+              ...restoredProfile,
+              id: user.uid,
+              deviceId: deviceId, // ensure bound
+              nameSet: true
+            };
+            setProfile(updatedProfile);
+            await saveUserProfileToFirestore(updatedProfile);
+            // Delete the old profile document to keep usernames unique and avoid duplicate deviceId
+            if (restoredProfile.id && restoredProfile.id !== user.uid) {
+              await deleteUserProfile(restoredProfile.id);
+            }
+            safeLocalStorage.removeItem('pending_restoration_profile');
+            safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+            showToast(`Profiliniz başarıyla geri yüklendi: ${updatedProfile.name}! 🎉`, 'success');
+          } else {
+            // Normal fetch
+            const dbProfile = await fetchUserProfile(user.uid);
+            if (active) {
+              if (dbProfile) {
+                // If the profile does not have deviceId set, or has a different deviceId, bind it!
+                if (!dbProfile.deviceId || dbProfile.deviceId !== deviceId) {
+                  dbProfile.deviceId = deviceId;
+                  await saveUserProfileToFirestore(dbProfile);
+                }
+                setProfile(dbProfile);
+                safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(dbProfile));
+              } else {
+                // If no doc in firestore, sync current profile state
+                const updatedProfile = {
+                  ...profile,
+                  id: user.uid,
+                  deviceId: deviceId,
+                  nameSet: true
+                };
+                setProfile(updatedProfile);
+                await saveUserProfileToFirestore(updatedProfile);
+                safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+              }
             }
           }
         } else {
           if (active) {
             setFirebaseUser(null);
+            
+            // Check if there is an existing anonymous/guest user profile with this deviceId in Firestore
+            try {
+              const existingProfile = await fetchUserProfileByDeviceId(deviceId);
+              if (existingProfile) {
+                console.log('Found existing profile associated with deviceId. Auto-logging in...', existingProfile);
+                // Save it to a temporary localStorage key so we can migrate it once signed in
+                safeLocalStorage.setItem('pending_restoration_profile', JSON.stringify(existingProfile));
+                
+                // Automatically trigger guest sign in
+                showToast('Mevcut profiliniz geri yükleniyor...', 'info');
+                await signInAsGuest();
+              }
+            } catch (deviceCheckErr) {
+              console.error('Error during automatic device profile recovery:', deviceCheckErr);
+            }
           }
         }
       } catch (err) {
@@ -787,7 +873,7 @@ export default function App() {
                 id: matchId,
                 wordLength: len,
                 targetWord: sharedWord,
-                matchWordsCount: matchWordsCount || 1,
+                matchWordsCount: matchWordsCount || 3,
                 currentRound: currentRound || 1,
                 roundsWon: roundsWon || { [profile.id]: 0, [opponentId]: 0 },
                 players: {
@@ -1225,6 +1311,7 @@ export default function App() {
     if (isDailyPuzzle) {
       const { dateStr } = getDailyWordAndLength();
       safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
+      syncDailyPuzzleProgress(attempts, false, true);
     }
 
     // Increment gamesPlayed and reset streak
@@ -1365,6 +1452,12 @@ export default function App() {
 
       // Check if won
       const hasWon = feedback.every((f) => f === 'green');
+
+      if (isDailyPuzzle) {
+        const solved = hasWon;
+        const failed = !hasWon && updatedAttempts.length >= 6;
+        syncDailyPuzzleProgress(updatedAttempts, solved, failed);
+      }
       let scoreAwarded = 0;
       if (hasWon) {
         if (isDailyPuzzle) {
@@ -1686,18 +1779,94 @@ export default function App() {
     }
   };
 
+  const syncDailyPuzzleProgress = async (updatedAttempts: GameAttempt[], solved: boolean, failed: boolean) => {
+    try {
+      await fetch('/api/daily-puzzle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId,
+          attempts: updatedAttempts,
+          solved,
+          failed
+        })
+      });
+    } catch (e) {
+      console.error('Error syncing daily puzzle progress:', e);
+    }
+  };
+
   const todayDateStr = getDailyWordAndLength().dateStr;
   const isDailyPuzzleCompletedToday = safeLocalStorage.getItem('kelimesavasi_daily_completed_date') === todayDateStr;
 
-  const handleStartDailyPuzzle = () => {
+  const handleStartDailyPuzzle = async () => {
     if (isDailyPuzzleCompletedToday) {
       showToast('Bugünkü Günlük Bulmacayı zaten çözdünüz! Yarın yeni bir kelime için tekrar gelin.', 'info');
       return;
     }
-    setIsDailyPuzzle(true);
-    setHasEnteredGame(true);
-    const dailyInfo = getDailyWordAndLength();
-    startNewGame(dailyInfo.length, true);
+
+    setIsValidating(true);
+    try {
+      const response = await fetch(`/api/daily-puzzle?deviceId=${encodeURIComponent(deviceId)}`);
+      if (!response.ok) {
+        throw new Error('Could not fetch daily puzzle status');
+      }
+      const data = await response.json();
+      const dailyInfo = getDailyWordAndLength();
+
+      if (data.solved || data.failed) {
+        showToast('Bugünkü Günlük Bulmacayı zaten çözdünüz/bitirdiniz! Yarın yeni bir kelime için tekrar gelin.', 'info');
+        safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dailyInfo.dateStr);
+        setIsValidating(false);
+        return;
+      }
+
+      setIsDailyPuzzle(true);
+      setHasEnteredGame(true);
+      
+      setWordLength(dailyInfo.length);
+      setTargetWord(dailyInfo.word);
+      setSecondsLeft(20);
+      setWordDefinition('');
+      setLetterStatuses({});
+      setActiveMatch(null);
+
+      if (data.attempts && data.attempts.length > 0) {
+        setAttempts(data.attempts);
+        setCurrentAttempt('');
+        
+        const letterStatusesMap: { [key: string]: 'green' | 'orange' | 'grey' } = {};
+        data.attempts.forEach((attempt: GameAttempt) => {
+          attempt.feedback.forEach((feedbackItem, index) => {
+            const letter = attempt.word[index];
+            const status = feedbackItem;
+            const currentStatus = letterStatusesMap[letter];
+            if (status === 'green') {
+              letterStatusesMap[letter] = 'green';
+            } else if (status === 'orange' && currentStatus !== 'green') {
+              letterStatusesMap[letter] = 'orange';
+            } else if (status === 'grey' && !currentStatus) {
+              letterStatusesMap[letter] = 'grey';
+            }
+          });
+        });
+        setLetterStatuses(letterStatusesMap);
+        showToast('Kaldığınız yerden devam ediyorsunuz!', 'success');
+      } else {
+        setAttempts([]);
+        setCurrentAttempt('');
+      }
+
+      setGameStatus('playing');
+    } catch (error) {
+      console.error('Error loading daily puzzle:', error);
+      setIsDailyPuzzle(true);
+      setHasEnteredGame(true);
+      const dailyInfo = getDailyWordAndLength();
+      startNewGame(dailyInfo.length, true);
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   const handleUpdateProfile = async (name: string, avatarUrl?: string) => {
@@ -1781,6 +1950,11 @@ export default function App() {
         ) : !firebaseUser ? (
           <AuthScreen
             onAuthComplete={(updatedProfile, fUser) => {
+              // Ensure deviceId is stored on the registered/logged-in profile!
+              if (!updatedProfile.deviceId || updatedProfile.deviceId !== deviceId) {
+                updatedProfile.deviceId = deviceId;
+                saveUserProfileToFirestore(updatedProfile);
+              }
               setProfile(updatedProfile);
               setFirebaseUser(fUser);
               safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));

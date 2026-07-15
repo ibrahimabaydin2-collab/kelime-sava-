@@ -599,8 +599,11 @@ export default function GroupRace({
 
   // Local finished handler for Online Mode
   const handleOnlineLocalRoundFinished = async (roundNum: number, solved: boolean, solvedRound: number, finalGuesses: string[]) => {
-    setUserFinished(true);
-    setUserSolved(solved);
+    const isFinished = solved || finalGuesses.length >= 6;
+    if (isFinished) {
+      setUserFinished(true);
+      setUserSolved(solved);
+    }
     
     // Save state to firestore player document
     try {
@@ -1616,25 +1619,25 @@ export default function GroupRace({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="flex overflow-x-auto gap-3 py-2 px-1 scrollbar-thin scrollbar-thumb-[#3E485A] scrollbar-track-transparent snap-x scroll-smooth" id="online-lobby-players-scroller">
               {roomPlayers.map((player) => (
                 <div
                   key={player.id}
-                  className={`p-3 rounded-2xl border flex items-center gap-3 transition ${
+                  className={`p-2.5 rounded-xl border flex items-center gap-2.5 transition shrink-0 w-[160px] snap-start ${
                     player.id === profile.id
                       ? 'bg-[#3D4756] border-emerald-400/40 shadow-md'
                       : 'bg-black/20 border-[#3E485A]/70'
                   }`}
                 >
-                  <span className="w-9 h-9 rounded-full bg-[#1E2532] flex items-center justify-center text-xl shrink-0">
+                  <span className="w-8 h-8 rounded-full bg-[#1E2532] flex items-center justify-center text-lg shrink-0">
                     {player.avatar || '👤'}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-extrabold truncate block text-[#FAF6E9]">
+                    <span className="text-[11px] font-extrabold truncate block text-[#FAF6E9]">
                       {player.name} {player.id === profile.id && '(Siz)'}
                     </span>
-                    <span className="text-[10px] text-emerald-400 block font-bold">
-                      {player.isBot ? '🤖 Yapay Zeka Bot' : (player.id === roomPlayers[0]?.id ? '👑 Ev Sahibi' : '✔ Katıldı')}
+                    <span className="text-[9px] text-emerald-400 block font-bold truncate">
+                      {player.isBot ? '🤖 Bot' : (player.id === roomPlayers[0]?.id ? '👑 Sahibi' : '✔ Katıldı')}
                     </span>
                   </div>
                 </div>
@@ -1726,21 +1729,21 @@ export default function GroupRace({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
+            <div className="flex overflow-x-auto gap-3 py-2 px-1 scrollbar-thin scrollbar-thumb-[#3E485A] scrollbar-track-transparent snap-x scroll-smooth" id="offline-lobby-players-scroller">
               {lobbyPlayers.map((player, idx) => (
                 <div 
                   key={idx} 
-                  className={`p-3 rounded-2xl border flex items-center gap-2.5 transition transform hover:scale-105 duration-150 ${
+                  className={`p-2.5 rounded-xl border flex items-center gap-2.5 transition shrink-0 w-[160px] snap-start ${
                     player.isUser 
-                      ? 'bg-[#3D4756] border-amber-300/65' 
+                      ? 'bg-[#3D4756] border-amber-300/65 shadow-md' 
                       : 'bg-black/25 border-[#3E485A]/85'
                   }`}
                 >
-                  <span className="w-9 h-9 rounded-full bg-[#3D4756] flex items-center justify-center text-xl shadow-inner shrink-0">
+                  <span className="w-8 h-8 rounded-full bg-[#3D4756] flex items-center justify-center text-lg shadow-inner shrink-0">
                     {player.avatar}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-extrabold truncate block text-[#FAF6E9]">
+                    <span className="text-[11px] font-extrabold truncate block text-[#FAF6E9]">
                       {player.name}
                     </span>
                     <span className={`text-[9px] font-bold block ${player.ready ? 'text-emerald-400' : 'text-gray-400 animate-pulse'}`}>
@@ -1750,10 +1753,9 @@ export default function GroupRace({
                 </div>
               ))}
 
-              {/* Placeholder slots to show 20 size limit */}
               {Array.from({ length: Math.max(0, 20 - lobbyPlayers.length) }).map((_, idx) => (
-                <div key={`empty-${idx}`} className="border border-dashed border-[#3E485A] p-3 rounded-2xl flex items-center justify-center text-gray-400 min-h-[58px]">
-                  <span className="text-[10px] font-mono tracking-wider">Açık Slot #{lobbyPlayers.length + idx + 1}</span>
+                <div key={`empty-${idx}`} className="border border-dashed border-[#3E485A] p-2 rounded-xl flex items-center justify-center text-gray-500 shrink-0 w-[140px] snap-start min-h-[48px]">
+                  <span className="text-[9px] font-mono tracking-wider">Slot #{lobbyPlayers.length + idx + 1}</span>
                 </div>
               ))}
             </div>

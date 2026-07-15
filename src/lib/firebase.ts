@@ -21,11 +21,17 @@ import {
   doc, 
   getDoc, 
   setDoc,
+  deleteDoc,
   serverTimestamp,
   getDocFromCache,
   persistentLocalCache,
   persistentMultipleTabManager,
-  memoryLocalCache
+  memoryLocalCache,
+  collection,
+  query,
+  where,
+  getDocs,
+  limit
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { UserProfile } from '../types.js';
@@ -114,6 +120,40 @@ export async function sendVerificationEmail(): Promise<void> {
  */
 export async function signOutUser(): Promise<void> {
   await firebaseSignOut(auth);
+}
+
+/**
+ * Fetches the user profile from Firestore matching a specific Device ID
+ */
+export async function fetchUserProfileByDeviceId(deviceId: string): Promise<UserProfile | null> {
+  try {
+    const usersCollection = collection(db, 'users');
+    const q = query(usersCollection, where('deviceId', '==', deviceId), limit(1));
+    const querySnapshot = await Promise.race([
+      getDocs(q),
+      new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Firestore Fetch Timeout')), 4000))
+    ]) as any;
+
+    if (querySnapshot && !querySnapshot.empty) {
+      const docSnap = querySnapshot.docs[0];
+      return docSnap.data() as UserProfile;
+    }
+  } catch (error) {
+    console.warn('Failed to fetch user profile by deviceId:', error);
+  }
+  return null;
+}
+
+/**
+ * Deletes a user profile document from Firestore
+ */
+export async function deleteUserProfile(uid: string): Promise<void> {
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    await deleteDoc(userDocRef);
+  } catch (error) {
+    console.error('Failed to delete user profile:', error);
+  }
 }
 
 /**

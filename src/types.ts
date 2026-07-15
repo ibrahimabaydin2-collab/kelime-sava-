@@ -34,6 +34,7 @@ export interface UserProfile {
   dailyScore: number;
   lastUpdated: string;
   nameSet?: boolean;
+  deviceId?: string;
 }
 
 export interface GameAttempt {
