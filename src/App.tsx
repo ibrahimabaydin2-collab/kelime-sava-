@@ -25,7 +25,7 @@ import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyM
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/turkish.js';
-import { getApiUrl, getWsUrl } from './utils/api.js';
+import { getApiUrl, getWsUrl, validateWordClientSide } from './utils/api.js';
 import { calculateDynamicScore, verifyScoringAccuracy } from './utils/scoring.js';
 import { getCachedWord, setCachedWord } from './utils/wordCache.js';
 
@@ -1298,70 +1298,24 @@ export default function App() {
           isValid = cached.valid;
           definition = cached.definition;
         } else {
-          // 2. FAST LOCAL CHECK: If it is in the curated list, it is definitely valid!
-          const inCurated = isWordInCuratedList(guess, wordLength);
-          if (inCurated) {
-            isValid = true;
-            definition = 'Türkçe sözlükte geçerli kelime.';
-            
-            // Asynchronously fetch the actual detailed Gemini definition in the background to avoid any blocking/lag!
-            fetch(getApiUrl('/api/validate-word'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ word: guess, length: wordLength })
-            })
-              .then(res => res.ok ? res.json() : null)
-              .then(data => {
-                if (data && data.valid) {
-                  setCachedWord(guess, wordLength, { valid: true, definition: data.definition || definition });
-                }
-              })
-              .catch(err => console.warn('Background definition fetch failed:', err));
-
+          // 2. Local heuristic check first (linguistics)
+          const linguisticCheck = validateTurkishLinguistics(guess, wordLength);
+          if (!linguisticCheck.valid) {
+            isValid = false;
+            definition = linguisticCheck.reason;
+            setCachedWord(guess, wordLength, { valid: false, definition: linguisticCheck.reason });
           } else {
-            // 3. Not in curated list. Let's do heuristic linguistic check first
-            const linguisticCheck = validateTurkishLinguistics(guess, wordLength);
-            if (!linguisticCheck.valid) {
-              isValid = false;
-              definition = linguisticCheck.reason;
-              setCachedWord(guess, wordLength, { valid: false, definition: linguisticCheck.reason });
-            } else {
-              // 4. Query Gemini API backend since it is a potential new word
-              try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 seconds timeout
-
-                const response = await fetch(getApiUrl('/api/validate-word'), {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ word: guess, length: wordLength }),
-                  signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-
-                if (response.ok) {
-                  const data = await response.json();
-                  let valResult = data.valid;
-                  const defText = data.definition || '';
-                  const lowerDef = defText.toLowerCase();
-                  if (lowerDef.includes('error') || lowerDef.includes('bulunamadı') || lowerDef.includes('bulunamadi')) {
-                    valResult = false;
-                  }
-                  isValid = valResult;
-                  definition = defText;
-                  setCachedWord(guess, wordLength, { valid: valResult, definition: defText });
-                } else {
-                  throw new Error('Server returned non-ok status');
-                }
-              } catch (fetchErr) {
-                console.warn('Yapay Zeka validation failed or timed out:', fetchErr);
-                isConnectionError = true;
-                
-                // Second offline backup
-                isValid = true;
-                definition = 'Kelime anlamı şu anda yüklenemedi ancak kelime geçerlidir.';
-                showToast('Bağlantı hatası oluştu. Çevrimdışı kurallarla onaylandı.', 'info');
-              }
+            // 3. Robust client-side validation (Local List + Wikisözlük fallback)
+            try {
+              const res = await validateWordClientSide(guess, wordLength);
+              isValid = res.valid;
+              definition = res.definition;
+              setCachedWord(guess, wordLength, { valid: res.valid, definition: res.definition });
+            } catch (validationErr: any) {
+              console.error('[Kelime Doğrulama] Ön yüz doğrulaması başarısız oldu:', validationErr);
+              // Fallback if everything is broken - let the user play
+              isValid = true;
+              definition = 'Kelime anlamı şu anda doğrulanamadı ancak kelime geçerlidir.';
             }
           }
         }

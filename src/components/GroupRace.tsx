@@ -7,7 +7,7 @@ import {
 import { UserProfile } from '../types.js';
 import { getRandomWord, isWordInCuratedList } from '../data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from '../utils/turkish.js';
-import { getApiUrl } from '../utils/api.js';
+import { getApiUrl, validateWordClientSide } from '../utils/api.js';
 import { getCachedWord, setCachedWord } from '../utils/wordCache.js';
 import { 
   collection, doc, setDoc, getDoc, updateDoc, onSnapshot, 
@@ -1215,55 +1215,21 @@ export default function GroupRace({
       if (cached) {
         isValid = cached.valid;
       } else {
-        // 2. FAST LOCAL CHECK: Validate instantly if in curated list
-        if (isWordInCuratedList(currentGuess, wordLength)) {
-          isValid = true;
-          // Cache it locally
-          setCachedWord(currentGuess, wordLength, { 
-            valid: true, 
-            definition: 'Türkçe sözlükte geçerli kelime.' 
-          });
+        // 2. Local heuristic check first (linguistics)
+        const linguisticCheck = validateTurkishLinguistics(currentGuess, wordLength);
+        if (!linguisticCheck.valid) {
+          isValid = false;
+          setCachedWord(currentGuess, wordLength, { valid: false, definition: linguisticCheck.reason });
         } else {
-          // 3. Not in curated list. Let's do heuristic linguistic check first
-          const linguisticCheck = validateTurkishLinguistics(currentGuess, wordLength);
-          if (!linguisticCheck.valid) {
-            isValid = false;
-            setCachedWord(currentGuess, wordLength, { valid: false, definition: linguisticCheck.reason });
-          } else {
-            // 4. Fetch server validation with timeout
-            try {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 seconds timeout
-
-              const response = await fetch(getApiUrl('/api/validate-word'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ word: currentGuess, length: wordLength }),
-                signal: controller.signal
-              });
-              clearTimeout(timeoutId);
-
-              if (response.ok) {
-                const data = await response.json();
-                let valResult = data.valid;
-                const defText = data.definition || '';
-                const lowerDef = defText.toLowerCase();
-                if (lowerDef.includes('error') || lowerDef.includes('bulunamadı') || lowerDef.includes('bulunamadi')) {
-                  valResult = false;
-                }
-                isValid = valResult;
-                setCachedWord(currentGuess, wordLength, { valid: valResult, definition: defText });
-              } else {
-                throw new Error('Server returned non-ok status');
-              }
-            } catch (e) {
-              console.warn('GroupRace Yapay Zeka validation failed or timed out:', e);
-              isConnectionError = true;
-              
-              // Heuristic fallback
-              isValid = true;
-              showToast('Bağlantı hatası oluştu. Çevrimdışı kurallarla onaylandı.', 'info');
-            }
+          // 3. Robust client-side validation (Local List + Wikisözlük fallback)
+          try {
+            const res = await validateWordClientSide(currentGuess, wordLength);
+            isValid = res.valid;
+            setCachedWord(currentGuess, wordLength, { valid: res.valid, definition: res.definition });
+          } catch (validationErr: any) {
+            console.error('[Grup Yarışı Kelime Doğrulama] Ön yüz doğrulaması başarısız oldu:', validationErr);
+            // Fallback if everything is broken - let the user play
+            isValid = true;
           }
         }
       }

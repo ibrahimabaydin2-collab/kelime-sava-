@@ -80,7 +80,7 @@ async function run() {
     const validChars = /^[a-zçğıöşüâîûA-ZÇĞİÖŞÜÂÎÛ]+$/;
 
     for (const rawWord of words) {
-      const word = rawWord.trim();
+      const word = rawWord.replace(/\r/g, '').replace(/\n/g, '').trim();
       if (!word) continue;
       
       // Clean word as per requirement:
@@ -122,7 +122,7 @@ const CLEANED_TURKISH_WORDS: { [key: number]: string[] } = {};
 
 Object.values(COMMON_TURKISH_WORDS).forEach((list) => {
   list.forEach((word) => {
-    const trimmed = word.trim();
+    const trimmed = word.replace(/\r/g, '').replace(/\n/g, '').trim();
     const len = trimmed.length;
     if (len >= 3 && len <= 8) {
       if (!CLEANED_TURKISH_WORDS[len]) {

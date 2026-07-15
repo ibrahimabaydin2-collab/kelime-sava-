@@ -10,8 +10,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './src/lib/firebase.js';
 import { getRandomWord, isWordInCuratedList } from './src/data/wordlist.js';
 import { turkishUpper, turkishLower } from './src/utils/turkish.js';
-import nspell from 'nspell';
-import dictionaryTr from 'dictionary-tr';
+import axios from 'axios';
 
 dotenv.config();
 
@@ -210,56 +209,119 @@ app.post('/api/random-word', (req, res) => {
   res.json({ word });
 });
 
-// Initialize the professional spellchecker with dictionary-tr
-let spellchecker: any = null;
-try {
-  const nspellDict = {
-    aff: Buffer.from((dictionaryTr as any).aff),
-    dic: Buffer.from((dictionaryTr as any).dic)
-  };
-  spellchecker = (nspell as any)(nspellDict);
-  console.log('[Spellchecker] Local Turkish spellchecker initialized successfully.');
-} catch (err) {
-  console.error('[Spellchecker Error] Failed to initialize local spellchecker:', err);
-}
-
-// En sade kelime doğrulama fonksiyonu (Türkçe küçük harf çevrimi + spellchecker kontrolü)
-function checkWordWithSpellchecker(word: string): boolean {
-  if (!spellchecker) return false;
-  const lowerWord = word.trim().toLocaleLowerCase('tr-TR');
-  return spellchecker.correct(lowerWord);
-}
-
 // Core hybrid validation function
 async function validateWordHybrid(word: string): Promise<{ valid: boolean; definition: string }> {
-  // 1. Türkçe kurallarına göre küçük harfe çevir
-  const lowerWord = word.trim().toLocaleLowerCase('tr-TR');
-  
-  // 2. İlk olarak bu kelimeyi bizim yerel kelime listemizde ara. Eğer yerel listede varsa doğrudan geçerli say ve internete hiç sorma.
-  const inCurated = isWordInCuratedList(lowerWord, lowerWord.length);
-  if (inCurated) {
-    console.log(`[Hybrid Validation] Word "${lowerWord}" found in local list. Directly VALID.`);
-    return {
-      valid: true,
-      definition: 'Yerel kelime listesinde kayıtlı geçerli bir Türkçe sözcüktür.'
-    };
-  }
-  
-  // 3. Yerel listede yoksa, local spellchecker (yazım denetleyici) ile doğrula
-  const isValid = checkWordWithSpellchecker(lowerWord);
-  if (isValid) {
-    console.log(`[Hybrid Validation] Word "${lowerWord}" is VALID according to local spellchecker.`);
-    return {
-      valid: true,
-      definition: 'Yazım denetimi tarafından onaylanmış geçerli bir Türkçe sözcüktür.'
-    };
-  }
+  try {
+    // 1. Türkçe kurallarına göre küçük harfe çevir
+    const lowerWord = word.trim().toLocaleLowerCase('tr-TR');
+    console.log(`[Hybrid Validation] Validating word: "${word}" (normalized lower: "${lowerWord}")`);
 
-  console.log(`[Hybrid Validation] Word "${lowerWord}" is INVALID according to local spellchecker.`);
-  return {
-    valid: false,
-    definition: 'Kelime Türkçe sözlükte bulunamadı.'
-  };
+    // 2. İlk olarak bu kelimeyi bizim yerel kelime listemizde ara. Eğer yerel listede varsa doğrudan geçerli say ve internete hiç sorma.
+    const inCurated = isWordInCuratedList(lowerWord, lowerWord.length);
+    if (inCurated) {
+      console.log(`[Hybrid Validation Result] Word "${lowerWord}" found in local list. Directly VALID.`);
+      return {
+        valid: true,
+        definition: 'Yerel kelime listesinde kayıtlı geçerli bir Türkçe sözcüktür.'
+      };
+    }
+
+    // 3. Eğer yerel listede yoksa, doğrudan Axios kullanarak Wikisözlük API'sine sorgu gönder.
+    // Sorgu adresi: https://tr.wiktionary.org/w/api.php?action=query&prop=revisions&rvprop=content&format=json&titles=kelime
+    const url = `https://tr.wiktionary.org/w/api.php?action=query&prop=revisions&rvprop=content&format=json&titles=${encodeURIComponent(lowerWord)}`;
+    
+    console.log(`[Wiktionary Query] Sending request for: "${lowerWord}"`);
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      timeout: 5000
+    });
+
+    const data = response.data;
+    if (!data || !data.query || !data.query.pages) {
+      console.log(`[Wiktionary Result] Word "${lowerWord}" is INVALID (No query or pages found in response)`);
+      return {
+        valid: false,
+        definition: 'Kelime Wikisözlük\'te bulunamadı.'
+      };
+    }
+
+    const pages = data.query.pages;
+    const pageKeys = Object.keys(pages);
+    if (pageKeys.length === 0 || pageKeys[0] === '-1') {
+      console.log(`[Wiktionary Result] Word "${lowerWord}" is INVALID (Page not found / missing)`);
+      return {
+        valid: false,
+        definition: 'Kelime Wikisözlük\'te bulunamadı.'
+      };
+    }
+
+    const page = pages[pageKeys[0]];
+    if (page.missing !== undefined) {
+      console.log(`[Wiktionary Result] Word "${lowerWord}" is INVALID (Page has missing property)`);
+      return {
+        valid: false,
+        definition: 'Kelime Wikisözlük\'te bulunamadı.'
+      };
+    }
+
+    if (!page.revisions || !Array.isArray(page.revisions) || page.revisions.length === 0) {
+      console.log(`[Wiktionary Result] Word "${lowerWord}" is INVALID (No revisions found)`);
+      return {
+        valid: false,
+        definition: 'Kelime Wikisözlük\'te bulunamadı.'
+      };
+    }
+
+    const content = page.revisions[0]['*'] || '';
+    
+    // Check if Turkish header or template exists in the content:
+    // "Gelen içerik içinde dil|tr veya Türkçe kelimeleri geçiyorsa kelimeyi doğrudan geçerli say."
+    const hasTurkishHeader = content.includes('dil|tr') || content.includes('Türkçe') || /==\s*Türkçe\s*==/.test(content);
+    
+    if (hasTurkishHeader) {
+      console.log(`[Wiktionary Result] Word "${lowerWord}" is VALID (Found Turkish section)`);
+      
+      // Try to extract a clean definition from the wikitext content for display
+      const lines = content.split('\n');
+      let definition = '';
+      for (const line of lines) {
+        if (line.startsWith('#') && !line.startsWith('##') && line.length > 5) {
+          let cleanLine = line.substring(1).trim();
+          cleanLine = cleanLine.replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_, p1, p2) => p2 || p1);
+          cleanLine = cleanLine.replace(/\{\{[^}]+\}\}/g, '');
+          cleanLine = cleanLine.replace(/'''?/g, '');
+          if (cleanLine.length > 3) {
+            definition = cleanLine;
+            break;
+          }
+        }
+      }
+
+      if (!definition) {
+        definition = 'Wikisözlük\'te kayıtlı geçerli bir Türkçe sözcüktür.';
+      }
+
+      return {
+        valid: true,
+        definition
+      };
+    } else {
+      console.log(`[Wiktionary Result] Word "${lowerWord}" is INVALID (No Turkish section found in contents)`);
+      return {
+        valid: false,
+        definition: 'Kelime Wikisözlük\'te mevcut fakat Türkçe dilinde değil.'
+      };
+    }
+
+  } catch (err: any) {
+    console.error(`[Hybrid Validation Error] Failed for "${word}":`, err?.message || err);
+    return {
+      valid: false,
+      definition: 'Sözlük doğrulama servisine şu anda erişilemiyor.'
+    };
+  }
 }
 
 // Endpoint to validate if a word is valid
@@ -298,7 +360,7 @@ app.post('/api/validate-word', async (req, res) => {
       });
     }
 
-    // 3. Eğer yerel listede yoksa, local spellchecker öncesi Cache / Firestore kontrol et
+    // 3. Eğer yerel listede yoksa, Wikisözlük öncesi Cache / Firestore kontrol et
     const cacheKey = `${normalized}_${wordLength}`;
     if (wordCache[cacheKey]) {
       return res.json(wordCache[cacheKey]);
@@ -325,7 +387,7 @@ app.post('/api/validate-word', async (req, res) => {
       console.warn('Firestore database read failed/timed out:', dbErr);
     }
 
-    // 4. Local spellchecker (yazım denetleyici) sorgusu
+    // 4. Wikisözlük (Wiktionary) sorgusu
     const validationResult = await validateWordHybrid(normalized);
     wordCache[cacheKey] = validationResult;
 
