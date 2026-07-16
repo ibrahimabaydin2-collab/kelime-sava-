@@ -1230,6 +1230,17 @@ export default function App() {
     }
   }, [wordLength, gameMode, hasEnteredGame, activeMatch]);
 
+  // Expose yeniKelimeyeBasla globally for Android Native WebView integration
+  useEffect(() => {
+    (window as any).yeniKelimeyeBasla = () => {
+      console.log('Android Native integration triggered: yeniKelimeyeBasla');
+      startNewGame(wordLength);
+    };
+    return () => {
+      delete (window as any).yeniKelimeyeBasla;
+    };
+  }, [wordLength]);
+
   // Countdown timer logic
   useEffect(() => {
     // In activeMatch we do want the timer to run
@@ -1591,49 +1602,101 @@ export default function App() {
         }
       }, 0);
 
+      // Determine which badges should be unlocked
+      const badgesToUnlock = new Set<string>(['first_step', 'champion']);
+      if (isDailyPuzzle) {
+        const { dateStr } = getDailyWordAndLength();
+        safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
+        badgesToUnlock.add('daily_puzzle_solver');
+      }
+      if (secondsLeft > 10) {
+        badgesToUnlock.add('lightning');
+      }
+      if (attemptCount <= 2) {
+        badgesToUnlock.add('flawless');
+      }
+      if (wordLength === 8) {
+        badgesToUnlock.add('genius');
+      }
+
+      // Compute updated badges array and collect newly unlocked badges
+      const newlyUnlockedBadges: Badge[] = [];
+      const updatedBadges = prev.badges.map((b) => {
+        if (badgesToUnlock.has(b.id) && !b.unlockedAt) {
+          const unlockedBadge = { ...b, unlockedAt: new Date().toISOString() };
+          newlyUnlockedBadges.push(unlockedBadge);
+          return unlockedBadge;
+        }
+        return b;
+      });
+
+      // Missions to update progress
+      const missionIncrements: { [key: string]: number } = {
+        play: 1,
+        win: 1,
+        streak: 1,
+        [`solve_${wordLength}`]: 1,
+      };
+      if (secondsLeft > 10) {
+        missionIncrements['fast_solve'] = 1;
+      }
+      if (attemptCount === 1) {
+        missionIncrements['perfect'] = 1;
+      }
+
+      // Compute updated missions and collect newly completed ones
+      const newlyCompletedMissions: typeof prev.missions = [];
+      const updatedMissions = prev.missions.map((m) => {
+        const inc = missionIncrements[m.type];
+        if (inc && !m.completed) {
+          const newCurrent = m.current + inc;
+          const isCompleted = newCurrent >= m.target;
+          const updatedM = {
+            ...m,
+            current: newCurrent,
+            completed: isCompleted
+          };
+          if (isCompleted) {
+            newlyCompletedMissions.push(updatedM);
+          }
+          return updatedM;
+        }
+        return m;
+      });
+
+      // Safely schedule UI toasts and modals on the macro-task event queue
+      setTimeout(() => {
+        let staggerDelay = 100;
+        
+        // Show newly completed missions
+        newlyCompletedMissions.forEach((m) => {
+          setTimeout(() => {
+            showToast(`🎯 GÜNLÜK GÖREV TAMAMLANDI: ${m.title}!`, 'success');
+          }, staggerDelay);
+          staggerDelay += 800;
+        });
+
+        // Show newly unlocked badges and trigger modal
+        newlyUnlockedBadges.forEach((b, idx) => {
+          setTimeout(() => {
+            showToast(`🏆 YENİ ROZET KAZANILDI: ${b.title}!`, 'success');
+            if (idx === 0) {
+              setUnlockedBadgeToShow(b);
+            }
+          }, staggerDelay);
+          staggerDelay += 1000;
+        });
+      }, 0);
+
       return {
         ...prev,
         stats: updatedStats,
         dailyScore: newScore,
+        badges: updatedBadges,
+        missions: updatedMissions,
         lastUpdated: new Date().toISOString()
       };
     });
-
-    // Check badges
-    unlockBadge('first_step');
-    unlockBadge('champion');
-
-    if (isDailyPuzzle) {
-      const { dateStr } = getDailyWordAndLength();
-      safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
-      unlockBadge('daily_puzzle_solver');
-    }
-    
-    if (secondsLeft > 10) {
-      unlockBadge('lightning');
-      updateMissionProgress('fast_solve', 1);
-    }
-
-    if (attemptCount <= 2) {
-      unlockBadge('flawless');
-    }
-
-    if (wordLength === 8) {
-      unlockBadge('genius');
-    }
-
-    // Update Missions
-    updateMissionProgress('play', 1);
-    updateMissionProgress('win', 1);
-    updateMissionProgress('streak', 1);
-    
-    // Dynamic word-length specific solving missions (solve_3 to solve_8)
-    updateMissionProgress(`solve_${wordLength}`, 1);
-
-    // Perfect solve mission (solving in exactly 1 try)
-    if (attemptCount === 1) {
-      updateMissionProgress('perfect', 1);
-    }
   };
 
   // Profile Badges unlocking
@@ -1739,26 +1802,65 @@ export default function App() {
     setCurrentAttempt((prev) => prev.slice(0, -1));
   };
 
-  // Bind physical keyboard listeners
+  // References to keep the physical keyboard listener persistent and prevent listener duplication/conflicts
+  const currentAttemptRef = useRef(currentAttempt);
+  const gameStatusRef = useRef(gameStatus);
+  const isValidatingRef = useRef(isValidating);
+  const isEditingNameRef = useRef(isEditingName);
+  const showStatsModalRef = useRef(showStatsModal);
+  const showLobbyModalRef = useRef(showLobbyModal);
+  const showCongratsModalRef = useRef(showCongratsModal);
+  const wordLengthRef = useRef(wordLength);
+  const onCharRef = useRef(onChar);
+  const onDeleteRef = useRef(onDelete);
+  const submitGuessRef = useRef(submitGuess);
+
+  useEffect(() => {
+    currentAttemptRef.current = currentAttempt;
+    gameStatusRef.current = gameStatus;
+    isValidatingRef.current = isValidating;
+    isEditingNameRef.current = isEditingName;
+    showStatsModalRef.current = showStatsModal;
+    showLobbyModalRef.current = showLobbyModal;
+    showCongratsModalRef.current = showCongratsModal;
+    wordLengthRef.current = wordLength;
+    onCharRef.current = onChar;
+    onDeleteRef.current = onDelete;
+    submitGuessRef.current = submitGuess;
+  });
+
+  // Bind physical keyboard listeners exactly once on mount to prevent double keypresses and WebView input lag
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || isEditingName || showStatsModal || showLobbyModal) return;
+      if (
+        e.metaKey || 
+        e.ctrlKey || 
+        e.altKey || 
+        isEditingNameRef.current || 
+        showStatsModalRef.current || 
+        showLobbyModalRef.current ||
+        showCongratsModalRef.current ||
+        gameStatusRef.current !== 'playing' ||
+        isValidatingRef.current
+      ) {
+        return;
+      }
 
       if (e.key === 'Enter') {
-        submitGuess();
+        submitGuessRef.current();
       } else if (e.key === 'Backspace') {
-        onDelete();
+        onDeleteRef.current();
       } else {
         const key = turkishUpper(e.key);
         if (key.length === 1 && /^[A-ZÇĞİÖŞÜ]$/i.test(key)) {
-          onChar(key);
+          onCharRef.current(key);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentAttempt, gameStatus, isValidating, isEditingName, showStatsModal, showLobbyModal]);
+  }, []);
 
   // Handle profile change
   const saveProfile = () => {
@@ -2823,9 +2925,11 @@ export default function App() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn" id="congrats-modal-container">
           {/* Backdrop */}
           <div 
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity duration-200"
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity duration-200 cursor-pointer"
             onClick={() => {
-              // Click background does not close to guarantee the user makes a choice or sees success
+              playClickSound(settings.soundEnabled);
+              startNewGame(wordLength);
+              setShowCongratsModal(false);
             }}
           />
           

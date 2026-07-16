@@ -3,6 +3,8 @@ package com.kelimesavasi.app;
 import android.os.Bundle;
 import android.view.ViewGroup;
 import android.webkit.WebView;
+import android.webkit.WebSettings;
+import android.webkit.WebChromeClient;
 import android.widget.FrameLayout;
 import com.getcapacitor.BridgeActivity;
 import com.google.android.gms.ads.AdRequest;
@@ -29,17 +31,25 @@ public class MainActivity extends BridgeActivity {
         // Retrieve Capacitor's WebView instance
         WebView webView = getBridge().getWebView();
 
-        // Enable persistent WebView storage / database cache settings
-        if (webView != null && webView.getSettings() != null) {
-            webView.getSettings().setDomStorageEnabled(true);
-            webView.getSettings().setDatabaseEnabled(true);
+        // Enable persistent WebView storage / database cache settings & JS support
+        if (webView != null) {
+            WebSettings webSettings = webView.getSettings();
+            if (webSettings != null) {
+                webSettings.setJavaScriptEnabled(true);
+                webSettings.setDomStorageEnabled(true);
+                webSettings.setDatabaseEnabled(true);
+                webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
+            }
+            webView.setWebChromeClient(new WebChromeClient());
         }
 
         // Safe check and reparent the webview to our container
-        if (webView.getParent() != null) {
-            ((ViewGroup) webView.getParent()).removeView(webView);
+        if (webView != null) {
+            if (webView.getParent() != null) {
+                ((ViewGroup) webView.getParent()).removeView(webView);
+            }
+            webviewContainer.addView(webView);
         }
-        webviewContainer.addView(webView);
 
         // Load AdMob banners
         AdRequest adRequest = new AdRequest.Builder().build();
