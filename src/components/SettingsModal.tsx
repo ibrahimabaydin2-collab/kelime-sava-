@@ -19,7 +19,6 @@ import {
   AlertTriangle, 
   Key, 
   Bell, 
-  Facebook,
   Sparkles
 } from 'lucide-react';
 import { UserProfile, LobbyPlayer } from '../types.js';
@@ -28,8 +27,7 @@ import {
   auth, 
   linkGuestToEmailAndPassword, 
   sendVerificationEmail,
-  linkGuestWithGoogle,
-  linkGuestWithFacebook 
+  linkGuestWithGoogle
 } from '../lib/firebase.js';
 
 export interface AppSettings {
@@ -528,18 +526,18 @@ export default function SettingsModal({
                 )}
               </div>
 
-              {/* Card 3: Sosyal Medya ile Bağlan */}
+              {/* Card 3: Hesabı Google ile Eşleştir */}
               <div className="inner-theme border border-theme rounded-2xl p-4.5 space-y-3.5 text-left shadow-md">
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
                   <User size={14} className="text-amber-400" />
-                  Sosyal Medya ile Bağlan
+                  Hesabını Google ile Eşleştir
                 </h4>
                 
                 <p className="text-[10px] text-slate-300/80 leading-normal">
-                  Misafir hesabınızı tek tıkla sosyal medya hesaplarınıza bağlayarak ilerlemenizi asla kaybetmeyin.
+                  Misafir hesabınızı tek tıkla Google hesabınıza bağlayarak ilerlemenizi ve başarılarınızı kalıcı olarak koruyun.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="pt-1">
                   {/* Google */}
                   <button
                     type="button"
@@ -558,7 +556,7 @@ export default function SettingsModal({
                         setSecurityError(msg);
                       }
                     }}
-                    className="flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-900 text-xs font-black rounded-xl transition shadow active:scale-[0.98] border border-slate-200 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2.5 py-3 px-4 bg-white hover:bg-slate-50 text-slate-900 text-xs font-black rounded-xl transition shadow active:scale-[0.98] border border-slate-200 cursor-pointer"
                   >
                     <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6c-.28 1.5-1.11 2.76-2.39 3.62v3h3.86c2.26-2.09 3.67-5.17 3.67-8.45z"/>
@@ -567,30 +565,6 @@ export default function SettingsModal({
                       <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.18 2.12 1.21 5.7L5.27 8.8c.95-2.85 3.6-4.96 6.73-4.96z"/>
                     </svg>
                     <span>Google ile Bağlan</span>
-                  </button>
-
-                  {/* Facebook */}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setSecurityError(null);
-                      setSecuritySuccess(null);
-                      try {
-                        await linkGuestWithFacebook();
-                        setSecuritySuccess('Hesabınız başarıyla Facebook ile eşleştirilmiştir! 🎉');
-                      } catch (err: any) {
-                        console.error('Facebook link error:', err);
-                        let msg = err.message || 'Facebook ile bağlanma başarısız oldu.';
-                        if (err.code === 'auth/credential-already-in-use') {
-                          msg = 'Bu Facebook hesabı zaten başka bir profil ile eşleşmiş.';
-                        }
-                        setSecurityError(msg);
-                      }
-                    }}
-                    className="flex items-center justify-center gap-2 py-2.5 px-4 bg-[#1877F2] hover:bg-[#166FE5] text-white text-xs font-black rounded-xl transition shadow active:scale-[0.98] border border-[#1877F2]/30 cursor-pointer"
-                  >
-                    <Facebook size={14} className="shrink-0" />
-                    <span>Facebook ile Bağlan</span>
                   </button>
                 </div>
               </div>

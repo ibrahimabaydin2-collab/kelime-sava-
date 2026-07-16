@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Swords, User, Mail, Lock, ShieldAlert, LogIn, AlertCircle, Facebook, Instagram } from 'lucide-react';
+import { Sparkles, Swords, User, Mail, Lock, ShieldAlert, LogIn, AlertCircle, Smartphone, ArrowLeft } from 'lucide-react';
 import { UserProfile, LobbyPlayer } from '../types.js';
 import { validateUsername, validatePassword } from '../utils/usernameValidation.js';
 import { 
@@ -8,9 +8,11 @@ import {
   loginWithEmailAndPassword,
   fetchUserProfile,
   saveUserProfileToFirestore,
-  signInWithFacebook,
-  signInWithInstagram,
-  linkWithCredential
+  signInWithGoogle,
+  linkWithCredential,
+  auth,
+  RecaptchaVerifier,
+  signInWithPhoneNumber
 } from '../lib/firebase.js';
 
 interface AuthScreenProps {
@@ -34,6 +36,15 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [selectedAvatar, setSelectedAvatar] = useState<string>('🧠');
+  
+  // Phone Login fields
+  const [phoneLoginActive, setPhoneLoginActive] = useState<boolean>(false);
+  const [phoneNumber, setPhoneNumber] = useState<string>('+90');
+  const [otpCode, setOtpCode] = useState<string>('');
+  const [confirmationResult, setConfirmationResult] = useState<any>(null);
+  const [phoneStep, setPhoneStep] = useState<'number' | 'otp'>('number');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [recaptchaVerifier, setRecaptchaVerifier] = useState<any>(null);
   
   // Touched states for validations
   const [isTouched, setIsTouched] = useState<boolean>(false);
@@ -127,11 +138,11 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
     return 'Şu an bağlanılamıyor, lütfen tekrar deneyin.';
   };
 
-  const handleFacebookLogin = async () => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
     setFirebaseError(null);
     try {
-      const { user, credential } = await signInWithFacebook();
+      const { user, credential } = await signInWithGoogle();
       if (credential) {
         setPendingCredential(credential);
         setPendingEmail(credential.email || '');
@@ -146,7 +157,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         } else {
           const initialProfile: UserProfile = {
             id: user.uid,
-            name: user.displayName || user.email?.split('@')[0] || 'Facebook Oyuncusu',
+            name: user.displayName || user.email?.split('@')[0] || 'Google Oyuncusu',
             avatarUrl: user.photoURL || '🧠',
             stats: {
               gamesPlayed: 0,
@@ -166,20 +177,76 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         }
       }
     } catch (err: any) {
-      console.error('Facebook login error:', err);
+      console.error('Google login error:', err);
       setFirebaseError('Giriş yapılamadı, lütfen tekrar deneyin.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInstagramLogin = async () => {
-    setLoading(true);
-    setFirebaseError(null);
+  const setupRecaptcha = () => {
+    if (recaptchaVerifier) return recaptchaVerifier;
     try {
-      const { user, credential } = await signInWithInstagram();
-      
-      // Since simulated/real Meta credentials could match an existing email if registered, check if user exists
+      const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+        callback: () => {},
+        'expired-callback': () => {}
+      });
+      setRecaptchaVerifier(verifier);
+      return verifier;
+    } catch (error) {
+      console.error('Recaptcha error:', error);
+      setPhoneError('Güvenlik doğrulaması başlatılamadı.');
+      return null;
+    }
+  };
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPhoneError(null);
+    setLoading(true);
+
+    const verifier = setupRecaptcha();
+    if (!verifier) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const formattedPhone = phoneNumber.trim();
+      if (!formattedPhone.startsWith('+')) {
+        setPhoneError('Lütfen ülke kodu ile birlikte giriniz (Örn: +905001112233).');
+        setLoading(false);
+        return;
+      }
+
+      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, verifier);
+      setConfirmationResult(confirmation);
+      setPhoneStep('otp');
+    } catch (error: any) {
+      console.error('Phone auth send OTP error:', error);
+      setPhoneError(getFirebaseErrorMessage(error));
+      setRecaptchaVerifier(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPhoneError(null);
+    setLoading(true);
+
+    try {
+      if (!confirmationResult) {
+        setPhoneError('Oturum zaman aşımına uğradı, lütfen tekrar deneyin.');
+        setLoading(false);
+        return;
+      }
+
+      const result = await confirmationResult.confirm(otpCode.trim());
+      const user = result.user;
+
       if (user) {
         const profile = await fetchUserProfile(user.uid);
         if (profile) {
@@ -187,8 +254,8 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         } else {
           const initialProfile: UserProfile = {
             id: user.uid,
-            name: user.displayName || 'Instagram Oyuncusu',
-            avatarUrl: user.photoURL || '🧠',
+            name: username.trim() || 'Savaşçı_' + user.uid.substring(0, 5),
+            avatarUrl: selectedAvatar || '🧠',
             stats: {
               gamesPlayed: 0,
               gamesWon: 0,
@@ -200,15 +267,19 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
             missions: [],
             dailyScore: 0,
             lastUpdated: new Date().toISOString(),
-            nameSet: true
+            nameSet: !!username.trim()
           };
           await saveUserProfileToFirestore(initialProfile);
           onAuthComplete(initialProfile, user);
         }
       }
-    } catch (err: any) {
-      console.error('Instagram login error:', err);
-      setFirebaseError('Giriş yapılamadı, lütfen tekrar deneyin.');
+    } catch (error: any) {
+      console.error('Phone auth verify OTP error:', error);
+      if (error.code?.includes('invalid-verification-code')) {
+        setPhoneError('Hatalı doğrulama kodu girdiniz.');
+      } else {
+        setPhoneError(getFirebaseErrorMessage(error));
+      }
     } finally {
       setLoading(false);
     }
@@ -331,6 +402,134 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
       setLoading(false);
     }
   };
+
+  if (phoneLoginActive) {
+    return (
+      <div className="w-full max-w-md mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-6 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col gap-5 animate-scale-up" id="auth-phone-card">
+        {/* Glows */}
+        <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex items-center justify-between relative z-10">
+          <button
+            type="button"
+            onClick={() => {
+              setPhoneLoginActive(false);
+              setPhoneStep('number');
+              setPhoneError(null);
+            }}
+            className="p-2 rounded-xl bg-[#2E3748]/60 hover:bg-[#2E3748] text-gray-300 transition cursor-pointer"
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <span className="text-[10px] font-black uppercase tracking-widest text-amber-200">Geri Dön</span>
+        </div>
+
+        <div className="text-center space-y-2 relative z-10">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center mx-auto text-2xl shadow-lg shadow-amber-500/15">
+            📱
+          </div>
+          <h2 className="text-lg font-serif font-semibold tracking-widest text-[#FAF6E9] uppercase font-serif">Telefon ile Giriş</h2>
+          <p className="text-xs text-gray-400 leading-normal max-w-xs mx-auto">
+            {phoneStep === 'number' 
+              ? 'Telefon numaranızı ülke koduyla girerek tek kullanımlık şifre (OTP) alın.' 
+              : 'Telefonunuza gönderilen 6 haneli doğrulama kodunu girin.'}
+          </p>
+        </div>
+
+        {phoneError && (
+          <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs font-semibold text-rose-300 flex items-start gap-2 animate-fade-in relative z-10">
+            <span className="shrink-0 mt-0.5">⚠️</span>
+            <span>{phoneError}</span>
+          </div>
+        )}
+
+        {/* Hidden recaptcha element */}
+        <div id="recaptcha-container" />
+
+        {phoneStep === 'number' ? (
+          <form onSubmit={handleSendOtp} className="space-y-4 text-left relative z-10">
+            {/* Optional username/avatar for new users */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">Kullanıcı Adı (Yeni Üye İçin)</label>
+              <input
+                type="text"
+                placeholder="Takma adınızı belirleyin (isteğe bağlı)..."
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl px-4 py-3 text-sm font-bold text-[#FAF6E9] focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">Telefon Numaranız</label>
+              <input
+                type="tel"
+                placeholder="+905001112233"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                required
+                className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl px-4 py-3 text-sm font-bold text-[#FAF6E9] focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] font-black text-xs py-4 px-4 rounded-2xl transition shadow-md active:scale-95 flex items-center justify-center gap-1.5 uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
+            >
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                'Doğrulama Kodu Gönder'
+              )}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleVerifyOtp} className="space-y-4 text-left relative z-10">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">Doğrulama Kodu (OTP)</label>
+              <input
+                type="text"
+                maxLength={6}
+                placeholder="123456"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                required
+                className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl px-4 py-3 text-sm font-bold text-[#FAF6E9] tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs py-3.5 px-4 rounded-xl transition shadow-md active:scale-95 flex items-center justify-center gap-1.5 uppercase tracking-wider cursor-pointer border border-emerald-500/20"
+              >
+                {loading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  'Kodu Doğrula'
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPhoneStep('number');
+                  setOtpCode('');
+                }}
+                disabled={loading}
+                className="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-xs py-3.5 px-4 rounded-xl transition active:scale-95 uppercase cursor-pointer border border-white/5"
+              >
+                Tekrar Dene
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    );
+  }
 
   if (pendingCredential) {
     return (
@@ -712,29 +911,49 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         {/* Social logins */}
         <div className="relative flex py-2 items-center" id="social-auth-separator">
           <div className="flex-grow border-t border-white/5" />
-          <span className="flex-shrink mx-4 text-gray-400 text-[10px] font-black uppercase tracking-widest font-sans">Veya Sosyal Medya İle</span>
+          <span className="flex-shrink mx-4 text-gray-400 text-[10px] font-black uppercase tracking-widest font-sans">Giriş Alternatifleri</span>
           <div className="flex-grow border-t border-white/5" />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" id="social-auth-buttons">
           <button
             type="button"
-            onClick={handleFacebookLogin}
+            onClick={handleGoogleLogin}
             disabled={loading}
             className="w-full flex items-center justify-center gap-2.5 bg-[#182C25]/45 hover:bg-[#1E3A2F]/60 disabled:opacity-50 text-[#FAF6E9] border border-emerald-500/20 hover:border-emerald-400/40 rounded-2xl py-3 px-4 text-xs font-black uppercase tracking-wider transition active:scale-95 shadow-md cursor-pointer"
           >
-            <Facebook size={14} className="text-[#3B82F6] fill-[#3B82F6] shrink-0" />
-            <span>Facebook ile Giriş</span>
+            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
+              <path
+                fill="#EA4335"
+                d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.47 14.97 1 12 1 7.35 1 3.39 3.65 1.43 7.5l3.8 2.94C6.18 7.02 8.84 5.04 12 5.04z"
+              />
+              <path
+                fill="#4285F4"
+                d="M23.49 12.27c0-.81-.07-1.59-.2-2.35H12v4.45h6.44c-.28 1.47-1.11 2.71-2.36 3.55l3.66 2.84c2.14-1.97 3.75-4.87 3.75-8.49z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.23 14.94c-.23-.69-.36-1.42-.36-2.19 0-.77.13-1.5.36-2.19L1.43 7.5C.52 9.32 0 11.36 0 13.5s.52 4.18 1.43 6l3.8-2.94-.36-1.62z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.66-2.84c-1.1.74-2.51 1.18-4.3 1.18-3.16 0-5.82-1.98-6.77-4.9l-3.8 2.94C3.39 20.35 7.35 23 12 23z"
+              />
+            </svg>
+            <span>Google ile Giriş</span>
           </button>
 
           <button
             type="button"
-            onClick={handleInstagramLogin}
+            onClick={() => {
+              setPhoneError(null);
+              setPhoneLoginActive(true);
+            }}
             disabled={loading}
             className="w-full flex items-center justify-center gap-2.5 bg-[#182C25]/45 hover:bg-[#1E3A2F]/60 disabled:opacity-50 text-[#FAF6E9] border border-emerald-500/20 hover:border-emerald-400/40 rounded-2xl py-3 px-4 text-xs font-black uppercase tracking-wider transition active:scale-95 shadow-md cursor-pointer"
           >
-            <Instagram size={14} className="text-[#EC4899] shrink-0" />
-            <span>Instagram ile Giriş</span>
+            <Smartphone size={14} className="text-amber-400 shrink-0" />
+            <span>Telefon ile Giriş</span>
           </button>
         </div>
 
