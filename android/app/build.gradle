@@ -45,6 +45,11 @@ dependencies {
     
     // Google AdMob SDK for displaying ads
     implementation 'com.google.android.gms:play-services-ads:23.0.0'
+
+    // Firebase Core SDKs for native guest login and session checks
+    implementation platform('com.google.firebase:firebase-bom:33.1.2')
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'com.google.firebase:firebase-firestore'
 }
 
 apply from: 'capacitor.build.gradle'
