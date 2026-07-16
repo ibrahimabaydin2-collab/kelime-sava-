@@ -48,7 +48,7 @@ public class GuestLoginActivity extends AppCompatActivity {
         initializeFirebaseSafely();
 
         auth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+        db = FirebaseFirestore.getInstance(FirebaseApp.getInstance(), "ai-studio-kelimesava-50aadbd1-03ed-4d0c-9769-866981f84d1c");
 
         etNickname = findViewById(R.id.et_guest_nickname);
         btnContinue = findViewById(R.id.btn_guest_continue);

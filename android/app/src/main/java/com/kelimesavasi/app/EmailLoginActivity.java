@@ -5,14 +5,11 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import com.google.android.gms.auth.api.signin.GoogleSignIn;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.auth.api.signin.GoogleSignInClient;
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -20,11 +17,9 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.Timestamp;
-import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.auth.GoogleAuthProvider;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -35,73 +30,53 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.TimeZone;
 
-public class LoginActivity extends AppCompatActivity {
+public class EmailLoginActivity extends AppCompatActivity {
 
-    private static final String TAG = "LoginActivity";
-    private static final int RC_SIGN_IN = 9001;
-
-    private Button btnGuestLogin;
-    private Button btnSocialLogin;
-    private Button btnEmailLogin;
-    
+    private static final String TAG = "EmailLoginActivity";
+    private EditText etEmail;
+    private EditText etPassword;
+    private Button btnSignIn;
+    private Button btnSignUp;
+    private TextView tvBack;
     private FirebaseAuth auth;
     private FirebaseFirestore db;
-    private GoogleSignInClient googleSignInClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        // Safe dynamic Firebase initialization
+        setContentView(R.layout.activity_email_login);
+
+        // Safe dynamic Firebase initializer
         initializeFirebaseSafely();
 
         auth = FirebaseAuth.getInstance();
+        // Use the exact custom database ID matching the web app config to prevent hanging / silent failures
         db = FirebaseFirestore.getInstance(FirebaseApp.getInstance(), "ai-studio-kelimesava-50aadbd1-03ed-4d0c-9769-866981f84d1c");
 
-        // 1. SESSION CHECK (Oturum Kontrolü): If already logged in, bypass login screen immediately
-        if (auth.getCurrentUser() != null) {
-            Log.d(TAG, "Active user session found. Redirecting to MainActivity.");
-            Intent intent = new Intent(LoginActivity.this, MainActivity.class);
-            startActivity(intent);
-            finish();
-            return;
-        }
+        etEmail = findViewById(R.id.et_email);
+        etPassword = findViewById(R.id.et_password);
+        btnSignIn = findViewById(R.id.btn_email_sign_in);
+        btnSignUp = findViewById(R.id.btn_email_sign_up);
+        tvBack = findViewById(R.id.tv_email_back);
 
-        setContentView(R.layout.activity_login);
-
-        btnGuestLogin = findViewById(R.id.btn_guest_login);
-        btnSocialLogin = findViewById(R.id.btn_social_login);
-        btnEmailLogin = findViewById(R.id.btn_email_login);
-
-        // Configure Google Sign-In options using the oAuthClientId from Firebase Config
-        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken("115209512617-156fu52vr6l6cpi5evfi883vb8j8e8n7.apps.googleusercontent.com")
-                .requestEmail()
-                .build();
-        googleSignInClient = GoogleSignIn.getClient(this, gso);
-
-        // Click handler for Guest login page redirect
-        btnGuestLogin.setOnClickListener(new View.OnClickListener() {
+        btnSignIn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(LoginActivity.this, GuestLoginActivity.class);
-                startActivity(intent);
+                handleEmailSignIn();
             }
         });
 
-        // Click handler for Google Login
-        btnSocialLogin.setOnClickListener(new View.OnClickListener() {
+        btnSignUp.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                handleSocialMediaLogin();
+                handleEmailSignUp();
             }
         });
 
-        // Click handler for Email authentication
-        btnEmailLogin.setOnClickListener(new View.OnClickListener() {
+        tvBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                handleEmailAuth();
+                finish();
             }
         });
     }
@@ -121,54 +96,19 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Real Google Sign-In login initialization
-     */
-    private void handleSocialMediaLogin() {
-        Log.d(TAG, "Starting Google Sign-In...");
-        setButtonsEnabled(false);
-        Toast.makeText(this, "Google Girişi başlatılıyor...", Toast.LENGTH_SHORT).show();
-        
-        Intent signInIntent = googleSignInClient.getSignInIntent();
-        startActivityForResult(signInIntent, RC_SIGN_IN);
-    }
+    private void handleEmailSignIn() {
+        String email = etEmail.getText().toString().trim();
+        String password = etPassword.getText().toString().trim();
 
-    /**
-     * Open the dedicated EmailLoginActivity for registration and login
-     */
-    private void handleEmailAuth() {
-        Log.d(TAG, "Redirecting to EmailLoginActivity.");
-        Intent intent = new Intent(LoginActivity.this, EmailLoginActivity.class);
-        startActivity(intent);
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        // Result returned from launching the Intent from GoogleSignInApi.getSignInIntent(...);
-        if (requestCode == RC_SIGN_IN) {
-            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
-            try {
-                // Google Sign In was successful, authenticate with Firebase
-                GoogleSignInAccount account = task.getResult(ApiException.class);
-                if (account != null) {
-                    firebaseAuthWithGoogle(account.getIdToken());
-                } else {
-                    setButtonsEnabled(true);
-                    Toast.makeText(this, "Google hesabı alınamadı.", Toast.LENGTH_SHORT).show();
-                }
-            } catch (ApiException e) {
-                setButtonsEnabled(true);
-                Log.w(TAG, "Google sign in failed", e);
-                Toast.makeText(this, "Giriş İptal Edildi veya Hata Oluştu: " + e.getLocalizedMessage(), Toast.LENGTH_LONG).show();
-            }
+        if (email.isEmpty() || password.isEmpty()) {
+            Toast.makeText(this, "E-posta ve şifre alanları boş bırakılamaz!", Toast.LENGTH_SHORT).show();
+            return;
         }
-    }
 
-    private void firebaseAuthWithGoogle(String idToken) {
-        AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
-        auth.signInWithCredential(credential)
+        setButtonsEnabled(false);
+        Toast.makeText(this, "Giriş yapılıyor, lütfen bekleyin...", Toast.LENGTH_SHORT).show();
+
+        auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
                 @Override
                 public void onComplete(@NonNull Task<AuthResult> task) {
@@ -179,11 +119,51 @@ public class LoginActivity extends AppCompatActivity {
                         }
                     } else {
                         setButtonsEnabled(true);
-                        String errorMsg = task.getException() != null ? task.getException().getLocalizedMessage() : "Firebase Google doğrulaması başarısız.";
-                        Toast.makeText(LoginActivity.this, "Hata: " + errorMsg, Toast.LENGTH_LONG).show();
+                        String errorMsg = task.getException() != null ? task.getException().getLocalizedMessage() : "Giriş başarısız.";
+                        Toast.makeText(EmailLoginActivity.this, "Hata: " + errorMsg, Toast.LENGTH_LONG).show();
                     }
                 }
             });
+    }
+
+    private void handleEmailSignUp() {
+        String email = etEmail.getText().toString().trim();
+        String password = etPassword.getText().toString().trim();
+
+        if (email.isEmpty() || password.isEmpty()) {
+            Toast.makeText(this, "E-posta ve şifre alanları boş bırakılamaz!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (password.length() < 6) {
+            etPassword.setError("Şifre en az 6 karakter olmalıdır!");
+            return;
+        }
+
+        setButtonsEnabled(false);
+        Toast.makeText(this, "Hesap oluşturuluyor, lütfen bekleyin...", Toast.LENGTH_SHORT).show();
+
+        auth.createUserWithEmailAndPassword(email, password)
+            .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                @Override
+                public void onComplete(@NonNull Task<AuthResult> task) {
+                    if (task.isSuccessful()) {
+                        FirebaseUser user = auth.getCurrentUser();
+                        if (user != null) {
+                            checkAndSaveUserProfile(user);
+                        }
+                    } else {
+                        setButtonsEnabled(true);
+                        String errorMsg = task.getException() != null ? task.getException().getLocalizedMessage() : "Kayıt başarısız.";
+                        Toast.makeText(EmailLoginActivity.this, "Kayıt Hatası: " + errorMsg, Toast.LENGTH_LONG).show();
+                    }
+                }
+            });
+    }
+
+    private void setButtonsEnabled(boolean enabled) {
+        btnSignIn.setEnabled(enabled);
+        btnSignUp.setEnabled(enabled);
     }
 
     private void checkAndSaveUserProfile(final FirebaseUser user) {
@@ -212,15 +192,18 @@ public class LoginActivity extends AppCompatActivity {
                         });
                 } else {
                     // Create brand new user profile
-                    String displayName = user.getDisplayName();
-                    if (displayName == null || displayName.trim().isEmpty()) {
-                        displayName = "Savaşçı";
+                    String emailPrefix = "Savaşçı";
+                    if (user.getEmail() != null) {
+                        String[] parts = user.getEmail().split("@");
+                        if (parts.length > 0 && !parts[0].isEmpty()) {
+                            emailPrefix = parts[0];
+                        }
                     }
 
                     HashMap<String, Object> userData = new HashMap<>();
                     userData.put("uid", uid);
                     userData.put("id", uid);
-                    userData.put("name", displayName);
+                    userData.put("name", emailPrefix);
                     userData.put("isAnonymous", false);
                     userData.put("nameSet", true);
                     userData.put("createdAt", Timestamp.now());
@@ -253,7 +236,7 @@ public class LoginActivity extends AppCompatActivity {
                             public void onFailure(@NonNull Exception e) {
                                 setButtonsEnabled(true);
                                 Toast.makeText(
-                                    LoginActivity.this,
+                                    EmailLoginActivity.this,
                                     "Kullanıcı verisi kaydedilemedi: " + e.getLocalizedMessage(),
                                     Toast.LENGTH_LONG
                                 ).show();
@@ -265,16 +248,10 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void navigateToMainActivity() {
-        Toast.makeText(LoginActivity.this, "Oturum Başarıyla Açıldı!", Toast.LENGTH_SHORT).show();
-        Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+        Toast.makeText(EmailLoginActivity.this, "Oturum Başarıyla Açıldı!", Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(EmailLoginActivity.this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
-    }
-
-    private void setButtonsEnabled(boolean enabled) {
-        btnGuestLogin.setEnabled(enabled);
-        btnSocialLogin.setEnabled(enabled);
-        btnEmailLogin.setEnabled(enabled);
     }
 }
