@@ -26,7 +26,7 @@ const AVATAR_PRESETS = [
   '🔥', '🐉', '🐼', '🛡️', '🏆', '🦉'
 ];
 
-type AuthMode = 'guest' | 'login' | 'register';
+type AuthMode = 'guest' | 'login' | 'register' | 'phone';
 
 export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>('guest');
@@ -38,7 +38,6 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
   const [selectedAvatar, setSelectedAvatar] = useState<string>('🧠');
   
   // Phone Login fields
-  const [phoneLoginActive, setPhoneLoginActive] = useState<boolean>(false);
   const [phoneNumber, setPhoneNumber] = useState<string>('+90');
   const [otpCode, setOtpCode] = useState<string>('');
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
@@ -403,133 +402,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
     }
   };
 
-  if (phoneLoginActive) {
-    return (
-      <div className="w-full max-w-md mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-6 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col gap-5 animate-scale-up" id="auth-phone-card">
-        {/* Glows */}
-        <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex items-center justify-between relative z-10">
-          <button
-            type="button"
-            onClick={() => {
-              setPhoneLoginActive(false);
-              setPhoneStep('number');
-              setPhoneError(null);
-            }}
-            className="p-2 rounded-xl bg-[#2E3748]/60 hover:bg-[#2E3748] text-gray-300 transition cursor-pointer"
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <span className="text-[10px] font-black uppercase tracking-widest text-amber-200">Geri Dön</span>
-        </div>
-
-        <div className="text-center space-y-2 relative z-10">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center mx-auto text-2xl shadow-lg shadow-amber-500/15">
-            📱
-          </div>
-          <h2 className="text-lg font-serif font-semibold tracking-widest text-[#FAF6E9] uppercase font-serif">Telefon ile Giriş</h2>
-          <p className="text-xs text-gray-400 leading-normal max-w-xs mx-auto">
-            {phoneStep === 'number' 
-              ? 'Telefon numaranızı ülke koduyla girerek tek kullanımlık şifre (OTP) alın.' 
-              : 'Telefonunuza gönderilen 6 haneli doğrulama kodunu girin.'}
-          </p>
-        </div>
-
-        {phoneError && (
-          <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs font-semibold text-rose-300 flex items-start gap-2 animate-fade-in relative z-10">
-            <span className="shrink-0 mt-0.5">⚠️</span>
-            <span>{phoneError}</span>
-          </div>
-        )}
-
-        {/* Hidden recaptcha element */}
-        <div id="recaptcha-container" />
-
-        {phoneStep === 'number' ? (
-          <form onSubmit={handleSendOtp} className="space-y-4 text-left relative z-10">
-            {/* Optional username/avatar for new users */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">Kullanıcı Adı (Yeni Üye İçin)</label>
-              <input
-                type="text"
-                placeholder="Takma adınızı belirleyin (isteğe bağlı)..."
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl px-4 py-3 text-sm font-bold text-[#FAF6E9] focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">Telefon Numaranız</label>
-              <input
-                type="tel"
-                placeholder="+905001112233"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                required
-                className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl px-4 py-3 text-sm font-bold text-[#FAF6E9] focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] font-black text-xs py-4 px-4 rounded-2xl transition shadow-md active:scale-95 flex items-center justify-center gap-1.5 uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
-            >
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                'Doğrulama Kodu Gönder'
-              )}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyOtp} className="space-y-4 text-left relative z-10">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">Doğrulama Kodu (OTP)</label>
-              <input
-                type="text"
-                maxLength={6}
-                placeholder="123456"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value)}
-                required
-                className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl px-4 py-3 text-sm font-bold text-[#FAF6E9] tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs py-3.5 px-4 rounded-xl transition shadow-md active:scale-95 flex items-center justify-center gap-1.5 uppercase tracking-wider cursor-pointer border border-emerald-500/20"
-              >
-                {loading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  'Kodu Doğrula'
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setPhoneStep('number');
-                  setOtpCode('');
-                }}
-                disabled={loading}
-                className="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-xs py-3.5 px-4 rounded-xl transition active:scale-95 uppercase cursor-pointer border border-white/5"
-              >
-                Tekrar Dene
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    );
-  }
 
   if (pendingCredential) {
     return (
@@ -674,7 +547,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
       </div>
 
       {/* Auth Tabs */}
-      <div className="flex bg-[#232B39]/80 p-1.5 rounded-2xl border border-white/5 relative z-10">
+      <div className="grid grid-cols-2 sm:grid-cols-4 bg-[#232B39]/80 p-1.5 rounded-2xl border border-white/5 relative z-10 gap-1.5">
         <button
           type="button"
           onClick={() => {
@@ -682,13 +555,13 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
             setFirebaseError(null);
             setIsTouched(false);
           }}
-          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black tracking-wider transition uppercase cursor-pointer ${
+          className={`py-2.5 px-2 rounded-xl text-[10px] sm:text-xs font-black tracking-wider transition uppercase cursor-pointer text-center ${
             mode === 'guest' 
               ? 'bg-[#FAF6E9] text-[#2E3748] shadow-md' 
               : 'text-gray-400 hover:text-white hover:bg-white/5'
           }`}
         >
-          Misafir Olarak
+          Misafir Girişi
         </button>
         <button
           type="button"
@@ -697,7 +570,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
             setFirebaseError(null);
             setIsTouched(false);
           }}
-          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black tracking-wider transition uppercase cursor-pointer ${
+          className={`py-2.5 px-2 rounded-xl text-[10px] sm:text-xs font-black tracking-wider transition uppercase cursor-pointer text-center ${
             mode === 'register' 
               ? 'bg-[#FAF6E9] text-[#2E3748] shadow-md' 
               : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -712,13 +585,30 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
             setFirebaseError(null);
             setIsTouched(false);
           }}
-          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black tracking-wider transition uppercase cursor-pointer ${
+          className={`py-2.5 px-2 rounded-xl text-[10px] sm:text-xs font-black tracking-wider transition uppercase cursor-pointer text-center ${
             mode === 'login' 
               ? 'bg-[#FAF6E9] text-[#2E3748] shadow-md' 
               : 'text-gray-400 hover:text-white hover:bg-white/5'
           }`}
         >
           Giriş Yap
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMode('phone');
+            setPhoneStep('number');
+            setPhoneError(null);
+            setFirebaseError(null);
+            setIsTouched(false);
+          }}
+          className={`py-2.5 px-2 rounded-xl text-[10px] sm:text-xs font-black tracking-wider transition uppercase cursor-pointer text-center ${
+            mode === 'phone' 
+              ? 'bg-[#FAF6E9] text-[#2E3748] shadow-md' 
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          Telefonla Giriş
         </button>
       </div>
 
@@ -731,182 +621,351 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
 
       <form onSubmit={handleSubmit} className="space-y-4 relative z-10 text-left">
         
-        {/* Username field (Guest & Register mode) */}
-        {(mode === 'guest' || mode === 'register') && (
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
-              Kullanıcı Adın (Username)
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">
-                <User size={15} />
-              </span>
-              <input
-                type="text"
-                maxLength={26}
-                required
-                value={username}
-                onChange={(e) => {
-                  setUsername(e.target.value);
-                  setIsTouched(true);
-                }}
-                placeholder="Kullanıcı adını belirle..."
-                className={`w-full bg-[#3D4756]/40 border ${usernameError ? 'border-rose-500 focus:ring-rose-400/40 focus:border-rose-400/40' : 'border-[#3E485A] focus:ring-amber-400/40 focus:border-amber-400/40'} rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
-              />
-            </div>
-            {usernameError && (
-              <p className="text-xs text-rose-400 font-semibold px-1 mt-1 leading-normal">
-                ⚠️ {usernameError}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Email field (Login & Register mode) */}
-        {(mode === 'login' || mode === 'register') && (
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
-              E-Posta Adresiniz
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">
-                <Mail size={15} />
-              </span>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="ornek@domain.com"
-                className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Password field (Login & Register mode) */}
-        {(mode === 'login' || mode === 'register') && (
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
-              Şifreniz
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">
-                <Lock size={15} />
-              </span>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setIsTouched(true);
-                }}
-                placeholder="••••••"
-                className={`w-full bg-[#3D4756]/40 border ${passwordError ? 'border-rose-500 focus:ring-rose-400/40 focus:border-rose-400/40' : 'border-[#3E485A] focus:ring-amber-400/40 focus:border-amber-400/40'} rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
-              />
-            </div>
-            {passwordError ? (
-              <p className="text-xs text-rose-400 font-semibold px-1 mt-1 leading-normal">
-                ⚠️ {passwordError}
-              </p>
-            ) : mode === 'register' && (
-              <p className="text-[10px] text-gray-400 px-1 mt-0.5 font-medium">
-                * Şifreniz en az 6 karakterden oluşmalı, en az bir harf ve bir sayı içermelidir.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Avatar selection (Guest & Register mode) */}
-        {(mode === 'guest' || mode === 'register') && (
-          <div className="space-y-3 pt-2">
-            <div className="flex justify-between items-end">
-              <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
-                Kullanıcı Avatarını Seç
-              </label>
-              
-              {/* Custom Image Upload Button */}
-              <div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  id="custom-avatar-upload-auth"
-                  className="hidden"
-                  onChange={handleCustomAvatarUpload}
-                />
-                <label 
-                  htmlFor="custom-avatar-upload-auth"
-                  className="text-[10px] bg-[#3D4756]/60 hover:bg-[#3D4756]/90 text-amber-200 border border-white/5 px-2.5 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 transition active:scale-95 shadow-md font-bold"
-                >
-                  <Sparkles size={11} className="text-amber-400" />
-                  Kendi Fotoğrafını Yükle
-                </label>
+        {mode === 'phone' ? (
+          <div className="space-y-4 animate-fade-in">
+            {phoneError && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs font-semibold text-rose-300 flex items-start gap-2 animate-fade-in">
+                <span className="shrink-0 mt-0.5">⚠️</span>
+                <span>{phoneError}</span>
               </div>
-            </div>
+            )}
 
-            <div className="flex gap-4 items-center bg-[#232B39]/50 p-3 rounded-2xl border border-white/5">
-              {/* Preview */}
-              <div className="w-14 h-14 rounded-full bg-[#3D4756] border-2 border-amber-200/60 shadow-[0_0_15px_rgba(251,191,36,0.25)] flex items-center justify-center text-2xl overflow-hidden shrink-0">
-                {selectedAvatar && selectedAvatar.length > 3 ? (
-                  <img src={selectedAvatar} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <span className="select-none">{selectedAvatar}</span>
+            {/* Hidden recaptcha element */}
+            <div id="recaptcha-container" />
+
+            {phoneStep === 'number' ? (
+              <div className="space-y-4 animate-fade-in">
+                {/* Optional username/avatar for new users */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
+                    Kullanıcı Adı (Yeni Üye İçin - İsteğe Bağlı)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">
+                      <User size={15} />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Takma adınızı belirleyin..."
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Avatar selection for phone registration if new */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex justify-between items-end">
+                    <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
+                      Kullanıcı Avatarını Seç
+                    </label>
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        id="custom-avatar-upload-auth-phone"
+                        className="hidden"
+                        onChange={handleCustomAvatarUpload}
+                      />
+                      <label 
+                        htmlFor="custom-avatar-upload-auth-phone"
+                        className="text-[10px] bg-[#3D4756]/60 hover:bg-[#3D4756]/90 text-amber-200 border border-white/5 px-2.5 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 transition active:scale-95 shadow-md font-bold"
+                      >
+                        <Sparkles size={11} className="text-amber-400" />
+                        Kendi Fotoğrafını Yükle
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 items-center bg-[#232B39]/50 p-3 rounded-2xl border border-white/5">
+                    <div className="w-14 h-14 rounded-full bg-[#3D4756] border-2 border-amber-200/60 shadow-[0_0_15px_rgba(251,191,36,0.25)] flex items-center justify-center text-2xl overflow-hidden shrink-0">
+                      {selectedAvatar && selectedAvatar.length > 3 ? (
+                        <img src={selectedAvatar} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <span className="select-none">{selectedAvatar}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 overflow-x-auto py-1 flex gap-2 scrollbar-none">
+                      {AVATAR_PRESETS.map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setSelectedAvatar(preset)}
+                          className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg transition duration-150 shrink-0 active:scale-90 hover:bg-white/10 ${
+                            selectedAvatar === preset 
+                              ? 'bg-gradient-to-tr from-amber-400 to-amber-200 text-slate-900 scale-105 shadow-md' 
+                              : 'bg-[#2E3748]/50 text-white border border-white/5'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
+                    Telefon Numaranız
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">
+                      <Smartphone size={15} />
+                    </span>
+                    <input
+                      type="tel"
+                      placeholder="+905001112233"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      required
+                      className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  disabled={loading}
+                  className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-sm py-4 px-6 rounded-2xl shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] disabled:opacity-50 transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5] mt-4"
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Smartphone size={15} className="mr-2 text-[#2E3748]" />
+                      <span>Doğrulama Kodu Gönder</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-fade-in">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
+                    Doğrulama Kodu (OTP)
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value)}
+                    required
+                    className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl px-4 py-3 text-sm font-bold text-[#FAF6E9] tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleVerifyOtp}
+                    disabled={loading}
+                    className="flex-grow bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs py-4 px-4 rounded-2xl transition shadow-md active:scale-95 flex items-center justify-center gap-1.5 uppercase tracking-wider cursor-pointer border border-emerald-500/20"
+                  >
+                    {loading ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      'Kodu Doğrula'
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoneStep('number');
+                      setOtpCode('');
+                    }}
+                    disabled={loading}
+                    className="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-xs py-4 px-4 rounded-2xl transition active:scale-95 uppercase cursor-pointer border border-white/5"
+                  >
+                    Tekrar Dene
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Username field (Guest & Register mode) */}
+            {(mode === 'guest' || mode === 'register') && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
+                  Kullanıcı Adın (Username)
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">
+                    <User size={15} />
+                  </span>
+                  <input
+                    type="text"
+                    maxLength={26}
+                    required
+                    value={username}
+                    onChange={(e) => {
+                      setUsername(e.target.value);
+                      setIsTouched(true);
+                    }}
+                    placeholder="Kullanıcı adını belirle..."
+                    className={`w-full bg-[#3D4756]/40 border ${usernameError ? 'border-rose-500 focus:ring-rose-400/40 focus:border-rose-400/40' : 'border-[#3E485A] focus:ring-amber-400/40 focus:border-amber-400/40'} rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
+                  />
+                </div>
+                {usernameError && (
+                  <p className="text-xs text-rose-400 font-semibold px-1 mt-1 leading-normal">
+                    ⚠️ {usernameError}
+                  </p>
                 )}
               </div>
+            )}
 
-              {/* Presets Slider */}
-              <div className="flex-1 overflow-x-auto py-1 flex gap-2 scrollbar-none">
-                {AVATAR_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setSelectedAvatar(preset)}
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg transition duration-150 shrink-0 active:scale-90 hover:bg-white/10 ${
-                      selectedAvatar === preset 
-                        ? 'bg-gradient-to-tr from-amber-400 to-amber-200 text-slate-900 scale-105 shadow-md' 
-                        : 'bg-[#2E3748]/50 text-white border border-white/5'
-                    }`}
-                  >
-                    {preset}
-                  </button>
-                ))}
+            {/* Email field (Login & Register mode) */}
+            {(mode === 'login' || mode === 'register') && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
+                  E-Posta Adresiniz
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">
+                    <Mail size={15} />
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="ornek@domain.com"
+                    className="w-full bg-[#3D4756]/40 border border-[#3E485A] rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/40 transition"
+                  />
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Action Button */}
-        <button
-          type="submit"
-          disabled={loading || (mode === 'register' && (!username.trim() || !email || !password)) || (mode === 'login' && (!email || !password)) || (mode !== 'guest' && !!usernameError) || !!passwordError}
-          className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-sm py-4 px-6 rounded-2xl shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] disabled:opacity-50 disabled:pointer-events-none transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5] mt-4"
-        >
-          {loading ? (
-            <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <>
-              {mode === 'guest' && (
+            {/* Password field (Login & Register mode) */}
+            {(mode === 'login' || mode === 'register') && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
+                  Şifreniz
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">
+                    <Lock size={15} />
+                  </span>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setIsTouched(true);
+                    }}
+                    placeholder="••••••"
+                    className={`w-full bg-[#3D4756]/40 border ${passwordError ? 'border-rose-500 focus:ring-rose-400/40 focus:border-rose-400/40' : 'border-[#3E485A] focus:ring-amber-400/40 focus:border-amber-400/40'} rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
+                  />
+                </div>
+                {passwordError ? (
+                  <p className="text-xs text-rose-400 font-semibold px-1 mt-1 leading-normal">
+                    ⚠️ {passwordError}
+                  </p>
+                ) : mode === 'register' && (
+                  <p className="text-[10px] text-gray-400 px-1 mt-0.5 font-medium">
+                    * Şifreniz en az 6 karakterden oluşmalı, en az bir harf ve bir sayı içermelidir.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Avatar selection (Guest & Register mode) */}
+            {(mode === 'guest' || mode === 'register') && (
+              <div className="space-y-3 pt-2">
+                <div className="flex justify-between items-end">
+                  <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-wider block font-sans">
+                    Kullanıcı Avatarını Seç
+                  </label>
+                  
+                  {/* Custom Image Upload Button */}
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="custom-avatar-upload-auth"
+                      className="hidden"
+                      onChange={handleCustomAvatarUpload}
+                    />
+                    <label 
+                      htmlFor="custom-avatar-upload-auth"
+                      className="text-[10px] bg-[#3D4756]/60 hover:bg-[#3D4756]/90 text-amber-200 border border-white/5 px-2.5 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 transition active:scale-95 shadow-md font-bold"
+                    >
+                      <Sparkles size={11} className="text-amber-400" />
+                      Kendi Fotoğrafını Yükle
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 items-center bg-[#232B39]/50 p-3 rounded-2xl border border-white/5">
+                  {/* Preview */}
+                  <div className="w-14 h-14 rounded-full bg-[#3D4756] border-2 border-amber-200/60 shadow-[0_0_15px_rgba(251,191,36,0.25)] flex items-center justify-center text-2xl overflow-hidden shrink-0">
+                    {selectedAvatar && selectedAvatar.length > 3 ? (
+                      <img src={selectedAvatar} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <span className="select-none">{selectedAvatar}</span>
+                    )}
+                  </div>
+
+                  {/* Presets Slider */}
+                  <div className="flex-1 overflow-x-auto py-1 flex gap-2 scrollbar-none">
+                    {AVATAR_PRESETS.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setSelectedAvatar(preset)}
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg transition duration-150 shrink-0 active:scale-90 hover:bg-white/10 ${
+                          selectedAvatar === preset 
+                            ? 'bg-gradient-to-tr from-amber-400 to-amber-200 text-slate-900 scale-105 shadow-md' 
+                            : 'bg-[#2E3748]/50 text-white border border-white/5'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Button */}
+            <button
+              type="submit"
+              disabled={loading || (mode === 'register' && (!username.trim() || !email || !password)) || (mode === 'login' && (!email || !password)) || (mode !== 'guest' && !!usernameError) || !!passwordError}
+              className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-sm py-4 px-6 rounded-2xl shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] disabled:opacity-50 disabled:pointer-events-none transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5] mt-4"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+              ) : (
                 <>
-                  <Swords size={15} className="mr-2 text-[#2E3748]" />
-                  <span>Misafir Olarak Oyna</span>
+                  {mode === 'guest' && (
+                    <>
+                      <Swords size={15} className="mr-2 text-[#2E3748]" />
+                      <span>Misafir Olarak Oyna</span>
+                    </>
+                  )}
+                  {mode === 'register' && (
+                    <>
+                      <Sparkles size={15} className="mr-2 text-amber-500 fill-amber-500" />
+                      <span>Kayıt Ol ve Oyuna Başla</span>
+                    </>
+                  )}
+                  {mode === 'login' && (
+                    <>
+                      <LogIn size={15} className="mr-2 text-[#2E3748]" />
+                      <span>E-posta İle Giriş Yap</span>
+                    </>
+                  )}
                 </>
               )}
-              {mode === 'register' && (
-                <>
-                  <Sparkles size={15} className="mr-2 text-amber-500 fill-amber-500" />
-                  <span>Kayıt Ol ve Oyuna Başla</span>
-                </>
-              )}
-              {mode === 'login' && (
-                <>
-                  <LogIn size={15} className="mr-2 text-[#2E3748]" />
-                  <span>E-posta İle Giriş Yap</span>
-                </>
-              )}
-            </>
-          )}
-        </button>
+            </button>
+          </>
+        )}
 
         {/* Social logins */}
         <div className="relative flex py-2 items-center" id="social-auth-separator">
@@ -947,7 +1006,8 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
             type="button"
             onClick={() => {
               setPhoneError(null);
-              setPhoneLoginActive(true);
+              setMode('phone');
+              setPhoneStep('number');
             }}
             disabled={loading}
             className="w-full flex items-center justify-center gap-2.5 bg-[#182C25]/45 hover:bg-[#1E3A2F]/60 disabled:opacity-50 text-[#FAF6E9] border border-emerald-500/20 hover:border-emerald-400/40 rounded-2xl py-3 px-4 text-xs font-black uppercase tracking-wider transition active:scale-95 shadow-md cursor-pointer"
