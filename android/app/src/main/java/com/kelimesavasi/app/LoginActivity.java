@@ -1,62 +1,71 @@
 package com.kelimesavasi.app;
 
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
-import android.text.InputFilter;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.Toast;
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
-import com.google.firebase.Timestamp;
-import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.FirebaseFirestore;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.TimeZone;
 
 public class LoginActivity extends AppCompatActivity {
 
     private static final String TAG = "LoginActivity";
     private Button btnGuestLogin;
+    private Button btnSocialLogin;
+    private Button btnEmailLogin;
     private FirebaseAuth auth;
-    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_login);
-
-        // Dynamic safe initializer
+        
+        // Safe dynamic Firebase initialization
         initializeFirebaseSafely();
 
         auth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+
+        // 1. SESSION CHECK (Oturum Kontrolü): If already logged in, bypass login screen immediately
+        if (auth.getCurrentUser() != null) {
+            Log.d(TAG, "Active user session found. Redirecting to MainActivity.");
+            Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+            startActivity(intent);
+            finish();
+            return;
+        }
+
+        setContentView(R.layout.activity_login);
 
         btnGuestLogin = findViewById(R.id.btn_guest_login);
+        btnSocialLogin = findViewById(R.id.btn_social_login);
+        btnEmailLogin = findViewById(R.id.btn_email_login);
 
+        // Click handler for Guest login page redirect
         btnGuestLogin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showNicknameDialog();
+                Intent intent = new Intent(LoginActivity.this, GuestLoginActivity.class);
+                startActivity(intent);
+            }
+        });
+
+        // Click handler for Social Media connection (Google standard stub)
+        btnSocialLogin.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                handleSocialMediaLogin();
+            }
+        });
+
+        // Click handler for Email authentication (Email standard stub)
+        btnEmailLogin.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                handleEmailAuth();
             }
         });
     }
@@ -77,158 +86,111 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     /**
-     * Shows a mandatory, non-cancelable dialog requiring a valid nickname
-     * before starting the guest session.
+     * Firebase Google Sign-In / Social Authentication boilerplate placeholder code
      */
-    private void showNicknameDialog() {
-        final AppCompatActivity context = this;
-        AlertDialog.Builder builder = new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert);
+    private void handleSocialMediaLogin() {
+        Log.d(TAG, "Social Media (Google) sign in initiated.");
         
-        builder.setTitle("Kullanıcı Adı Belirle");
-        builder.setMessage("Lobi ve yarışlarda görünecek kullanıcı adınızı giriniz (en az 3, en fazla 15 karakter):");
-
-        // Create an elegant layout wrapper for EditText to ensure padding
-        FrameLayout container = new FrameLayout(context);
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        // Convert dp to pixels for standard padding
-        int marginPx = (int) (20 * context.getResources().getDisplayMetrics().density);
-        params.setMargins(marginPx, marginPx / 2, marginPx, marginPx / 2);
-
-        final EditText inputEditText = new EditText(context);
-        inputEditText.setLayoutParams(params);
-        inputEditText.setHint("Kullanıcı adı giriniz...");
-        inputEditText.setSingleLine(true);
-        // Set maximum length filter to 15 characters
-        inputEditText.setFilters(new InputFilter[]{new InputFilter.LengthFilter(15)});
+        // Standard Dialog explaining how Google Sign-In is configured on Android
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert);
+        builder.setTitle("Sosyal Medya Girişi");
+        builder.setMessage("Google Sign-In entegrasyonu kod taslağı hazırdır. "
+                + "Geliştirme aşamasında Firebase Console üzerinden Google Auth sağlayıcısını aktifleştirip "
+                + "ve GoogleSignInOptions yapılandırmasını tamamlayarak tam akışa bağlayabilirsiniz.");
         
-        container.addView(inputEditText);
-        builder.setView(container);
+        builder.setPositiveButton("Anladım", null);
+        builder.show();
 
-        builder.setCancelable(false); // Make the dialog completely non-cancelable
+        /*
+        // --- BOILERPLATE FOR GOOGLE SIGN IN ---
+        // Step 1: Configure Google Sign-In options
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken(getString(R.string.default_web_client_id))
+                .requestEmail()
+                .build();
+        GoogleSignInClient mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        builder.setPositiveButton("Giriş Yap", null); // Set null to override behavior and handle dismiss manually
-        builder.setNegativeButton("İptal", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                dialog.dismiss();
-            }
-        });
+        // Step 2: Launch Google Sign-In intent
+        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+        startActivityForResult(signInIntent, RC_SIGN_IN);
 
-        final AlertDialog dialog = builder.create();
-        dialog.show();
-
-        // Override button click handlers to prevent auto-closing on invalid input
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String rawNickname = inputEditText.getText().toString();
-                String cleanNickname = rawNickname.trim();
-
-                // Validate the entered username
-                if (cleanNickname.isEmpty()) {
-                    inputEditText.setError("Kullanıcı adı boş bırakılamaz!");
-                    Toast.makeText(context, "Lütfen geçerli bir kullanıcı adı yazın.", Toast.LENGTH_SHORT).show();
-                } else if (cleanNickname.length() < 3) {
-                    inputEditText.setError("En az 3 karakter olmalıdır!");
-                    Toast.makeText(context, "Kullanıcı adı çok kısa!", Toast.LENGTH_SHORT).show();
-                } else {
-                    dialog.dismiss();
-                    performGuestSignIn(cleanNickname);
+        // Step 3: Handle result in onActivityResult
+        @Override
+        public void onActivityResult(int requestCode, int resultCode, Intent data) {
+            super.onActivityResult(requestCode, resultCode, data);
+            if (requestCode == RC_SIGN_IN) {
+                Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+                try {
+                    GoogleSignInAccount account = task.getResult(ApiException.class);
+                    firebaseAuthWithGoogle(account.getIdToken());
+                } catch (ApiException e) {
+                    Log.w(TAG, "Google sign in failed", e);
                 }
             }
-        });
+        }
+
+        // Step 4: Authenticate with Firebase using Google credential
+        private void firebaseAuthWithGoogle(String idToken) {
+            AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
+            auth.signInWithCredential(credential)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        if (task.isSuccessful()) {
+                            // Save profile and go to MainActivity
+                        }
+                    }
+                });
+        }
+        */
+        Toast.makeText(this, "Sosyal Medya Giriş Taslağı Tetiklendi!", Toast.LENGTH_SHORT).show();
     }
 
     /**
-     * Performs anonymous sign-in via Firebase Auth and records the username mapping on success.
+     * Firebase Email-Password Authentication boilerplate placeholder code
      */
-    private void performGuestSignIn(final String nickname) {
-        // Disable the login button to prevent duplicate login triggers
-        btnGuestLogin.setEnabled(false);
-        Toast.makeText(this, "Giriş yapılıyor, lütfen bekleyin...", Toast.LENGTH_SHORT).show();
+    private void handleEmailAuth() {
+        Log.d(TAG, "Email/Password sign in initiated.");
 
-        auth.signInAnonymously()
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert);
+        builder.setTitle("E-posta Girişi ve Kayıt");
+        builder.setMessage("E-posta ve şifre tabanlı kayıt kod taslağı hazırdır. "
+                + "Firebase Auth SDK ile createUserWithEmailAndPassword() "
+                + "ve signInWithEmailAndPassword() metodlarını kullanarak kullanıcı kaydı/girişi yapabilirsiniz.");
+        
+        builder.setPositiveButton("Anladım", null);
+        builder.show();
+
+        /*
+        // --- BOILERPLATE FOR EMAIL/PASSWORD SIGN UP & SIGN IN ---
+        // Email Sign-up flow:
+        auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
                 @Override
                 public void onComplete(@NonNull Task<AuthResult> task) {
                     if (task.isSuccessful()) {
-                        FirebaseUser firebaseUser = auth.getCurrentUser();
-                        if (firebaseUser != null) {
-                            saveGuestProfileToFirestore(firebaseUser.getUid(), nickname);
-                        } else {
-                            btnGuestLogin.setEnabled(true);
-                            Toast.makeText(LoginActivity.this, "Giriş başarısız oldu. Lütfen tekrar deneyin.", Toast.LENGTH_LONG).show();
-                        }
+                        FirebaseUser user = auth.getCurrentUser();
+                        // Save profile meta and redirect
                     } else {
-                        btnGuestLogin.setEnabled(true);
-                        String errorMessage = task.getException() != null ? task.getException().getLocalizedMessage() : "Bilinmeyen bir hata oluştu.";
-                        Toast.makeText(LoginActivity.this, "Bağlantı Hatası: " + errorMessage, Toast.LENGTH_LONG).show();
+                        Log.e(TAG, "Sign up failed", task.getException());
                     }
                 }
             });
-    }
 
-    /**
-     * Persists the newly created guest user metadata under the /users/{uid} document in Firestore.
-     */
-    private void saveGuestProfileToFirestore(final String uid, final String nickname) {
-        DocumentReference userRef = db.collection("users").document(uid);
-        
-        // Generate ISO date format for perfect compatibility with React app
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
-        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-        String isoNow = sdf.format(new Date());
-
-        HashMap<String, Object> userData = new HashMap<>();
-        userData.put("uid", uid);
-        userData.put("id", uid); // Bind 'id' for full Javascript web compatibility
-        userData.put("name", nickname);
-        userData.put("isAnonymous", true);
-        userData.put("nameSet", true);
-        userData.put("createdAt", Timestamp.now());
-        userData.put("updatedAt", Timestamp.now());
-        userData.put("lastUpdated", isoNow);
-        userData.put("dailyScore", 0);
-
-        // Pre-populate core stats mapping to prevent JS parsing errors on fresh logins
-        HashMap<String, Object> stats = new HashMap<>();
-        stats.put("gamesPlayed", 0);
-        stats.put("gamesWon", 0);
-        stats.put("currentStreak", 0);
-        stats.put("maxStreak", 0);
-        
-        ArrayList<Integer> winDistribution = new ArrayList<>();
-        for (int i = 0; i < 6; i++) {
-            winDistribution.add(0);
-        }
-        stats.put("winDistribution", winDistribution);
-        userData.put("stats", stats);
-
-        userRef.set(userData)
-            .addOnSuccessListener(new OnSuccessListener<Void>() {
+        // Email Sign-in flow:
+        auth.signInWithEmailAndPassword(email, password)
+            .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
                 @Override
-                public void onSuccess(Void aVoid) {
-                    Toast.makeText(LoginActivity.this, "Oturum Başarıyla Açıldı!", Toast.LENGTH_SHORT).show();
-                    
-                    // Complete login, navigate to MainActivity lobby
-                    Intent intent = new Intent(LoginActivity.this, MainActivity.class);
-                    startActivity(intent);
-                    finish();
-                }
-            })
-            .addOnFailureListener(new OnFailureListener() {
-                @Override
-                public void onFailure(@NonNull Exception e) {
-                    btnGuestLogin.setEnabled(true);
-                    Toast.makeText(
-                        LoginActivity.this,
-                        "Kullanıcı verisi kaydedilemedi: " + e.getLocalizedMessage(),
-                        Toast.LENGTH_LONG
-                    ).show();
+                public void onComplete(@NonNull Task<AuthResult> task) {
+                    if (task.isSuccessful()) {
+                        FirebaseUser user = auth.getCurrentUser();
+                        // Redirect to MainActivity
+                    } else {
+                        Log.e(TAG, "Sign in failed", task.getException());
+                    }
                 }
             });
+        */
+        Toast.makeText(this, "E-posta Kayıt Taslağı Tetiklendi!", Toast.LENGTH_SHORT).show();
     }
 }

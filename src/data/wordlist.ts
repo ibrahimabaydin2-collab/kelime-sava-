@@ -32,36 +32,41 @@ Object.values(COMMON_TURKISH_WORDS).forEach((list) => {
 // Returns a random word from the popular list of specified length
 export const EASY_WORDS_LEVEL_1: { [key: number]: string[] } = {
   3: ['ana', 'arı', 'ara', 'bal', 'çay', 'dağ', 'iyi', 'kar', 'koç', 'şef', 'tek', 'tuz', 'yaz', 'yol', 'son', 'sol', 'sağ', 'süt', 'gül', 'göz', 'gök', 'dil', 'diş', 'baş', 'beş', 'bir', 'biz', 'sen', 'var', 'yok', 'muz', 'dut'],
-  4: ['açık', 'adım', 'alan', 'altı', 'anne', 'baba', 'baca', 'bacı', 'dere', 'deve', 'dolu', 'dost', 'dört', 'duru', 'gemi', 'gece', 'geri', 'gibi', 'kedi', 'kuzu', 'kutu', 'kuru', 'masa', 'mavi', 'okul', 'ordu', 'orta', 'oyun', 'para', 'sarı', 'soru', 'taze', 'uçak', 'uyku', 'uzak', 'uzun', 'yeni', 'yeşil'],
-  5: ['kalem', 'kitap', 'büyük', 'küçük', 'yeşil', 'beyaz', 'siyah', 'kırmızı', 'limon', 'çocuk', 'insan', 'dünya', 'hayat', 'zaman', 'sabah', 'akşam', 'güzel', 'çorba', 'ekmek', 'meyve', 'sebze', 'dolap', 'kaşık', 'çatal', 'tabak', 'bardak', 'sokak', 'şehir', 'deniz', 'güneş', 'bulut', 'yağmur', 'rüzgar', 'bahçe', 'çiçek', 'ağaç'],
-  6: ['adalet', 'akıllı', 'bardak', 'başarı', 'defter', 'eldiven', 'fincan', 'gözlük', 'hayvan', 'karpuz', 'koltuk', 'makas', 'peynir', 'resim', 'sinema', 'tavşan', 'yaprak', 'yemek', 'yıldız', 'yolcu'],
-  7: ['arkadaş', 'belediye', 'hastane', 'merhaba', 'çikolata', 'pencere', 'oyuncak', 'öğrenci', 'telefon', 'bisiklet'],
-  8: ['bilgisayar', 'güzellik', 'telefon', 'temizlik', 'öğretmen', 'kütüphane', 'kelebek']
+  4: ['açık', 'adım', 'alan', 'altı', 'anne', 'baba', 'baca', 'bacı', 'dere', 'deve', 'dolu', 'dost', 'dört', 'duru', 'gemi', 'gece', 'geri', 'gibi', 'kedi', 'kuzu', 'kutu', 'kuru', 'masa', 'mavi', 'okul', 'ordu', 'orta', 'oyun', 'para', 'sarı', 'soru', 'taze', 'uçak', 'uyku', 'uzak', 'uzun', 'yeni', 'ağaç'],
+  5: ['kalem', 'kitap', 'büyük', 'küçük', 'yeşil', 'beyaz', 'siyah', 'limon', 'çocuk', 'insan', 'dünya', 'hayat', 'zaman', 'sabah', 'akşam', 'güzel', 'çorba', 'ekmek', 'meyve', 'sebze', 'dolap', 'kaşık', 'çatal', 'tabak', 'sokak', 'şehir', 'deniz', 'güneş', 'bulut', 'bahçe', 'çiçek', 'makas', 'resim', 'yemek', 'yolcu'],
+  6: ['adalet', 'akıllı', 'bardak', 'başarı', 'defter', 'fincan', 'gözlük', 'hayvan', 'karpuz', 'koltuk', 'peynir', 'sinema', 'tavşan', 'yaprak', 'yıldız', 'yağmur', 'rüzgar'],
+  7: ['arkadaş', 'hastane', 'merhaba', 'pencere', 'oyuncak', 'öğrenci', 'telefon', 'kırmızı', 'eldiven', 'kelebek'],
+  8: ['belediye', 'çikolata', 'bisiklet', 'güzellik', 'temizlik', 'öğretmen']
 };
 
 export function getRandomWord(length: number, isLevel1?: boolean): string {
   if (isLevel1) {
     const easyList = EASY_WORDS_LEVEL_1[length];
     if (easyList && easyList.length > 0) {
-      const word = easyList[Math.floor(Math.random() * easyList.length)];
-      return turkishUpper(word);
+      const filteredEasyList = easyList.filter(word => word.trim().length === length);
+      if (filteredEasyList.length > 0) {
+        const word = filteredEasyList[Math.floor(Math.random() * filteredEasyList.length)];
+        return turkishUpper(word);
+      }
     }
   }
 
   const words = populerKelimeler[length] || [];
-  if (!words || words.length === 0) {
+  const filteredWords = words.filter(word => word.trim().length === length);
+  if (!filteredWords || filteredWords.length === 0) {
     const fallbackWords: { [key: number]: string[] } = {
       3: ['ana', 'arı', 'ara', 'bal', 'çay', 'dağ', 'iyi', 'kar', 'koç', 'şef', 'tek', 'tuz', 'yaz', 'yol', 'zor'],
       4: ['açık', 'adım', 'alan', 'altı'],
       5: ['kalem', 'kitap', 'büyük', 'yeşil'],
       6: ['adalet', 'akıllı', 'bardak', 'başarı'],
-      7: ['arkadaş', 'belediye', 'hastane', 'merhaba'],
-      8: ['bilgisay', 'güzellik', 'telefon', 'temizlik']
+      7: ['arkadaş', 'hastane', 'merhaba'],
+      8: ['belediye', 'güzellik', 'temizlik', 'öğretmen']
     };
-    const list = fallbackWords[length] || fallbackWords[5];
-    return turkishUpper(list[Math.floor(Math.random() * list.length)]);
+    const list = (fallbackWords[length] || fallbackWords[5]).filter(word => word.trim().length === length);
+    const finalWord = list.length > 0 ? list[Math.floor(Math.random() * list.length)] : 'SAVAŞ';
+    return turkishUpper(finalWord);
   }
-  const word = words[Math.floor(Math.random() * words.length)];
+  const word = filteredWords[Math.floor(Math.random() * filteredWords.length)];
   return turkishUpper(word);
 }
 
