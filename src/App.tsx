@@ -21,7 +21,7 @@ import AuthScreen from './components/AuthScreen.js';
 import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
 import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser, fetchUserProfileByDeviceId, deleteUserProfile, signInAsGuest } from './lib/firebase.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge } from './types.js';
-import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play } from 'lucide-react';
+import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play, Home } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/turkish.js';
 import { getApiUrl, getWsUrl, validateWordClientSide } from './utils/api.js';
@@ -526,6 +526,8 @@ export default function App() {
   const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
   const [activeChallenges, setActiveChallenges] = useState<Challenge[]>([]);
   const [activeMatch, setActiveMatch] = useState<RealtimeMatch | null>(null);
+  const [rematchRequested, setRematchRequested] = useState<boolean>(false);
+  const [opponentRematchRequested, setOpponentRematchRequested] = useState<boolean>(false);
 
   const socketRef = useRef<WebSocket | null>(null);
   const wasOnlineRef = useRef<boolean>(false);
@@ -876,6 +878,8 @@ export default function App() {
               setShowLobbyModal(false);
               setMatchmakingStatus('idle');
               setHasEnteredGame(true);
+              setRematchRequested(false);
+              setOpponentRematchRequested(false);
 
               // Set active match reference
               setActiveMatch({
@@ -1004,6 +1008,15 @@ export default function App() {
                   players: updatedPlayers
                 };
               });
+              break;
+            }
+
+            case 'rematch_requested': {
+              const { by } = data;
+              if (by !== profile.id) {
+                setOpponentRematchRequested(true);
+                showToast('Rakip tekrar oynamak istiyor! 🔄', 'info');
+              }
               break;
             }
 
@@ -1243,8 +1256,9 @@ export default function App() {
 
   // Countdown timer logic
   useEffect(() => {
-    // In activeMatch we do want the timer to run
-    if (gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch)) {
+    // In activeMatch we do want the timer to run - wait, user says:
+    // "Süreyi Kökten Kaldır: Canlı Düello yarışındaki gizli veya açık tüm süre sayaçlarını tamamen iptal et. Oyun %100 süresiz olacak."
+    if (gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch) || activeMatch) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
@@ -1526,11 +1540,19 @@ export default function App() {
           playEnterSound(settings.soundEnabled);
           syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded);
         } else if (updatedAttempts.length >= 6) {
-          showToast(`Kelimeyi bulamadınız! Rakibin tamamlaması bekleniyor... Doğru kelime: ${targetWord}`, 'error');
+          showToast(`6 tahmin hakkınız tükendi! Sizin için yeni kelime yükleniyor. Doğru kelime: ${targetWord}`, 'info');
           playDefeatSound(settings.soundEnabled);
-          syncMatchState(updatedAttempts, updatedAttempts.length, true, false, 0);
+          
+          // Generate new word and soft-reset attempts locally
+          const newWord = getRandomWord(wordLength);
+          setTargetWord(newWord);
+          setAttempts([]);
+          setCurrentAttempt('');
+          setLetterStatuses({});
+          
+          // Notify the server/opponent of the reset
+          syncMatchState([], 0, false, false, 0);
         } else {
-          setSecondsLeft(20);
           playEnterSound(settings.soundEnabled);
           syncMatchState(updatedAttempts, updatedAttempts.length, false, false, 0);
         }
@@ -2548,43 +2570,43 @@ export default function App() {
 
           {/* Multiplayer Results Card (Tek Tur Sonuç Ekranı) */}
           {activeMatch && activeMatch.status === 'ended' && (
-            <div className="w-full max-w-md mx-auto bg-slate-900/95 border-2 border-amber-500/30 rounded-3xl p-5 text-center space-y-4 shadow-2xl animate-scale-up" id="multiplayer-results-container">
-              <div className="flex justify-center">
+            <div className="w-full max-w-sm sm:max-w-md mx-auto bg-slate-900/95 border-2 border-amber-500/30 rounded-3xl p-4 sm:p-5 text-center shadow-2xl animate-scale-up flex flex-col justify-between max-h-[85vh] overflow-hidden" id="multiplayer-results-container">
+              <div className="flex justify-center shrink-0">
                 {activeMatch.winnerId === profile.id ? (
                   <div className="relative flex flex-col items-center">
-                    <div className="w-14 h-14 bg-gradient-to-tr from-amber-500 to-yellow-400 rounded-full flex items-center justify-center border border-yellow-300 shadow-lg animate-bounce">
-                      <Trophy size={28} className="text-slate-950 stroke-[2.5]" />
+                    <div className="w-12 h-12 bg-gradient-to-tr from-amber-500 to-yellow-400 rounded-full flex items-center justify-center border border-yellow-300 shadow-lg animate-bounce">
+                      <Trophy size={24} className="text-slate-950 stroke-[2.5]" />
                     </div>
-                    <span className="text-xs font-black text-amber-400 uppercase tracking-widest mt-2 font-mono">DÜELLO GALİBİ</span>
-                    <h2 className="text-2xl font-black text-[#FAF6E9] uppercase tracking-wide leading-none mt-1">ZAFER SENİN!</h2>
+                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest mt-1.5 font-mono">DÜELLO GALİBİ</span>
+                    <h2 className="text-xl font-black text-[#FAF6E9] uppercase tracking-wide leading-none mt-0.5">ZAFER SENİN!</h2>
                   </div>
                 ) : activeMatch.winnerId === 'draw' ? (
                   <div className="relative flex flex-col items-center">
-                    <div className="w-14 h-14 bg-slate-800 rounded-full flex items-center justify-center border border-white/10 shadow-lg">
-                      <Swords size={28} className="text-amber-400 stroke-[2.5]" />
+                    <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center border border-white/10 shadow-lg">
+                      <Swords size={24} className="text-amber-400 stroke-[2.5]" />
                     </div>
-                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest mt-2 font-mono font-bold">DURUM</span>
-                    <h2 className="text-2xl font-black text-amber-300 uppercase tracking-wide leading-none mt-1">BERABERE!</h2>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1.5 font-mono font-bold">DURUM</span>
+                    <h2 className="text-xl font-black text-amber-300 uppercase tracking-wide leading-none mt-0.5">BERABERE!</h2>
                   </div>
                 ) : (
                   <div className="relative flex flex-col items-center">
-                    <div className="w-14 h-14 bg-[#1E1E1E] rounded-full flex items-center justify-center border border-rose-500/25 shadow-lg">
-                      <X size={28} className="text-rose-500 stroke-[2.5]" />
+                    <div className="w-12 h-12 bg-[#1E1E1E] rounded-full flex items-center justify-center border border-rose-500/25 shadow-lg">
+                      <X size={24} className="text-rose-500 stroke-[2.5]" />
                     </div>
-                    <span className="text-xs font-black text-rose-400 uppercase tracking-widest mt-2 font-mono">DÜELLO MAĞLUBU</span>
-                    <h2 className="text-2xl font-black text-rose-500 uppercase tracking-wide leading-none mt-1">KAYBETTİNİZ</h2>
+                    <span className="text-[10px] font-black text-rose-400 uppercase tracking-widest mt-1.5 font-mono">DÜELLO MAĞLUBU</span>
+                    <h2 className="text-xl font-black text-rose-500 uppercase tracking-wide leading-none mt-0.5">KAYBETTİNİZ</h2>
                   </div>
                 )}
               </div>
 
               {/* Word Definition Section inside Results Card */}
-              <div className="bg-black/30 border border-white/5 rounded-2xl p-4 space-y-2 text-left">
+              <div className="bg-black/30 border border-white/5 rounded-2xl p-3 my-2 text-left shrink-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider font-mono">ARANAN SÖZCÜK</span>
-                  <span className="text-[10px] font-mono text-amber-400 font-bold">{targetWord.length} Harfli</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider font-mono">ARANAN SÖZCÜK</span>
+                  <span className="text-[9px] font-mono text-amber-400 font-bold">{targetWord.length} Harfli</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <strong className="text-2xl font-black tracking-widest text-[#FAF6E9] uppercase leading-none">{targetWord}</strong>
+                <div className="flex items-center gap-1.5 my-0.5">
+                  <strong className="text-xl font-black tracking-widest text-[#FAF6E9] uppercase leading-none">{targetWord}</strong>
                   <button
                     onClick={() => {
                       setShowDefinitionModal(true);
@@ -2593,35 +2615,35 @@ export default function App() {
                     className="p-1 rounded-full text-amber-400 hover:bg-amber-400/10 transition active:scale-95"
                     title="Anlamını Gör"
                   >
-                    <Info size={16} className="stroke-[2.5]" />
+                    <Info size={14} className="stroke-[2.5]" />
                   </button>
                 </div>
                 {wordDefinition && wordDefinition !== 'loading' ? (
-                  <p className="text-[11px] text-gray-300 italic font-serif leading-relaxed line-clamp-3">
+                  <p className="text-[10px] text-gray-300 italic font-serif leading-relaxed line-clamp-2">
                     "{wordDefinition}"
                   </p>
                 ) : wordDefinition === 'loading' ? (
-                  <p className="text-[11px] text-gray-400 italic animate-pulse">Sözlük anlamı yükleniyor...</p>
+                  <p className="text-[10px] text-gray-400 italic animate-pulse">Sözlük anlamı yükleniyor...</p>
                 ) : null}
               </div>
 
               {/* Player Round Statistics */}
-              <div className="bg-black/25 rounded-2xl border border-white/5 p-3.5 space-y-3">
-                <h4 className="text-[10px] font-black text-amber-300/80 tracking-widest uppercase font-mono text-left font-bold">OYUNCU DETAYLARI</h4>
+              <div className="bg-black/25 rounded-2xl border border-white/5 p-3 mb-2 space-y-1.5 shrink-0">
+                <h4 className="text-[9px] font-black text-amber-300/80 tracking-widest uppercase font-mono text-left font-bold">OYUNCU DETAYLARI</h4>
                 {Object.entries(activeMatch.players).map(([pId, playerState]: [string, any]) => {
                   const isSelf = pId === profile.id;
                   return (
-                    <div key={pId} className="flex justify-between items-center text-xs">
+                    <div key={pId} className="flex justify-between items-center text-[11px]">
                       <div className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${playerState.won ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                        <span className={`w-1.5 h-1.5 rounded-full ${playerState.won ? 'bg-emerald-400' : 'bg-rose-400'}`} />
                         <span className={`font-black uppercase tracking-wider ${isSelf ? 'text-amber-400' : 'text-gray-300'}`}>
                           {playerState.name} {isSelf ? '(Sen)' : ''}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3 font-mono font-bold">
+                      <div className="flex items-center gap-2 font-mono font-bold">
                         <span className="text-gray-400">Deneme:</span>
                         <span className={playerState.won ? 'text-emerald-400' : 'text-rose-400'}>
-                          {playerState.won ? `${playerState.attempts.length} / 6` : 'BAŞARISIZ'}
+                          {playerState.won ? `${playerState.attempts.length} / 6` : 'BİLEMEDİ'}
                         </span>
                       </div>
                     </div>
@@ -2629,19 +2651,71 @@ export default function App() {
                 })}
               </div>
 
-              {/* Redirect Button */}
-              <button
-                onClick={() => {
-                  playClickSound(settings.soundEnabled);
-                  setActiveMatch(null);
-                  setHasEnteredGame(false);
-                }}
-                className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] text-[#2E3748] font-black text-xs sm:text-sm py-2.5 px-4 rounded-xl shadow-md transition-all uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2"
-                id="back-to-menu-from-match-btn"
-              >
-                <ArrowLeft size={16} className="stroke-[2.5]" />
-                <span>Lobiye Geri Dön</span>
-              </button>
+              {/* Buttons Block - No Scroll & Balanced */}
+              <div className="space-y-2 mt-auto shrink-0 pt-1">
+                {/* Rematch Button */}
+                <button
+                  disabled={rematchRequested}
+                  onClick={() => {
+                    playClickSound(settings.soundEnabled);
+                    setRematchRequested(true);
+                    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+                      socketRef.current.send(JSON.stringify({
+                        type: 'request_rematch',
+                        matchId: activeMatch.id
+                      }));
+                    }
+                    showToast('Yarışmayı tekrarlama isteği gönderildi!', 'success');
+                  }}
+                  className={`w-full font-black text-xs py-2 px-3 rounded-xl shadow-md transition-all uppercase tracking-widest cursor-pointer flex items-center justify-center gap-1.5 ${
+                    rematchRequested
+                      ? 'bg-slate-800 text-gray-500 border border-white/5 cursor-not-allowed'
+                      : opponentRematchRequested
+                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white animate-pulse'
+                      : 'bg-amber-500 hover:bg-amber-600 text-[#1E293B]'
+                  }`}
+                  id="rematch-btn"
+                >
+                  <RotateCcw size={14} className={`stroke-[2.5] ${rematchRequested ? '' : 'animate-spin'}`} />
+                  <span>
+                    {rematchRequested
+                      ? 'İstek Gönderildi...'
+                      : opponentRematchRequested
+                      ? 'Yarışmayı Tekrarla (Rakip İstiyor!)'
+                      : 'Yarışmayı Tekrarla'}
+                  </span>
+                </button>
+
+                {/* Back and Home Row */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      playClickSound(settings.soundEnabled);
+                      setActiveMatch(null);
+                      setHasEnteredGame(false);
+                    }}
+                    className="bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-[#FAF6E9] font-black text-xs py-2 px-3 rounded-xl shadow-md transition-all uppercase tracking-widest cursor-pointer flex items-center justify-center gap-1.5 border border-white/5"
+                    id="match-back-btn"
+                  >
+                    <ArrowLeft size={14} className="stroke-[2.5]" />
+                    <span>Geri</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      playClickSound(settings.soundEnabled);
+                      setActiveMatch(null);
+                      setHasEnteredGame(false);
+                      setShowLobbyModal(false);
+                    }}
+                    className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] text-[#2E3748] font-black text-xs py-2 px-3 rounded-xl shadow-md transition-all uppercase tracking-widest cursor-pointer flex items-center justify-center gap-1.5"
+                    id="match-home-btn"
+                  >
+                    <Home size={14} className="stroke-[2.5]" />
+                    <span>Ana Sayfa</span>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -27,7 +27,10 @@ import {
   auth, 
   linkGuestToEmailAndPassword, 
   sendVerificationEmail,
-  linkGuestWithGoogle
+  linkGuestWithGoogle,
+  PhoneAuthProvider,
+  RecaptchaVerifier,
+  linkWithCredential
 } from '../lib/firebase.js';
 
 export interface AppSettings {
@@ -80,6 +83,113 @@ export default function SettingsModal({
   const [isLinking, setIsLinking] = useState<boolean>(false);
   const [resendingVerification, setResendingVerification] = useState<boolean>(false);
   const [verificationSent, setVerificationSent] = useState<boolean>(false);
+
+  // Phone Linking state
+  const [selectedLinkMethod, setSelectedLinkMethod] = useState<'none' | 'phone' | 'email' | 'google'>('none');
+  const [linkPhone, setLinkPhone] = useState<string>('+90');
+  const [linkOtp, setLinkOtp] = useState<string>('');
+  const [phoneStep, setPhoneStep] = useState<'number' | 'otp'>('number');
+  const [phoneVerificationId, setPhoneVerificationId] = useState<string | null>(null);
+  const [phoneLoading, setPhoneLoading] = useState<boolean>(false);
+
+  const currentUser = auth.currentUser;
+  const isAnonymous = currentUser ? currentUser.isAnonymous : true;
+  const isPhone = currentUser?.providerData?.some(p => p.providerId === 'phone') || !!currentUser?.phoneNumber;
+  const isGoogle = currentUser?.providerData?.some(p => p.providerId === 'google.com') || false;
+  const isEmail = !isAnonymous && !isGoogle && !isPhone;
+
+  const formatPhoneNumber = (num: string | null | undefined) => {
+    if (!num) return 'Bilinmeyen Numara';
+    if (num.length >= 7) {
+      return num.substring(0, 4) + ' ' + num.substring(4, 7) + ' *** ' + num.substring(num.length - 2);
+    }
+    return num;
+  };
+
+  const handleSendPhoneOtp = async () => {
+    setSecurityError(null);
+    setSecuritySuccess(null);
+    setPhoneLoading(true);
+
+    try {
+      const formattedPhone = linkPhone.trim();
+      if (!formattedPhone.startsWith('+')) {
+        setSecurityError('Lütfen ülke kodu ile birlikte giriniz (Örn: +905001112233).');
+        setPhoneLoading(false);
+        return;
+      }
+
+      // Initialize Recaptcha
+      let verifier = (window as any).recaptchaVerifier;
+      if (!verifier) {
+        verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'invisible',
+          callback: () => {},
+          'expired-callback': () => {}
+        });
+        (window as any).recaptchaVerifier = verifier;
+      }
+
+      const phoneProvider = new PhoneAuthProvider(auth);
+      const verificationId = await phoneProvider.verifyPhoneNumber(formattedPhone, verifier);
+      setPhoneVerificationId(verificationId);
+      setPhoneStep('otp');
+      setSecuritySuccess('Doğrulama kodu telefonunuza gönderildi!');
+    } catch (err: any) {
+      console.error('Phone link OTP error:', err);
+      let msg = err.message || 'Kod gönderilemedi.';
+      if (err.code === 'auth/invalid-phone-number') {
+        msg = 'Geçersiz telefon numarası formatı.';
+      }
+      setSecurityError(msg);
+      if ((window as any).recaptchaVerifier) {
+        try {
+          (window as any).recaptchaVerifier.clear();
+          (window as any).recaptchaVerifier = null;
+        } catch (clearErr) {}
+      }
+    } finally {
+      setPhoneLoading(false);
+    }
+  };
+
+  const handleVerifyPhoneOtp = async () => {
+    setSecurityError(null);
+    setSecuritySuccess(null);
+    setPhoneLoading(true);
+
+    try {
+      if (!phoneVerificationId) {
+        setSecurityError('Oturum zaman aşımına uğradı, lütfen tekrar deneyin.');
+        setPhoneLoading(false);
+        return;
+      }
+
+      const credential = PhoneAuthProvider.credential(phoneVerificationId, linkOtp.trim());
+      if (!auth.currentUser) {
+        throw new Error('Aktif kullanıcı bulunamadı.');
+      }
+      
+      await linkWithCredential(auth.currentUser, credential);
+      setSecuritySuccess('Hesabınız başarıyla telefon numaranızla eşleştirildi! 🎉');
+      setLinkPhone('+90');
+      setLinkOtp('');
+      setPhoneStep('number');
+      setPhoneVerificationId(null);
+      setSelectedLinkMethod('none');
+    } catch (err: any) {
+      console.error('Phone link verification error:', err);
+      let msg = err.message || 'Kod doğrulanamadı.';
+      if (err.code === 'auth/invalid-verification-code') {
+        msg = 'Girdiğiniz doğrulama kodu hatalı veya süresi dolmuş.';
+      } else if (err.code === 'auth/credential-already-in-use') {
+        msg = 'Bu telefon numarası zaten başka bir hesaba bağlı.';
+      }
+      setSecurityError(msg);
+    } finally {
+      setPhoneLoading(false);
+    }
+  };
 
   const error = isTouched || editName !== profile.name ? validateUsername(editName, lobbyPlayers, profile.id) : null;
 
@@ -277,7 +387,7 @@ export default function SettingsModal({
                   {/* Username Input */}
                   <div className="flex-1 w-full space-y-1.5 text-left">
                     <label className="text-[10px] font-bold text-amber-100/60 uppercase tracking-widest block font-sans">KULLANICI ADI</label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="text"
                         maxLength={26}
@@ -287,7 +397,7 @@ export default function SettingsModal({
                           setIsTouched(true);
                         }}
                         placeholder="Kullanıcı adınızı yazın..."
-                        className={`flex-1 bg-[#1E2640]/75 border ${error ? 'border-rose-500 focus:ring-rose-400/40' : 'border-[#2E3754] focus:ring-amber-200/40'} rounded-xl px-4 py-2 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
+                        className={`w-full sm:flex-1 bg-[#1E2640]/75 border ${error ? 'border-rose-500 focus:ring-rose-400/40' : 'border-[#2E3754] focus:ring-amber-200/40'} rounded-xl px-4 py-2 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
                       />
                       <button
                         type="button"
@@ -298,7 +408,7 @@ export default function SettingsModal({
                           }
                         }}
                         disabled={!editName.trim() || !!error || editName.trim() === profile.name}
-                        className="px-3.5 py-2 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] text-xs font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer shrink-0"
+                        className="w-full sm:w-auto px-4 py-2 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] text-xs font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer shrink-0"
                       >
                         Güncelle
                       </button>
@@ -349,68 +459,113 @@ export default function SettingsModal({
               <div className="inner-theme border border-theme rounded-2xl p-4.5 space-y-4 text-left shadow-md">
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
                   <Shield size={14} className="text-amber-400" />
-                  Hesap Güvenliği & Koruma
+                  Hesap Güvenliği & Giriş Bilgileri
                 </h4>
 
-                {auth.currentUser ? (
-                  !auth.currentUser.isAnonymous ? (
-                    /* Connected / Email Login Mode */
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between bg-black/25 p-3 rounded-xl border border-[#2E3754]">
-                        <div className="space-y-0.5">
-                          <p className="text-[10px] font-bold text-amber-100/50 uppercase tracking-wider font-sans">BAĞLI E-POSTA</p>
-                          <p className="text-xs font-black text-gray-200 truncate max-w-[200px]">{auth.currentUser.email}</p>
-                        </div>
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">
-                          <CheckCircle2 size={12} />
-                          <span>Bağlı</span>
-                        </div>
-                      </div>
+                {securityError && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs font-semibold text-rose-300 leading-normal animate-fade-in">
+                    ⚠️ {securityError}
+                  </div>
+                )}
 
-                      {auth.currentUser.emailVerified ? (
-                        <div className="flex items-start gap-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-3 rounded-xl text-xs font-semibold">
-                          <CheckCircle2 size={16} className="shrink-0 text-emerald-400 mt-0.5" />
-                          <div>
-                            <p className="font-bold text-emerald-200">🟢 Doğrulanmış Üye</p>
-                            <p className="text-[10px] text-emerald-300/80 mt-0.5 leading-normal">Hesabınız tamamen doğrulanmış ve veri kurtarma havuzuna eklenmiştir.</p>
+                {securitySuccess && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs font-semibold text-emerald-300 leading-normal animate-fade-in">
+                    🎉 {securitySuccess}
+                  </div>
+                )}
+
+                {auth.currentUser ? (
+                  !isAnonymous ? (
+                    /* Connected Mode */
+                    <div className="space-y-3">
+                      {isPhone && (
+                        <div className="flex items-center justify-between bg-black/25 p-3.5 rounded-xl border border-amber-500/20">
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold text-amber-100/50 uppercase tracking-wider font-sans">GİRİŞ YÖNTEMİ</p>
+                            <p className="text-xs font-black text-amber-400">Telefon Numarası ile Giriş Yapıldı</p>
+                            <p className="text-[11px] text-gray-300 font-mono select-all truncate max-w-[200px] sm:max-w-[320px]">{formatPhoneNumber(currentUser?.phoneNumber)}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">
+                            <CheckCircle2 size={12} />
+                            <span>Bağlı</span>
                           </div>
                         </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-300 p-3 rounded-xl text-xs font-semibold">
-                            <AlertTriangle size={16} className="shrink-0 mt-0.5 text-rose-400" />
-                            <div>
-                              <p className="font-bold text-rose-200">🟡 E-posta Doğrulanmamış</p>
-                              <p className="text-[10px] text-rose-300/80 mt-0.5 font-medium leading-normal">E-postanız doğrulanana kadar hesap kurtarma havuzuna tam dahil edilmezsiniz.</p>
+                      )}
+
+                      {isEmail && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between bg-black/25 p-3.5 rounded-xl border border-amber-500/20">
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-bold text-amber-100/50 uppercase tracking-wider font-sans">GİRİŞ YÖNTEMİ</p>
+                              <p className="text-xs font-black text-amber-400">E-posta ile Giriş Yapıldı</p>
+                              <p className="text-[11px] text-gray-300 font-mono select-all truncate max-w-[200px] sm:max-w-[320px]">{currentUser?.email}</p>
+                            </div>
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">
+                              <CheckCircle2 size={12} />
+                              <span>Bağlı</span>
                             </div>
                           </div>
-                          
-                          <button
-                            type="button"
-                            disabled={resendingVerification || verificationSent}
-                            onClick={async () => {
-                              setResendingVerification(true);
-                              setSecurityError(null);
-                              try {
-                                await sendVerificationEmail();
-                                setVerificationSent(true);
-                              } catch (err: any) {
-                                setSecurityError(err.message || 'Doğrulama e-postası gönderilemedi.');
-                              } finally {
-                                setResendingVerification(false);
-                              }
-                            }}
-                            className="w-full py-2.5 px-3 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-slate-900 text-xs font-black rounded-xl transition shadow-md active:scale-95 flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
-                          >
-                            {resendingVerification ? 'Gönderiliyor...' : verificationSent ? 'Doğrulama E-postası Gönderildi ✔' : 'Doğrulama E-postası Gönder'}
-                          </button>
+
+                          {currentUser?.emailVerified ? (
+                            <div className="flex items-start gap-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-3 rounded-xl text-xs font-semibold">
+                              <CheckCircle2 size={16} className="shrink-0 text-emerald-400 mt-0.5" />
+                              <div>
+                                <p className="font-bold text-emerald-200">🟢 Doğrulanmış Üye</p>
+                                <p className="text-[10px] text-emerald-300/80 mt-0.5 leading-normal">Hesabınız tamamen doğrulanmış ve veri kurtarma havuzuna eklenmiştir.</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-300 p-3 rounded-xl text-xs font-semibold">
+                                <AlertTriangle size={16} className="shrink-0 mt-0.5 text-rose-400" />
+                                <div>
+                                  <p className="font-bold text-rose-200">🟡 E-posta Doğrulanmamış</p>
+                                  <p className="text-[10px] text-rose-300/80 mt-0.5 font-medium leading-normal">E-postanız doğrulanana kadar hesap kurtarma havuzuna tam dahil edilmezsiniz.</p>
+                                </div>
+                              </div>
+                              
+                              <button
+                                type="button"
+                                disabled={resendingVerification || verificationSent}
+                                onClick={async () => {
+                                  setResendingVerification(true);
+                                  setSecurityError(null);
+                                  try {
+                                    await sendVerificationEmail();
+                                    setVerificationSent(true);
+                                  } catch (err: any) {
+                                    setSecurityError(err.message || 'Doğrulama e-postası gönderilemedi.');
+                                  } finally {
+                                    setResendingVerification(false);
+                                  }
+                                }}
+                                className="w-full py-2.5 px-3 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-slate-900 text-xs font-black rounded-xl transition shadow-md active:scale-95 flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
+                              >
+                                {resendingVerification ? 'Gönderiliyor...' : verificationSent ? 'Doğrulama E-postası Gönderildi ✔' : 'Doğrulama E-postası Gönder'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {isGoogle && (
+                        <div className="flex items-center justify-between bg-black/25 p-3.5 rounded-xl border border-amber-500/20">
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold text-amber-100/50 uppercase tracking-wider font-sans">GİRİŞ YÖNTEMİ</p>
+                            <p className="text-xs font-black text-amber-400">Google Hesabı ile Giriş Yapıldı</p>
+                            <p className="text-[11px] text-gray-300 font-mono select-all truncate max-w-[200px] sm:max-w-[320px]">{currentUser?.email}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-[#EBE6D5]/20 text-emerald-400 text-[10px] font-black uppercase">
+                            <CheckCircle2 size={12} />
+                            <span>Bağlı</span>
+                          </div>
                         </div>
                       )}
                     </div>
                   ) : (
                     /* Anonymous / Guest Mode (Needs Protection) */
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-300 p-3 rounded-xl text-xs font-semibold">
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-300 p-3.5 rounded-xl text-xs font-semibold">
                         <AlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-400" />
                         <div>
                           <p className="font-bold text-amber-200">Geçici Misafir Profili</p>
@@ -418,155 +573,269 @@ export default function SettingsModal({
                         </div>
                       </div>
 
-                      {securityError && (
-                        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs font-semibold text-rose-300 leading-normal animate-fade-in">
-                          ⚠️ {securityError}
-                        </div>
-                      )}
-
-                      {securitySuccess && (
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs font-semibold text-emerald-300 leading-normal animate-fade-in">
-                          🎉 {securitySuccess}
-                        </div>
-                      )}
-
-                      {!securitySuccess && (
-                        <div className="space-y-2.5">
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-amber-100/50 uppercase tracking-widest block font-sans">E-POSTA ADRESİ</label>
-                            <input
-                              type="email"
-                              placeholder="ornek@domain.com"
-                              value={secureEmail}
-                              onChange={(e) => setSecureEmail(e.target.value)}
-                              className="w-full bg-[#1E2640]/75 border border-[#2E3754] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-bold text-amber-100/50 uppercase tracking-widest block font-sans">YENİ ŞİFRE</label>
-                              <input
-                                type="password"
-                                placeholder="••••••"
-                                value={securePassword}
-                                onChange={(e) => setSecurePassword(e.target.value)}
-                                className="w-full bg-[#1E2640]/75 border border-[#2E3754] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-bold text-amber-100/50 uppercase tracking-widest block font-sans">ŞİFRE TEKRAR</label>
-                              <input
-                                type="password"
-                                placeholder="••••••"
-                                value={securePasswordConfirm}
-                                onChange={(e) => setSecurePasswordConfirm(e.target.value)}
-                                className="w-full bg-[#1E2640]/75 border border-[#2E3754] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40"
-                              />
-                            </div>
-                          </div>
-
+                      {/* Stacked / Accordion options for linking */}
+                      <div className="space-y-2.5">
+                        
+                        {/* 1. TELEFON BAĞLAMA BUTONU / AKORDİYONU */}
+                        <div className="border border-[#2E3754] rounded-xl overflow-hidden bg-black/10">
                           <button
                             type="button"
-                            disabled={isLinking || !secureEmail || !securePassword}
-                            onClick={async () => {
-                              setSecurityError(null);
-                              setSecuritySuccess(null);
-                              
-                              /* Validations */
-                              const passErr = validatePassword(securePassword);
-                              if (passErr) {
-                                setSecurityError(passErr);
-                                return;
-                              }
-                              if (securePassword !== securePasswordConfirm) {
-                                setSecurityError('Şifreler uyuşmuyor.');
-                                return;
-                              }
-
-                              setIsLinking(true);
-                              try {
-                                await linkGuestToEmailAndPassword(secureEmail, securePassword);
-                                setSecuritySuccess('Misafir hesabınız başarıyla e-posta ile korunmuştur. Doğrulama e-postası gönderildi!');
-                                setSecureEmail('');
-                                setSecurePassword('');
-                                setSecurePasswordConfirm('');
-                              } catch (err: any) {
-                                console.error('Error protecting account:', err);
-                                let msg = err.message || 'Hesap eşleştirme başarısız oldu.';
-                                if (err.code?.includes('auth/email-already-in-use')) {
-                                  msg = 'Bu e-posta adresi zaten kullanımda.';
-                                } else if (err.code?.includes('auth/invalid-email')) {
-                                  msg = 'Geçersiz bir e-posta adresi girdiniz.';
-                                } else if (err.code?.includes('auth/weak-password')) {
-                                  msg = 'Şifre çok zayıf. Lütfen en az 6 karakter girin.';
-                                }
-                                setSecurityError(msg);
-                              } finally {
-                                setIsLinking(false);
-                              }
-                            }}
-                            className="w-full py-2.5 px-4 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] text-xs font-black rounded-xl transition shadow-md active:scale-[0.98] flex items-center justify-center gap-1.5 uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
+                            onClick={() => setSelectedLinkMethod(selectedLinkMethod === 'phone' ? 'none' : 'phone')}
+                            className="w-full px-4 py-3 bg-[#1E2640]/50 hover:bg-[#1E2640] text-left flex items-center justify-between text-xs font-bold text-amber-100/90 transition"
                           >
-                            {isLinking ? (
-                              <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <>
-                                <Key size={12} />
-                                <span>Hesabımı Koru (E-posta Bağla)</span>
-                              </>
-                            )}
+                            <span className="flex items-center gap-2">
+                              <Smartphone size={14} className="text-amber-400 animate-pulse" />
+                              Telefon Numarası ile Bağla
+                            </span>
+                            <span className="text-[10px] text-amber-400/60 font-semibold font-mono">
+                              {selectedLinkMethod === 'phone' ? '▲ Kapat' : '▼ Aç'}
+                            </span>
                           </button>
+
+                          {selectedLinkMethod === 'phone' && (
+                            <div className="p-4 bg-black/20 border-t border-[#2E3754] space-y-3 animate-fade-in text-left">
+                              <p className="text-[10px] text-gray-300 leading-normal">
+                                Telefon numaranızı kullanarak hesabınızı doğrulayın ve dilediğiniz cihazdan giriş yapın.
+                              </p>
+                              
+                              {phoneStep === 'number' ? (
+                                <div className="space-y-3">
+                                  <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold text-amber-100/50 uppercase tracking-widest block font-sans">TELEFON NUMARASI</label>
+                                    <input
+                                      type="tel"
+                                      placeholder="+905001112233"
+                                      value={linkPhone}
+                                      onChange={(e) => setLinkPhone(e.target.value)}
+                                      className="w-full bg-[#1E2640]/75 border border-[#2E3754] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40"
+                                    />
+                                  </div>
+                                  
+                                  <div id="recaptcha-container" className="my-1"></div>
+
+                                  <button
+                                    type="button"
+                                    disabled={phoneLoading || !linkPhone}
+                                    onClick={handleSendPhoneOtp}
+                                    className="w-full py-2.5 px-4 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-slate-900 text-xs font-black rounded-xl transition shadow-md active:scale-95 flex items-center justify-center gap-1.5 uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
+                                  >
+                                    {phoneLoading ? (
+                                      <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      'Kod Gönder'
+                                    )}
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold text-amber-100/50 uppercase tracking-widest block font-sans">DOĞRULAMA KODU (OTP)</label>
+                                    <input
+                                      type="text"
+                                      maxLength={6}
+                                      placeholder="123456"
+                                      value={linkOtp}
+                                      onChange={(e) => setLinkOtp(e.target.value)}
+                                      className="w-full bg-[#1E2640]/75 border border-[#2E3754] rounded-xl px-3.5 py-2.5 text-xs font-bold text-center tracking-widest text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40"
+                                    />
+                                  </div>
+
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setPhoneStep('number')}
+                                      className="flex-1 py-2.5 px-4 bg-[#2E3754] hover:bg-[#3E4A6F] text-white text-xs font-black rounded-xl transition cursor-pointer"
+                                    >
+                                      Geri
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={phoneLoading || linkOtp.length < 6}
+                                      onClick={handleVerifyPhoneOtp}
+                                      className="flex-[2] py-2.5 px-4 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-slate-900 text-xs font-black rounded-xl transition shadow-md active:scale-95 flex items-center justify-center gap-1.5 uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
+                                    >
+                                      {phoneLoading ? (
+                                        <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                                      ) : (
+                                        'Kodu Doğrula ve Bağla'
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
+
+                        {/* 2. E-POSTA BAĞLAMA BUTONU / AKORDİYONU */}
+                        <div className="border border-[#2E3754] rounded-xl overflow-hidden bg-black/10">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLinkMethod(selectedLinkMethod === 'email' ? 'none' : 'email')}
+                            className="w-full px-4 py-3 bg-[#1E2640]/50 hover:bg-[#1E2640] text-left flex items-center justify-between text-xs font-bold text-amber-100/90 transition"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Key size={14} className="text-amber-400" />
+                              E-posta ve Şifre ile Bağla
+                            </span>
+                            <span className="text-[10px] text-amber-400/60 font-semibold font-mono">
+                              {selectedLinkMethod === 'email' ? '▲ Kapat' : '▼ Aç'}
+                            </span>
+                          </button>
+
+                          {selectedLinkMethod === 'email' && (
+                            <div className="p-4 bg-black/20 border-t border-[#2E3754] space-y-3.5 animate-fade-in text-left">
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-amber-100/50 uppercase tracking-widest block font-sans">E-POSTA ADRESİ</label>
+                                <input
+                                  type="email"
+                                  placeholder="ornek@domain.com"
+                                  value={secureEmail}
+                                  onChange={(e) => setSecureEmail(e.target.value)}
+                                  className="w-full bg-[#1E2640]/75 border border-[#2E3754] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40"
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-amber-100/50 uppercase tracking-widest block font-sans">YENİ ŞİFRE</label>
+                                  <input
+                                    type="password"
+                                    placeholder="••••••"
+                                    value={securePassword}
+                                    onChange={(e) => setSecurePassword(e.target.value)}
+                                    className="w-full bg-[#1E2640]/75 border border-[#2E3754] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-amber-100/50 uppercase tracking-widest block font-sans">ŞİFRE TEKRAR</label>
+                                  <input
+                                    type="password"
+                                    placeholder="••••••"
+                                    value={securePasswordConfirm}
+                                    onChange={(e) => setSecurePasswordConfirm(e.target.value)}
+                                    className="w-full bg-[#1E2640]/75 border border-[#2E3754] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200/40"
+                                  />
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                disabled={isLinking || !secureEmail || !securePassword}
+                                onClick={async () => {
+                                  setSecurityError(null);
+                                  setSecuritySuccess(null);
+                                  
+                                  const passErr = validatePassword(securePassword);
+                                  if (passErr) {
+                                    setSecurityError(passErr);
+                                    return;
+                                  }
+                                  if (securePassword !== securePasswordConfirm) {
+                                    setSecurityError('Şifreler uyuşmuyor.');
+                                    return;
+                                  }
+
+                                  setIsLinking(true);
+                                  try {
+                                    await linkGuestToEmailAndPassword(secureEmail, securePassword);
+                                    setSecuritySuccess('Misafir hesabınız başarıyla e-posta ile korunmuştur. Doğrulama e-postası gönderildi!');
+                                    setSecureEmail('');
+                                    setSecurePassword('');
+                                    setSecurePasswordConfirm('');
+                                    setSelectedLinkMethod('none');
+                                  } catch (err: any) {
+                                    console.error('Error protecting account:', err);
+                                    let msg = err.message || 'Hesap eşleştirme başarısız oldu.';
+                                    if (err.code?.includes('auth/email-already-in-use')) {
+                                      msg = 'Bu e-posta adresi zaten kullanımda.';
+                                    } else if (err.code?.includes('auth/invalid-email')) {
+                                      msg = 'Geçersiz bir e-posta adresi girdiniz.';
+                                    } else if (err.code?.includes('auth/weak-password')) {
+                                      msg = 'Şifre çok zayıf. Lütfen en az 6 karakter girin.';
+                                    }
+                                    setSecurityError(msg);
+                                  } finally {
+                                    setIsLinking(false);
+                                  }
+                                }}
+                                className="w-full py-2.5 px-4 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-slate-900 text-xs font-black rounded-xl transition shadow-md active:scale-[0.98] flex items-center justify-center gap-1.5 uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
+                              >
+                                {isLinking ? (
+                                  <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <>
+                                    <Key size={12} />
+                                    <span>E-posta Bağla ve Koru</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 3. GOOGLE BAĞLAMA BUTONU / AKORDİYONU */}
+                        <div className="border border-[#2E3754] rounded-xl overflow-hidden bg-black/10">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLinkMethod(selectedLinkMethod === 'google' ? 'none' : 'google')}
+                            className="w-full px-4 py-3 bg-[#1E2640]/50 hover:bg-[#1E2640] text-left flex items-center justify-between text-xs font-bold text-amber-100/90 transition"
+                          >
+                            <span className="flex items-center gap-2">
+                              <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
+                                <path fill="#FBBC05" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6c-.28 1.5-1.11 2.76-2.39 3.62v3h3.86c2.26-2.09 3.67-5.17 3.67-8.45z"/>
+                              </svg>
+                              Google Hesabı ile Bağla
+                            </span>
+                            <span className="text-[10px] text-amber-400/60 font-semibold font-mono">
+                              {selectedLinkMethod === 'google' ? '▲ Kapat' : '▼ Aç'}
+                            </span>
+                          </button>
+
+                          {selectedLinkMethod === 'google' && (
+                            <div className="p-4 bg-black/20 border-t border-[#2E3754] space-y-3 animate-fade-in text-left">
+                              <p className="text-[10px] text-gray-300 leading-normal">
+                                Misafir hesabınızı tek tıkla Google hesabınıza bağlayarak ilerlemenizi ve başarılarınızı kalıcı olarak koruyun.
+                              </p>
+                              
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setSecurityError(null);
+                                  setSecuritySuccess(null);
+                                  try {
+                                    await linkGuestWithGoogle();
+                                    setSecuritySuccess('Hesabınız başarıyla Google ile eşleştirilmiştir! 🎉');
+                                    setSelectedLinkMethod('none');
+                                  } catch (err: any) {
+                                    console.error('Google link error:', err);
+                                    let msg = err.message || 'Google ile bağlanma başarısız oldu.';
+                                    if (err.code === 'auth/credential-already-in-use') {
+                                      msg = 'Bu Google hesabı zaten başka bir kullanıcı profili ile eşleşmiş.';
+                                    }
+                                    setSecurityError(msg);
+                                  }
+                                }}
+                                className="w-full flex items-center justify-center gap-2.5 py-3 px-4 bg-white hover:bg-slate-50 text-slate-900 text-xs font-black rounded-xl transition shadow active:scale-[0.98] border border-slate-200 cursor-pointer"
+                              >
+                                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6c-.28 1.5-1.11 2.76-2.39 3.62v3h3.86c2.26-2.09 3.67-5.17 3.67-8.45z"/>
+                                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.21v3.11C3.18 21.88 7.31 24 12 24z"/>
+                                  <path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.6H1.21C.44 8.13 0 9.85 0 11.7c0 1.85.44 3.57 1.21 5.1l4.06-3.11z"/>
+                                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.18 2.12 1.21 5.7L5.27 8.8c.95-2.85 3.6-4.96 6.73-4.96z"/>
+                                </svg>
+                                <span>Google ile Bağlan</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
                     </div>
                   )
                 ) : (
                   <p className="text-xs text-gray-400 font-medium">Hesap koruması için aktif bir oturum algılanamadı.</p>
                 )}
-              </div>
-
-              {/* Card 3: Hesabı Google ile Eşleştir */}
-              <div className="inner-theme border border-theme rounded-2xl p-4.5 space-y-3.5 text-left shadow-md">
-                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                  <User size={14} className="text-amber-400" />
-                  Hesabını Google ile Eşleştir
-                </h4>
-                
-                <p className="text-[10px] text-slate-300/80 leading-normal">
-                  Misafir hesabınızı tek tıkla Google hesabınıza bağlayarak ilerlemenizi ve başarılarınızı kalıcı olarak koruyun.
-                </p>
-
-                <div className="pt-1">
-                  {/* Google */}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setSecurityError(null);
-                      setSecuritySuccess(null);
-                      try {
-                        await linkGuestWithGoogle();
-                        setSecuritySuccess('Hesabınız başarıyla Google ile eşleştirilmiştir! 🎉');
-                      } catch (err: any) {
-                        console.error('Google link error:', err);
-                        let msg = err.message || 'Google ile bağlanma başarısız oldu.';
-                        if (err.code === 'auth/credential-already-in-use') {
-                          msg = 'Bu Google hesabı zaten başka bir kullanıcı profili ile eşleşmiş.';
-                        }
-                        setSecurityError(msg);
-                      }
-                    }}
-                    className="w-full flex items-center justify-center gap-2.5 py-3 px-4 bg-white hover:bg-slate-50 text-slate-900 text-xs font-black rounded-xl transition shadow active:scale-[0.98] border border-slate-200 cursor-pointer"
-                  >
-                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6c-.28 1.5-1.11 2.76-2.39 3.62v3h3.86c2.26-2.09 3.67-5.17 3.67-8.45z"/>
-                      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.21v3.11C3.18 21.88 7.31 24 12 24z"/>
-                      <path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.6H1.21C.44 8.13 0 9.85 0 11.7c0 1.85.44 3.57 1.21 5.1l4.06-3.11z"/>
-                      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.18 2.12 1.21 5.7L5.27 8.8c.95-2.85 3.6-4.96 6.73-4.96z"/>
-                    </svg>
-                    <span>Google ile Bağlan</span>
-                  </button>
-                </div>
               </div>
 
             </div>
