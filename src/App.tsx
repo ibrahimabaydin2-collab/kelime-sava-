@@ -546,6 +546,7 @@ export default function App() {
   const [showLobbyModal, setShowLobbyModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showDefinitionModal, setShowDefinitionModal] = useState<boolean>(false);
+  const [showCongratsModal, setShowCongratsModal] = useState<boolean>(false);
   const [unlockedBadgeToShow, setUnlockedBadgeToShow] = useState<Badge | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -1213,6 +1214,7 @@ export default function App() {
       setAttempts([]);
       setCurrentAttempt('');
       setSecondsLeft(20);
+      setShowCongratsModal(false);
     }
   }, [hasEnteredGame]);
 
@@ -1519,6 +1521,7 @@ export default function App() {
       } else {
         if (hasWon) {
           setGameStatus('won');
+          setShowCongratsModal(true);
           if (targetWord) {
             fetchTargetWordDefinition(targetWord);
           } else {
@@ -2279,108 +2282,7 @@ export default function App() {
             isGameOver={gameStatus !== 'playing'}
           />
 
-          {/* Victory Celebration Showcase (Zafer Gösterisi) */}
-          {gameStatus === 'won' && (
-            <div className="w-full max-w-lg mt-2 bg-gradient-to-b from-emerald-500/10 to-teal-500/5 dark:from-emerald-950/20 dark:to-teal-950/5 border border-emerald-500/20 dark:border-emerald-500/10 rounded-3xl p-3 sm:p-4 shadow-xl relative overflow-hidden animate-scale-up" id="victory-celebration-container">
-              {/* Spinning background fireworks glow */}
-              <div className="absolute inset-0 pointer-events-none opacity-10 dark:opacity-20 flex items-center justify-center">
-                <div className="w-72 h-72 rounded-full border-4 border-dashed border-emerald-400 animate-rotate-slow" />
-                <div className="absolute w-56 h-56 rounded-full border-2 border-dotted border-teal-400 animate-rotate-slow" style={{ animationDirection: 'reverse' }} />
-              </div>
-
-              {/* Celebration Layout with Side Torches (Meşaleler) */}
-              <div className="flex justify-between items-center gap-4 relative z-10">
-                {/* Left Torch */}
-                <div className="hidden sm:block shrink-0 animate-bounce" style={{ animationDuration: '3s' }}>
-                  <div className="relative w-12 h-20 flex flex-col items-center">
-                    {/* Rising Sparks */}
-                    <div className="absolute -top-8 w-8 h-8 overflow-hidden pointer-events-none">
-                      <div className="absolute bottom-0 left-1/4 w-1 bg-amber-400 rounded-full animate-float-up-slow" style={{ animationDelay: '0s' }} />
-                      <div className="absolute bottom-1 left-1/2 w-1.5 h-1.5 bg-orange-400 rounded-full animate-float-up-slow" style={{ animationDelay: '0.4s' }} />
-                      <div className="absolute bottom-0 left-2/3 w-1 h-1 bg-yellow-400 rounded-full animate-float-up-slow" style={{ animationDelay: '0.8s' }} />
-                    </div>
-                    {/* Multilayered Fire */}
-                    <div className="relative w-6 h-8 -mb-1 animate-pulse-glow">
-                      <div className="absolute inset-x-0 bottom-0 mx-auto w-6 h-8 bg-gradient-to-t from-red-600 via-orange-500 to-transparent rounded-b-full rounded-t-2xl opacity-50 blur-[2px] animate-flicker" />
-                      <div className="absolute inset-x-0.5 bottom-0 mx-auto w-4.5 h-6.5 bg-gradient-to-t from-red-500 via-amber-400 to-transparent rounded-b-full rounded-t-xl opacity-90 animate-flicker" style={{ animationDuration: '0.14s' }} />
-                      <div className="absolute inset-x-1.5 bottom-0.5 mx-auto.5 w-2 h-3.5 bg-gradient-to-t from-yellow-300 to-white rounded-b-full rounded-t-md opacity-100 animate-flicker" style={{ animationDuration: '0.09s' }} />
-                    </div>
-                    {/* Torch Top Cup */}
-                    <div className="w-4.5 h-3.5 bg-gradient-to-r from-amber-600 via-yellow-400 to-amber-700 rounded-t-xs rounded-b-md shadow-md border-t border-yellow-300" />
-                    {/* Handle */}
-                    <div className="w-1 h-8 bg-gradient-to-r from-gray-500 via-gray-400 to-gray-600 rounded-b-full shadow" />
-                  </div>
-                </div>
-
-                {/* Main Content */}
-                <div className="flex-1 text-center space-y-2">
-                  <div className="space-y-1">
-                    <div className="flex justify-center items-center gap-1.5 text-emerald-500">
-                      <Sparkles className="animate-spin text-yellow-500" size={16} style={{ animationDuration: '4s' }} />
-                      <span className="text-[10px] font-black uppercase tracking-widest font-mono text-emerald-600 dark:text-emerald-400">ZAFER KAZANILDI</span>
-                      <Sparkles className="animate-bounce text-yellow-500" size={16} />
-                    </div>
-                    <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight drop-shadow-sm">
-                      Kelimelerin Efendisi! 🎉
-                    </h3>
-                  </div>
-
-                  <div className="py-1.5 px-3 bg-white/70 dark:bg-gray-950/40 rounded-xl border border-emerald-500/10 shadow-inner inline-block mx-auto">
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-mono mb-1 leading-none">Bulunan Kelime</p>
-                    <div className="flex items-center justify-center gap-1.5">
-                      <span className="text-xl sm:text-2xl font-extrabold tracking-widest uppercase bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 bg-clip-text text-transparent drop-shadow-sm filter drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]">
-                        {targetWord}
-                      </span>
-                      <button
-                        onClick={() => {
-                          setShowDefinitionModal(true);
-                          playClickSound(settings.soundEnabled);
-                        }}
-                        className="p-1 rounded-full text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition active:scale-95 cursor-pointer flex items-center justify-center"
-                        title="Kelime Anlamı"
-                        id="info-definition-btn-victory"
-                      >
-                        <Info size={16} className="stroke-[2.5]" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-1 flex flex-col sm:flex-row justify-center items-center gap-2">
-                    <button
-                      onClick={() => startNewGame(wordLength)}
-                      className="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-[11px] py-2 px-4 rounded-lg shadow-md shadow-emerald-500/15 hover:shadow-emerald-500/25 transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
-                      id="victory-retry-button"
-                    >
-                      <RotateCcw size={14} />
-                      <span>YENİ SAVAŞA BAŞLA</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Right Torch */}
-                <div className="hidden sm:block shrink-0 animate-bounce animate-delay-150" style={{ animationDuration: '3s', animationDelay: '0.3s' }}>
-                  <div className="relative w-12 h-20 flex flex-col items-center">
-                    {/* Rising Sparks */}
-                    <div className="absolute -top-8 w-8 h-8 overflow-hidden pointer-events-none">
-                      <div className="absolute bottom-0 left-1/4 w-1.5 h-1.5 bg-amber-400 rounded-full animate-float-up-slow" style={{ animationDelay: '0.2s' }} />
-                      <div className="absolute bottom-1 left-1/2 w-1 h-1 bg-orange-400 rounded-full animate-float-up-slow" style={{ animationDelay: '0.6s' }} />
-                      <div className="absolute bottom-0 left-2/3 w-1.5 h-1.5 bg-yellow-400 rounded-full animate-float-up-slow" style={{ animationDelay: '1s' }} />
-                    </div>
-                    {/* Multilayered Fire */}
-                    <div className="relative w-6 h-8 -mb-1 animate-pulse-glow">
-                      <div className="absolute inset-x-0 bottom-0 mx-auto w-6 h-8 bg-gradient-to-t from-red-600 via-orange-500 to-transparent rounded-b-full rounded-t-2xl opacity-50 blur-[2px] animate-flicker" style={{ animationDelay: '0.05s' }} />
-                      <div className="absolute inset-x-0.5 bottom-0 mx-auto w-4.5 h-6.5 bg-gradient-to-t from-red-500 via-amber-400 to-transparent rounded-b-full rounded-t-xl opacity-90 animate-flicker" style={{ animationDuration: '0.14s', animationDelay: '0.05s' }} />
-                      <div className="absolute inset-x-1.5 bottom-0.5 mx-auto.5 w-2 h-3.5 bg-gradient-to-t from-yellow-300 to-white rounded-b-full rounded-t-md opacity-100 animate-flicker" style={{ animationDuration: '0.09s', animationDelay: '0.05s' }} />
-                    </div>
-                    {/* Torch Top Cup */}
-                    <div className="w-4.5 h-3.5 bg-gradient-to-r from-amber-600 via-yellow-400 to-amber-700 rounded-t-xs rounded-b-md shadow-md border-t border-yellow-300" />
-                    {/* Handle */}
-                    <div className="w-1 h-8 bg-gradient-to-r from-gray-500 via-gray-400 to-gray-600 rounded-b-full shadow" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Victory Celebration is now handled via the lightweight showCongratsModal popup to prevent layout shifts, lag and WebView/AdMob crashes */}
 
           {/* Standard Game Over (Loss) Screen */}
           {gameStatus === 'lost' && (
@@ -2878,6 +2780,62 @@ export default function App() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Congrats / Victory Modal */}
+      {showCongratsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn" id="congrats-modal-container">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity duration-200"
+            onClick={() => {
+              // Click background does not close to guarantee the user makes a choice or sees success
+            }}
+          />
+          
+          {/* Modal Container */}
+          <div className="bg-[#2E3748] border-2 border-emerald-500/30 rounded-[2.5rem] p-6 max-w-sm w-full shadow-2xl relative z-10 overflow-hidden text-white animate-scale-up text-center space-y-4" id="congrats-modal-card">
+            {/* Soft decorative glow */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex flex-col items-center relative z-10">
+              <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center border border-emerald-500/20 shadow-lg mb-3">
+                <Trophy size={24} className="animate-bounce" />
+              </div>
+              <h3 className="text-base font-black text-emerald-400 uppercase tracking-widest font-mono">Tebrikler! Doğru Bildiniz</h3>
+              <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wider">Kelimelerin Efendisi!</p>
+            </div>
+
+            {/* Found Word Display */}
+            <div className="p-3.5 bg-black/30 rounded-2xl border border-white/5 space-y-1 text-center relative z-10">
+              <span className="text-[9px] text-gray-400 uppercase font-mono tracking-widest block">BULUNAN KELİME</span>
+              <strong className="text-2xl font-black tracking-widest text-[#FAF6E9] uppercase block leading-none">{targetWord}</strong>
+              
+              {/* Word Definition */}
+              {wordDefinition && wordDefinition !== 'loading' ? (
+                <p className="text-[11px] text-gray-300 italic font-serif leading-relaxed line-clamp-3 mt-1.5">
+                  "{wordDefinition}"
+                </p>
+              ) : wordDefinition === 'loading' ? (
+                <p className="text-[10px] text-gray-400 italic animate-pulse mt-1.5">Anlamı yükleniyor...</p>
+              ) : null}
+            </div>
+
+            {/* Action button matching the loss restart button but themed in emerald */}
+            <button
+              onClick={() => {
+                playClickSound(settings.soundEnabled);
+                startNewGame(wordLength);
+                setShowCongratsModal(false);
+              }}
+              className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider relative z-10"
+              id="congrats-new-game-button"
+            >
+              <RotateCcw size={14} />
+              <span>Yeni Kelimeye Başla</span>
+            </button>
           </div>
         </div>
       )}
