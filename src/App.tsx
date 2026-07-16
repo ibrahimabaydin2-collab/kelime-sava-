@@ -607,15 +607,14 @@ export default function App() {
     let active = true;
     let resolved = false;
 
-    // 5-second fallback timeout for the "Oturum Hazırlanıyor..." screen
+    // 15-second graceful fallback timeout for the "Oturum Hazırlanıyor..." screen
     const timeoutId = setTimeout(() => {
       if (active && !resolved) {
         resolved = true;
-        console.warn('Firebase Auth/Profile initialization timed out (5s). Reverting to local state.');
-        showToast('Oturum hazırlığı zaman aşımına uğradı, yerel profil ile devam ediliyor.', 'info');
+        console.warn('Firebase Auth/Profile initialization timed out (15s). Falling back gracefully in background.');
         setAuthLoading(false);
       }
-    }, 5000);
+    }, 15000);
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!active) return;
@@ -662,38 +661,57 @@ export default function App() {
                 setProfile(dbProfile);
                 safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(dbProfile));
               } else {
-                // If no doc in firestore, sync current profile state
-                const updatedProfile = {
-                  ...profile,
-                  id: user.uid,
-                  deviceId: deviceId,
-                  nameSet: true
-                };
-                setProfile(updatedProfile);
-                await saveUserProfileToFirestore(updatedProfile);
-                safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+                // No profile exists for this UID. Let's trigger device profile recovery now that we are successfully authenticated!
+                try {
+                  const existingProfile = await fetchUserProfileByDeviceId(deviceId);
+                  if (existingProfile && existingProfile.id !== user.uid) {
+                    console.log('Found existing profile associated with deviceId. Auto-recovering profile...', existingProfile);
+                    const updatedProfile = {
+                      ...existingProfile,
+                      id: user.uid,
+                      deviceId: deviceId,
+                      nameSet: true
+                    };
+                    setProfile(updatedProfile);
+                    await saveUserProfileToFirestore(updatedProfile);
+                    // Delete the old profile document to keep usernames unique and avoid duplicate deviceId
+                    if (existingProfile.id) {
+                      await deleteUserProfile(existingProfile.id);
+                    }
+                    safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+                    showToast(`Profiliniz başarıyla geri yüklendi: ${updatedProfile.name}! 🎉`, 'success');
+                  } else {
+                    // No existing profile found with this deviceId. Sync current profile state
+                    const updatedProfile = {
+                      ...profile,
+                      id: user.uid,
+                      deviceId: deviceId,
+                      nameSet: true
+                    };
+                    setProfile(updatedProfile);
+                    await saveUserProfileToFirestore(updatedProfile);
+                    safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+                  }
+                } catch (deviceCheckErr) {
+                  console.error('Error during automatic device profile recovery after auth:', deviceCheckErr);
+                  // Sync current profile state as fallback
+                  const updatedProfile = {
+                    ...profile,
+                    id: user.uid,
+                    deviceId: deviceId,
+                    nameSet: true
+                  };
+                  setProfile(updatedProfile);
+                  await saveUserProfileToFirestore(updatedProfile);
+                  safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+                }
               }
             }
           }
         } else {
           if (active) {
             setFirebaseUser(null);
-            
-            // Check if there is an existing anonymous/guest user profile with this deviceId in Firestore
-            try {
-              const existingProfile = await fetchUserProfileByDeviceId(deviceId);
-              if (existingProfile) {
-                console.log('Found existing profile associated with deviceId. Auto-logging in...', existingProfile);
-                // Save it to a temporary localStorage key so we can migrate it once signed in
-                safeLocalStorage.setItem('pending_restoration_profile', JSON.stringify(existingProfile));
-                
-                // Automatically trigger guest sign in
-                showToast('Mevcut profiliniz geri yükleniyor...', 'info');
-                await signInAsGuest();
-              }
-            } catch (deviceCheckErr) {
-              console.error('Error during automatic device profile recovery:', deviceCheckErr);
-            }
+            // We do not check deviceId or perform any Firestore queries when unauthenticated.
           }
         }
       } catch (err) {

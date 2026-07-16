@@ -1,12 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:ads="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <WebView
+    <!-- Google AdMob Banner View anchored to the top -->
+    <com.google.android.gms.ads.AdView
+        android:id="@+id/adViewTop"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        ads:adSize="BANNER"
+        ads:adUnitId="ca-app-pub-1284515268865249/2035597391" />
+
+    <!-- Container for Capacitor's WebView -->
+    <FrameLayout
+        android:id="@+id/webview_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/adViewTop"
+        android:layout_above="@+id/adView" />
+
+    <!-- Google AdMob Banner View anchored to the bottom -->
+    <com.google.android.gms.ads.AdView
+        android:id="@+id/adView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        ads:adSize="BANNER"
+        ads:adUnitId="ca-app-pub-1284515268865249/5480586606" />
+
+</RelativeLayout>

@@ -31,7 +31,8 @@ import {
   query,
   where,
   getDocs,
-  limit
+  limit,
+  getDocFromServer
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { UserProfile } from '../types.js';
@@ -43,7 +44,7 @@ export const auth = getAuth(app);
 // Use the custom firestore database ID from firebase-applet-config.json if specified
 const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
 
-// Check if localStorage is supported and accessible (can throw in sandboxed iframes)
+// Check if localStorage is supported and accessible
 let usePersistentCache = false;
 try {
   if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
@@ -55,13 +56,71 @@ try {
   usePersistentCache = false;
 }
 
-// Initialize Firestore with long polling and persistent offline cache only if supported
+// Initialize Firestore with auto-detect long polling and cache configuration
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
+  experimentalAutoDetectLongPolling: true,
   localCache: usePersistentCache 
     ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
     : memoryLocalCache()
 }, dbId);
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+// Validate Connection to Firestore on startup as required by the Firebase Integration skill
+async function testConnection() {
+  try {
+    await getDoc(doc(db, 'test', 'connection'));
+    console.log('Successfully checked Cloud Firestore connection (cached or online).');
+  } catch (error) {
+    console.warn("Firestore connection check:", error);
+  }
+}
+testConnection();
 
 /**
  * Signs in anonymously (Guest Mode)
@@ -140,6 +199,9 @@ export async function fetchUserProfileByDeviceId(deviceId: string): Promise<User
     }
   } catch (error) {
     console.warn('Failed to fetch user profile by deviceId:', error);
+    if (error instanceof Error && (error.message.includes('permission') || error.message.includes('Permission'))) {
+      handleFirestoreError(error, OperationType.LIST, 'users');
+    }
   }
   return null;
 }
@@ -153,6 +215,7 @@ export async function deleteUserProfile(uid: string): Promise<void> {
     await deleteDoc(userDocRef);
   } catch (error) {
     console.error('Failed to delete user profile:', error);
+    handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
   }
 }
 
@@ -173,6 +236,9 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
     }
   } catch (error) {
     console.warn('Failed to fetch user profile from server, trying offline cache:', error);
+    if (error instanceof Error && (error.message.includes('permission') || error.message.includes('Permission'))) {
+      handleFirestoreError(error, OperationType.GET, `users/${uid}`);
+    }
     try {
       // 2. Try to fetch from local Firestore cache
       const userSnap = await getDocFromCache(userDocRef);
@@ -218,6 +284,9 @@ export async function saveUserProfileToFirestore(profile: UserProfile): Promise<
       updatedAt: serverTimestamp()
     }, { merge: true }).catch(error => {
       console.warn('Background Firestore profile save queued/deferred:', error);
+      if (error instanceof Error && (error.message.includes('permission') || error.message.includes('Permission'))) {
+        handleFirestoreError(error, OperationType.WRITE, `users/${profile.id}`);
+      }
     });
     
     // Update browser local storage immediately so client-side state is always perfectly synchronized
@@ -226,6 +295,7 @@ export async function saveUserProfileToFirestore(profile: UserProfile): Promise<
     }
   } catch (error) {
     console.error('Failed to save user profile:', error);
+    handleFirestoreError(error, OperationType.WRITE, `users/${profile.id}`);
   }
 }
 
