@@ -1,5 +1,25 @@
 import { useState } from 'react';
-import { X, Award, CheckCircle, BarChart2, Share2, Sparkles, Copy, Check } from 'lucide-react';
+import { 
+  X, 
+  Award, 
+  CheckCircle, 
+  BarChart2, 
+  Share2, 
+  Sparkles, 
+  Copy, 
+  Check,
+  Calendar,
+  Trophy,
+  Zap,
+  Star,
+  Brain,
+  Shield,
+  Crown,
+  Search,
+  Flame,
+  Target,
+  Compass
+} from 'lucide-react';
 import { UserProfile, Badge, DailyMission } from '../types';
 import { getBaseUrl } from '../utils/api.js';
 
@@ -8,6 +28,39 @@ interface StatsModalProps {
   onClose: () => void;
   onResetStats?: () => void;
 }
+
+const renderBadgeIcon = (iconName: string, isUnlocked: boolean) => {
+  const className = isUnlocked ? 'animate-pulse text-amber-400' : '';
+  switch (iconName) {
+    case 'Calendar':
+      return <Calendar size={24} className={className} />;
+    case 'Trophy':
+      return <Trophy size={24} className={className} />;
+    case 'Zap':
+      return <Zap size={24} className={className} />;
+    case 'Star':
+      return <Star size={24} className={className} />;
+    case 'Brain':
+      return <Brain size={24} className={className} />;
+    case 'Shield':
+      return <Shield size={24} className={className} />;
+    case 'Crown':
+      return <Crown size={24} className={className} />;
+    case 'Search':
+      return <Search size={24} className={className} />;
+    case 'Flame':
+      return <Flame size={24} className={isUnlocked ? 'animate-pulse text-orange-400' : ''} />;
+    case 'Sparkles':
+      return <Sparkles size={24} className={className} />;
+    case 'Target':
+      return <Target size={24} className={className} />;
+    case 'Compass':
+      return <Compass size={24} className={className} />;
+    case 'Award':
+    default:
+      return <Award size={24} className={className} />;
+  }
+};
 
 export default function StatsModal({
   profile,
@@ -245,7 +298,7 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
                         ? 'bg-[#3D4756] text-amber-400 border border-amber-400/50'
                         : 'bg-black/20 text-gray-500'
                     }`}>
-                      <Award size={24} className={isUnlocked ? 'animate-pulse text-amber-400' : ''} />
+                      {renderBadgeIcon(badge.iconName, isUnlocked)}
                     </div>
                     <div>
                       <h4 className={`font-bold text-sm ${isUnlocked ? 'text-amber-300' : 'text-gray-500'}`}>

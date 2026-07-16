@@ -291,20 +291,22 @@ app.post('/api/daily-puzzle', async (req, res) => {
 });
 
 // Core hybrid validation function
-async function validateWordHybrid(word: string): Promise<{ valid: boolean; definition: string }> {
+async function validateWordHybrid(word: string, skipLocalCheck = false): Promise<{ valid: boolean; definition: string }> {
   try {
     // 1. Türkçe kurallarına göre küçük harfe çevir
     const lowerWord = word.trim().toLocaleLowerCase('tr-TR');
     console.log(`[Hybrid Validation] Validating word: "${word}" (normalized lower: "${lowerWord}")`);
 
     // 2. İlk olarak bu kelimeyi bizim yerel kelime listemizde ara. Eğer yerel listede varsa doğrudan geçerli say ve internete hiç sorma.
-    const inCurated = isWordInCuratedList(lowerWord, lowerWord.length);
-    if (inCurated) {
-      console.log(`[Hybrid Validation Result] Word "${lowerWord}" found in local list. Directly VALID.`);
-      return {
-        valid: true,
-        definition: 'Yerel kelime listesinde kayıtlı geçerli bir Türkçe sözcüktür.'
-      };
+    if (!skipLocalCheck) {
+      const inCurated = isWordInCuratedList(lowerWord, lowerWord.length);
+      if (inCurated) {
+        console.log(`[Hybrid Validation Result] Word "${lowerWord}" found in local list. Directly VALID.`);
+        return {
+          valid: true,
+          definition: 'Yerel kelime listesinde kayıtlı geçerli bir Türkçe sözcüktür.'
+        };
+      }
     }
 
     // 3. Eğer yerel listede yoksa, doğrudan Axios kullanarak Wikisözlük API'sine sorgu gönder.
@@ -510,12 +512,23 @@ app.post('/api/get-definition', async (req, res) => {
     const lowerWord = word.trim().toLocaleLowerCase('tr-TR');
     const cacheKey = `definition_${normalized}`;
 
-    // Check cache
+    // Check cache (ignore if cached definition is a generic placeholder or fallback)
     if (wordCache[cacheKey]) {
-      return res.json(wordCache[cacheKey]);
+      const cachedDef = wordCache[cacheKey].definition;
+      const isGeneric = !cachedDef ||
+                        cachedDef === 'Yerel kelime listesinde kayıtlı geçerli bir Türkçe sözcüktür.' ||
+                        cachedDef === 'Wikisözlük\'te kayıtlı geçerli bir Türkçe sözcüktür.' ||
+                        cachedDef.includes('yüklenemedi') ||
+                        cachedDef.includes('erişilemiyor') ||
+                        cachedDef.includes('oyunda yer alan') ||
+                        cachedDef.includes('kelime haznenizde yer alan') ||
+                        cachedDef.includes('resmi sözlük tanımına şu an ulaşılamıyor');
+      if (!isGeneric) {
+        return res.json(wordCache[cacheKey]);
+      }
     }
 
-    // Check Firestore
+    // Check Firestore (ignore if database definition is a generic placeholder or fallback)
     try {
       const wordDocRef = doc(db, 'dictionary', normalized);
       const wordSnap = await Promise.race([
@@ -525,40 +538,71 @@ app.post('/api/get-definition', async (req, res) => {
       if (wordSnap && wordSnap.exists()) {
         const dbData = wordSnap.data();
         if (dbData.definition) {
-          const dbResult = { valid: true, definition: dbData.definition };
-          wordCache[cacheKey] = dbResult;
-          console.log(`[Database Hit - Definition] Word "${normalized}" found in database:`, dbResult);
-          return res.json(dbResult);
+          const dbDef = dbData.definition;
+          const isGeneric = !dbDef ||
+                            dbDef === 'Yerel kelime listesinde kayıtlı geçerli bir Türkçe sözcüktür.' ||
+                            dbDef === 'Wikisözlük\'te kayıtlı geçerli bir Türkçe sözcüktür.' ||
+                            dbDef.includes('yüklenemedi') ||
+                            dbDef.includes('erişilemiyor') ||
+                            dbDef.includes('oyunda yer alan') ||
+                            dbDef.includes('kelime haznenizde yer alan') ||
+                            dbDef.includes('resmi sözlük tanımına şu an ulaşılamıyor');
+          
+          if (!isGeneric) {
+            const dbResult = { valid: true, definition: dbDef };
+            wordCache[cacheKey] = dbResult;
+            console.log(`[Database Hit - Definition] Word "${normalized}" found in database:`, dbResult);
+            return res.json(dbResult);
+          }
         }
       }
     } catch (dbErr) {
       console.warn('Firestore database read for definition failed/timed out:', dbErr);
     }
 
-    // Retrieve via hybrid validation
-    const validationResult = await validateWordHybrid(normalized);
-    
+    // Retrieve via hybrid validation (Wiktionary/Local) - skip local list to force Wiktionary fetch
+    const validationResult = await validateWordHybrid(normalized, true);
+    let definition = validationResult.definition;
+
+    // Use a clean custom fallback sentence if definition is missing or generic/not found
+    const isFallback = !definition || 
+                      definition === 'Yerel kelime listesinde kayıtlı geçerli bir Türkçe sözcüktür.' ||
+                      definition === 'Wikisözlük\'te kayıtlı geçerli bir Türkçe sözcüktür.' ||
+                      definition.includes('bulunamadı') || 
+                      definition.includes('yüklenemedi') || 
+                      definition.includes('erişilemiyor') ||
+                      definition.includes('oyunda yer alan') ||
+                      definition.includes('kelime haznenizde yer alan') ||
+                      definition.includes('resmi sözlük tanımına şu an ulaşılamıyor');
+
+    if (isFallback) {
+      definition = 'Bu kelimenin resmi sözlük tanımına şu an ulaşılamıyor.';
+    }
+
     const finalResult = {
       valid: true, // Target words are always valid in game contexts
-      definition: validationResult.definition || 'Türkçe kelime anlamı yüklenemedi.'
+      definition
     };
 
     wordCache[cacheKey] = finalResult;
 
-    // Save definition back to Firestore dictionary (non-blocking in background)
-    try {
-      const wordDocRef = doc(db, 'dictionary', normalized);
-      setDoc(wordDocRef, {
-        word: normalized,
-        valid: true,
-        definition: finalResult.definition,
-        createdAt: new Date().toISOString()
-      }, { merge: true }).catch(saveErr => {
-        console.error('Failed to save word definition to Firestore in background:', saveErr);
-      });
-      console.log(`[Database Save - Definition] Queued definition for "${normalized}" to save in background.`);
-    } catch (saveErr) {
-      console.error('Failed to save word definition to Firestore:', saveErr);
+    // Only save to Firestore if it's not the failure fallback
+    if (definition !== 'Bu kelimenin resmi sözlük tanımına şu an ulaşılamıyor.') {
+      // Save definition back to Firestore dictionary (non-blocking in background)
+      try {
+        const wordDocRef = doc(db, 'dictionary', normalized);
+        setDoc(wordDocRef, {
+          word: normalized,
+          valid: true,
+          definition: finalResult.definition,
+          createdAt: new Date().toISOString()
+        }, { merge: true }).catch(saveErr => {
+          console.error('Failed to save word definition to Firestore in background:', saveErr);
+        });
+        console.log(`[Database Save - Definition] Queued definition for "${normalized}" to save in background.`);
+      } catch (saveErr) {
+        console.error('Failed to save word definition to Firestore:', saveErr);
+      }
     }
 
     return res.json(finalResult);
@@ -566,7 +610,7 @@ app.post('/api/get-definition', async (req, res) => {
     console.error('[Get Definition ERROR]:', error);
     res.json({
       valid: true,
-      definition: `Kelime doğrulandı ve kelime haznenize eklendi.`
+      definition: 'Bu kelimenin resmi sözlük tanımına şu an ulaşılamıyor.'
     });
   }
 });

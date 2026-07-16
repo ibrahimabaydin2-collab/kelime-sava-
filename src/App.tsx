@@ -38,12 +38,23 @@ const INITIAL_STATS = {
 
 const DEFAULT_BADGES: Badge[] = [
   { id: 'first_step', title: 'İlk Adım', description: 'İlk kelime oyununu oyna', iconName: 'Award' },
-  { id: 'champion', title: 'Şampiyon', description: 'İlk galibiyetini kazan', iconName: 'Award' },
-  { id: 'lightning', title: 'Yıldırım Çözücü', description: '10 saniyeden fazla süre varken kelimeyi çöz', iconName: 'Award' },
-  { id: 'flawless', title: 'Kusursuz', description: 'Kelimeyi ilk veya ikinci denemede doğru bil', iconName: 'Award' },
-  { id: 'genius', title: 'Zeka Küpü', description: '8 harfli bir kelimeyi başarıyla tamamla', iconName: 'Award' },
-  { id: 'gladiator', title: 'Gladyatör', description: 'Gerçek zamanlı bir arkadaş meydan okumasını kazan', iconName: 'Award' },
-  { id: 'daily_puzzle_solver', title: 'Günlük Bilge', description: 'Günün bulmacasını başarıyla çöz', iconName: 'Calendar' }
+  { id: 'champion', title: 'Şampiyon', description: 'İlk galibiyetini kazan', iconName: 'Trophy' },
+  { id: 'lightning', title: 'Yıldırım Çözücü', description: '10 saniyeden fazla süre varken kelimeyi çöz', iconName: 'Zap' },
+  { id: 'flawless', title: 'Kusursuz', description: 'Kelimeyi ilk veya ikinci denemede doğru bil', iconName: 'Star' },
+  { id: 'genius', title: 'Zeka Küpü', description: '8 harfli bir kelimeyi başarıyla tamamla', iconName: 'Brain' },
+  { id: 'gladiator', title: 'Gladyatör', description: 'Gerçek zamanlı bir arkadaş meydan okumasını kazan', iconName: 'Shield' },
+  { id: 'daily_puzzle_solver', title: 'Günlük Bilge', description: 'Günün bulmacasını başarıyla çöz', iconName: 'Calendar' },
+  { id: 'word_detective', title: 'Kelime Dedektifi', description: 'Toplam 10 kelimeyi başarıyla çöz', iconName: 'Search' },
+  { id: 'word_guru', title: 'Kelime Gurusu', description: 'Toplam 50 kelimeyi başarıyla çöz', iconName: 'Crown' },
+  { id: 'word_master', title: 'Kelime Ustası', description: 'Toplam 100 kelimeyi başarıyla çöz', iconName: 'Crown' },
+  { id: 'persistent_player', title: 'Azimli Oyuncu', description: 'Toplam 25 oyun oyna', iconName: 'Award' },
+  { id: 'quick_draw', title: 'Hızlı Silah', description: 'Bir kelimeyi 5 saniyeden kısa sürede çöz', iconName: 'Zap' },
+  { id: 'streak_master', title: 'Seri Katil', description: 'Üst üste 5 galibiyet serisi yakala', iconName: 'Flame' },
+  { id: 'legend', title: 'Efsane', description: 'Üst üste 10 galibiyet serisi yakala', iconName: 'Crown' },
+  { id: 'perfect_brain', title: 'Kusursuz Deha', description: 'Bir kelimeyi ilk denemede doğru bil', iconName: 'Sparkles' },
+  { id: 'mission_seeker', title: 'Görev Avcısı', description: '5 günlük görevi tamamla', iconName: 'Target' },
+  { id: 'mission_lord', title: 'Görev Efendisi', description: '20 günlük görevi tamamla', iconName: 'Trophy' },
+  { id: 'polymath', title: 'Kelime Bilgini', description: 'Tüm kelime uzunluklarından (3-8 harf) en az birer kelime çöz', iconName: 'Compass' }
 ];
 
 const DEFAULT_MISSIONS: DailyMission[] = [
@@ -1321,7 +1332,7 @@ export default function App() {
     };
   }, [gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch, isDailyPuzzle, targetWord]); // Resets interval on attempt submission or validation change or exit or gameMode change
 
-  // Fetch direct definition for the target word when the game ends (won or lost)
+  // Fetch direct definition for the target word
   const fetchTargetWordDefinition = async (wordToFetch: string) => {
     if (!wordToFetch) return;
     setWordDefinition('loading');
@@ -1338,12 +1349,21 @@ export default function App() {
           return;
         }
       }
-      setWordDefinition('Bu kelimenin tanımı otomatik olarak yüklenemedi.');
+      setWordDefinition('Bu kelimenin resmi sözlük tanımına şu an ulaşılamıyor.');
     } catch (e) {
       console.error('Failed to fetch target word definition:', e);
-      setWordDefinition('Tanım yüklenirken bağlantı hatası oluştu.');
+      setWordDefinition('Bu kelimenin resmi sözlük tanımına şu an ulaşılamıyor.');
     }
   };
+
+  // Prefetch target word definition in the background when the target word is determined (active game)
+  useEffect(() => {
+    if (targetWord) {
+      fetchTargetWordDefinition(targetWord);
+    } else {
+      setWordDefinition('');
+    }
+  }, [targetWord]);
 
   const renderWordDefinition = (themeColor: 'emerald' | 'rose') => {
     if (!wordDefinition) return null;
@@ -1353,7 +1373,7 @@ export default function App() {
         <div className="w-full max-w-sm mx-auto p-4 bg-black/10 rounded-2xl border border-[#3E485A] flex items-center justify-center gap-2 animate-pulse py-4 text-center my-2">
           <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
           <span className="text-[10px] text-gray-400 font-medium tracking-wide font-sans">
-            Yapay zeka anlamı yükleniyor...
+            Kelime anlamı yükleniyor...
           </span>
         </div>
       );
@@ -1366,7 +1386,7 @@ export default function App() {
       <div className={`w-full max-w-sm mx-auto p-4 bg-black/25 rounded-2xl border ${borderColorClass} text-left space-y-1.5 transition-all duration-300 shadow-md my-2`}>
         <div className="flex items-center justify-between">
           <span className={`text-[10px] font-black uppercase tracking-wider ${titleColorClass} font-mono flex items-center gap-1`}>
-            📖 YAPAY ZEKA SÖZLÜK ANLAMI
+            📖 KELİME ANLAMI
           </span>
           <a
             href={`https://www.google.com/search?q=${encodeURIComponent(turkishLower(targetWord) + ' ne demek')}`}
@@ -1408,15 +1428,45 @@ export default function App() {
         gamesPlayed: prev.stats.gamesPlayed + 1,
         currentStreak: 0
       };
+
+      const badgesToUnlockOnLoss = new Set<string>();
+      if (newStats.gamesPlayed >= 1) {
+        badgesToUnlockOnLoss.add('first_step');
+      }
+      if (newStats.gamesPlayed >= 25) {
+        badgesToUnlockOnLoss.add('persistent_player');
+      }
+
+      const newlyUnlocked: Badge[] = [];
+      const updatedBadges = prev.badges.map((b) => {
+        if (badgesToUnlockOnLoss.has(b.id) && !b.unlockedAt) {
+          const unlockedB = { ...b, unlockedAt: new Date().toISOString() };
+          newlyUnlocked.push(unlockedB);
+          return unlockedB;
+        }
+        return b;
+      });
+
+      if (newlyUnlocked.length > 0) {
+        setTimeout(() => {
+          newlyUnlocked.forEach((b, idx) => {
+            setTimeout(() => {
+              showToast(`🏆 YENİ ROZET KAZANILDI: ${b.title}!`, 'success');
+              if (idx === 0) {
+                setUnlockedBadgeToShow(b);
+              }
+            }, idx * 1000);
+          });
+        }, 500);
+      }
+
       return {
         ...prev,
         stats: newStats,
+        badges: updatedBadges,
         lastUpdated: new Date().toISOString()
       };
     });
-
-    // Check first step badge
-    unlockBadge('first_step');
 
     // Sync if multiplayer
     syncMatchState(attempts, attempts.length, true, false, 0);
@@ -1656,34 +1706,6 @@ export default function App() {
         }
       }, 0);
 
-      // Determine which badges should be unlocked
-      const badgesToUnlock = new Set<string>(['first_step', 'champion']);
-      if (isDailyPuzzle) {
-        const { dateStr } = getDailyWordAndLength();
-        safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
-        badgesToUnlock.add('daily_puzzle_solver');
-      }
-      if (secondsLeft > 10) {
-        badgesToUnlock.add('lightning');
-      }
-      if (attemptCount <= 2) {
-        badgesToUnlock.add('flawless');
-      }
-      if (wordLength === 8) {
-        badgesToUnlock.add('genius');
-      }
-
-      // Compute updated badges array and collect newly unlocked badges
-      const newlyUnlockedBadges: Badge[] = [];
-      const updatedBadges = prev.badges.map((b) => {
-        if (badgesToUnlock.has(b.id) && !b.unlockedAt) {
-          const unlockedBadge = { ...b, unlockedAt: new Date().toISOString() };
-          newlyUnlockedBadges.push(unlockedBadge);
-          return unlockedBadge;
-        }
-        return b;
-      });
-
       // Missions to update progress
       const missionIncrements: { [key: string]: number } = {
         play: 1,
@@ -1716,6 +1738,80 @@ export default function App() {
           return updatedM;
         }
         return m;
+      });
+
+      // Determine which badges should be unlocked
+      const badgesToUnlock = new Set<string>();
+      if (updatedStats.gamesPlayed >= 1) {
+        badgesToUnlock.add('first_step');
+      }
+      if (updatedStats.gamesWon >= 1) {
+        badgesToUnlock.add('champion');
+      }
+      if (secondsLeft > 10) {
+        badgesToUnlock.add('lightning');
+      }
+      if (attemptCount <= 2) {
+        badgesToUnlock.add('flawless');
+      }
+      if (wordLength === 8) {
+        badgesToUnlock.add('genius');
+      }
+      if (isDailyPuzzle) {
+        const { dateStr } = getDailyWordAndLength();
+        safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
+        badgesToUnlock.add('daily_puzzle_solver');
+      }
+      if (updatedStats.gamesWon >= 10) {
+        badgesToUnlock.add('word_detective');
+      }
+      if (updatedStats.gamesWon >= 50) {
+        badgesToUnlock.add('word_guru');
+      }
+      if (updatedStats.gamesWon >= 100) {
+        badgesToUnlock.add('word_master');
+      }
+      if (updatedStats.gamesPlayed >= 25) {
+        badgesToUnlock.add('persistent_player');
+      }
+      if (secondsLeft >= 15) {
+        badgesToUnlock.add('quick_draw');
+      }
+      if (updatedStats.currentStreak >= 5) {
+        badgesToUnlock.add('streak_master');
+      }
+      if (updatedStats.currentStreak >= 10) {
+        badgesToUnlock.add('legend');
+      }
+      if (attemptCount === 1) {
+        badgesToUnlock.add('perfect_brain');
+      }
+      const totalCompletedMissions = updatedMissions.filter(m => m.completed).length;
+      if (totalCompletedMissions >= 5) {
+        badgesToUnlock.add('mission_seeker');
+      }
+      if (totalCompletedMissions >= 20) {
+        badgesToUnlock.add('mission_lord');
+      }
+      const solve3 = updatedMissions.find(m => m.type === 'solve_3')?.current || 0;
+      const solve4 = updatedMissions.find(m => m.type === 'solve_4')?.current || 0;
+      const solve5 = updatedMissions.find(m => m.type === 'solve_5')?.current || 0;
+      const solve6 = updatedMissions.find(m => m.type === 'solve_6')?.current || 0;
+      const solve7 = updatedMissions.find(m => m.type === 'solve_7')?.current || 0;
+      const solve8 = updatedMissions.find(m => m.type === 'solve_8')?.current || 0;
+      if (solve3 >= 1 && solve4 >= 1 && solve5 >= 1 && solve6 >= 1 && solve7 >= 1 && solve8 >= 1) {
+        badgesToUnlock.add('polymath');
+      }
+
+      // Compute updated badges array and collect newly unlocked badges
+      const newlyUnlockedBadges: Badge[] = [];
+      const updatedBadges = prev.badges.map((b) => {
+        if (badgesToUnlock.has(b.id) && !b.unlockedAt) {
+          const unlockedBadge = { ...b, unlockedAt: new Date().toISOString() };
+          newlyUnlockedBadges.push(unlockedBadge);
+          return unlockedBadge;
+        }
+        return b;
       });
 
       // Safely schedule UI toasts and modals on the macro-task event queue
@@ -2990,7 +3086,7 @@ export default function App() {
             <div className="relative z-10 text-left space-y-4">
               <div className="flex items-center gap-2 border-b border-[#3E485A] pb-3 mr-6">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-amber-400 font-mono flex items-center gap-1">
-                  📖 YAPAY ZEKA KELİME ANLAMI
+                  📖 SÖZLÜK ANLAMI
                 </span>
               </div>
 
@@ -3011,11 +3107,11 @@ export default function App() {
               ) : (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-200 italic font-serif leading-relaxed px-1">
-                    "{wordDefinition || 'Bu kelimenin tanımı otomatik olarak yüklenemedi.'}"
+                    "{wordDefinition || 'Bu kelimenin resmi sözlük tanımına şu an ulaşılamıyor.'}"
                   </p>
                   
                   {/* If there was an error, show a retry button */}
-                  {(wordDefinition.includes('hata') || wordDefinition.includes('yüklenemedi') || wordDefinition.includes('bağlantı')) && (
+                  {(wordDefinition.includes('hata') || wordDefinition.includes('yüklenemedi') || wordDefinition.includes('bağlantı') || wordDefinition.includes('ulaşılamıyor')) && (
                     <button
                       onClick={() => fetchTargetWordDefinition(targetWord)}
                       className="w-full mt-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 py-2 px-4 rounded-xl text-xs font-bold transition duration-200 cursor-pointer flex items-center justify-center gap-1.5"

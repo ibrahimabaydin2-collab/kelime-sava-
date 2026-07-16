@@ -1,6 +1,23 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Award, Calendar, Sparkles, X, Share2, Check } from 'lucide-react';
+import { 
+  Award, 
+  Calendar, 
+  Sparkles, 
+  X, 
+  Share2, 
+  Check,
+  Trophy,
+  Zap,
+  Brain,
+  Shield,
+  Crown,
+  Search,
+  Flame,
+  Target,
+  Compass,
+  Star
+} from 'lucide-react';
 import { Badge } from '../types';
 import { playVictorySound, playClickSound } from '../utils/soundEffects';
 import { getBaseUrl } from '../utils/api';
@@ -47,6 +64,28 @@ Sen de katıl, kelime dağarcığını test et! 🚀 ${shareLink}`;
     switch (iconName) {
       case 'Calendar':
         return <Calendar className="w-14 h-14 text-amber-400" />;
+      case 'Trophy':
+        return <Trophy className="w-14 h-14 text-amber-400" />;
+      case 'Zap':
+        return <Zap className="w-14 h-14 text-amber-400 animate-bounce" />;
+      case 'Star':
+        return <Star className="w-14 h-14 text-amber-400" />;
+      case 'Brain':
+        return <Brain className="w-14 h-14 text-amber-400" />;
+      case 'Shield':
+        return <Shield className="w-14 h-14 text-amber-400" />;
+      case 'Crown':
+        return <Crown className="w-14 h-14 text-amber-400 animate-pulse" />;
+      case 'Search':
+        return <Search className="w-14 h-14 text-amber-400" />;
+      case 'Flame':
+        return <Flame className="w-14 h-14 text-orange-500 animate-pulse" />;
+      case 'Sparkles':
+        return <Sparkles className="w-14 h-14 text-amber-400" />;
+      case 'Target':
+        return <Target className="w-14 h-14 text-amber-400" />;
+      case 'Compass':
+        return <Compass className="w-14 h-14 text-amber-400 animate-spin-slow" />;
       case 'Award':
       default:
         return <Award className="w-14 h-14 text-amber-400" />;
