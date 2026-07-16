@@ -12,7 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Google AdMob Banner View anchored to the top (overlay) -->
+    <!-- Google AdMob Banner View anchored to the top (overlay) - DISABLED
     <com.google.android.gms.ads.AdView
         android:id="@+id/adViewTop"
         android:layout_width="match_parent"
@@ -20,8 +20,9 @@
         android:layout_gravity="top"
         ads:adSize="BANNER"
         ads:adUnitId="ca-app-pub-1284515268865249/2035597391" />
+    -->
 
-    <!-- Google AdMob Banner View anchored to the bottom (overlay) -->
+    <!-- Google AdMob Banner View anchored to the bottom (overlay) - DISABLED
     <com.google.android.gms.ads.AdView
         android:id="@+id/adView"
         android:layout_width="match_parent"
@@ -29,5 +30,6 @@
         android:layout_gravity="bottom"
         ads:adSize="BANNER"
         ads:adUnitId="ca-app-pub-1284515268865249/5480586606" />
+    -->
 
 </FrameLayout>
