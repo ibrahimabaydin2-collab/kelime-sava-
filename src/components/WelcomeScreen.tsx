@@ -855,7 +855,7 @@ export default function WelcomeScreen({
                 Eşleşme Aranıyor...
               </span>
               <span className="text-[9px] text-gray-400 block mt-0.5">
-                {wordLength} Harf • {selectedMatchWords} Kelime
+                {wordLength} Harf
               </span>
             </div>
             <button

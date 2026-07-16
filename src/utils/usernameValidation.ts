@@ -18,9 +18,9 @@ export function validateUsername(
     return 'Kullanıcı adının başında, sonunda veya içinde boşluk (space) bırakılamaz.';
   }
 
-  // 2. Karakter ve Uzunluk Sınırları: en az 3, en fazla 26 karakter
-  if (name.length < 3 || name.length > 26) {
-    return 'Kullanıcı adı en az 3, en fazla 26 karakterden oluşabilir.';
+  // 2. Karakter ve Uzunluk Sınırları: en az 5, en fazla 27 karakter
+  if (name.length < 5 || name.length > 27) {
+    return 'Kullanıcı adı en az 5, en fazla 27 karakterden oluşabilir.';
   }
 
   // İsim içerisinde en fazla 20 adet sayı (rakam) kullanılabilir
@@ -29,11 +29,10 @@ export function validateUsername(
     return 'Kullanıcı adı içerisinde en fazla 20 adet sayı (rakam) kullanılabilir.';
   }
 
-  // Özel karakterlerden sadece noktalı virgül (;) serbest, diğerleri engellenir.
-  // Küresel standartlar için Türkçe karakterler (ç, ğ, ı, ö, ş, ü, İ) desteklensin.
-  const allowedRegex = /^[a-zA-Z0-9çğıöşüÇĞİÖŞÜ;]+$/;
+  // İzin verilen karakterler: harf, sayı, alt tire (_) ve nokta (.)
+  const allowedRegex = /^[a-zA-Z0-9çğıöşüÇĞİÖŞÜ_.]+$/;
   if (!allowedRegex.test(name)) {
-    return 'Özel karakterlerden sadece noktalı virgül (;) kullanımına izin verilir, diğer özel karakterler yasaktır.';
+    return 'Kullanıcı adı sadece harf, sayı, alt tire (_) ve nokta (.) içerebilir.';
   }
 
   // 3. Biçimlendirme ve Güvenlik: Yan yana 4 tane aynı harfin (Örn: "aaaa") gelmesi yasaklansın.

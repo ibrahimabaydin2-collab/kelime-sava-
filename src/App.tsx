@@ -2442,13 +2442,29 @@ export default function App() {
                 </div>
               </div>
 
-              <button
-                onClick={() => startNewGame(wordLength)}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white font-black py-2 px-6 rounded-lg shadow-md shadow-emerald-500/15 text-[11px] uppercase tracking-wider active:scale-95 transition cursor-pointer"
-                id="loss-retry-button"
-              >
-                Yeni Kelime ile Başla
-              </button>
+              <div className="flex flex-col sm:flex-row justify-center gap-2 pt-1">
+                <button
+                  onClick={() => startNewGame(wordLength)}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white font-black py-2.5 px-5 rounded-xl shadow-md shadow-emerald-500/15 text-[11px] uppercase tracking-wider active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5"
+                  id="loss-retry-button"
+                >
+                  <RotateCcw size={12} className="stroke-[2.5]" />
+                  <span>Yeni Kelime ile Başla</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    playClickSound(settings.soundEnabled);
+                    setHasEnteredGame(false);
+                    setIsDailyPuzzle(false);
+                  }}
+                  className="bg-slate-700 hover:bg-slate-650 text-slate-200 font-bold py-2.5 px-5 rounded-xl border border-[#3E485A] text-[11px] uppercase tracking-wider active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5"
+                  id="loss-back-to-lobby-button"
+                >
+                  <ArrowLeft size={12} className="stroke-[2.5]" />
+                  <span>Ana Sayfaya Dön</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -2961,19 +2977,35 @@ export default function App() {
               ) : null}
             </div>
 
-            {/* Action button matching the loss restart button but themed in emerald */}
-            <button
-              onClick={() => {
-                playClickSound(settings.soundEnabled);
-                startNewGame(wordLength);
-                setShowCongratsModal(false);
-              }}
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider relative z-10"
-              id="congrats-new-game-button"
-            >
-              <RotateCcw size={14} />
-              <span>Yeni Kelimeye Başla</span>
-            </button>
+            {/* Action buttons matching the loss restart button but themed in emerald */}
+            <div className="flex flex-col gap-2 relative z-10">
+              <button
+                onClick={() => {
+                  playClickSound(settings.soundEnabled);
+                  startNewGame(wordLength);
+                  setShowCongratsModal(false);
+                }}
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs py-3 px-4 rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider"
+                id="congrats-new-game-button"
+              >
+                <RotateCcw size={14} />
+                <span>Yeni Kelimeye Başla</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  playClickSound(settings.soundEnabled);
+                  setHasEnteredGame(false);
+                  setIsDailyPuzzle(false);
+                  setShowCongratsModal(false);
+                }}
+                className="w-full bg-slate-700/80 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs py-2.5 px-4 rounded-xl border border-[#3E485A] transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider"
+                id="congrats-back-to-lobby-button"
+              >
+                <ArrowLeft size={14} />
+                <span>Ana Sayfaya Dön</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

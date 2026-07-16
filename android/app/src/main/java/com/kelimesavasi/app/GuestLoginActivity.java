@@ -54,8 +54,28 @@ public class GuestLoginActivity extends AppCompatActivity {
         btnContinue = findViewById(R.id.btn_guest_continue);
         tvBack = findViewById(R.id.tv_guest_back);
 
-        // Set max length to 15 characters
-        etNickname.setFilters(new InputFilter[]{new InputFilter.LengthFilter(15)});
+        // Set maximum length to 27 characters and restrict characters to letters, digits, underscores, and periods
+        InputFilter characterFilter = new InputFilter() {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, android.text.Spanned dest, int dstart, int dend) {
+                StringBuilder sb = new StringBuilder();
+                for (int i = start; i < end; i++) {
+                    char c = source.charAt(i);
+                    if (Character.isLetterOrDigit(c) || c == '_' || c == '.') {
+                        sb.append(c);
+                    }
+                }
+                if (sb.length() == (end - start)) {
+                    return null; // keep original input
+                }
+                return sb.toString();
+            }
+        };
+
+        etNickname.setFilters(new InputFilter[]{
+            new InputFilter.LengthFilter(27),
+            characterFilter
+        });
 
         btnContinue.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -98,9 +118,23 @@ public class GuestLoginActivity extends AppCompatActivity {
             return;
         }
 
-        if (cleanNickname.length() < 3) {
-            etNickname.setError("En az 3 karakter olmalıdır!");
+        if (cleanNickname.length() < 5) {
+            etNickname.setError("En az 5 karakter olmalıdır!");
             Toast.makeText(this, "Girdiğiniz kullanıcı adı çok kısa!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (cleanNickname.length() > 27) {
+            etNickname.setError("En fazla 27 karakter olmalıdır!");
+            Toast.makeText(this, "Girdiğiniz kullanıcı adı çok uzun!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Regex validation: letters (including Turkish chars), digits, underscore, period
+        String nicknameRegex = "^[a-zA-Z0-9_\\.çğıöşüÇĞİÖŞÜ]+$";
+        if (!cleanNickname.matches(nicknameRegex)) {
+            etNickname.setError("Kullanıcı adı sadece harf, sayı, alt tire (_) ve nokta (.) içerebilir!");
+            Toast.makeText(this, "Kullanıcı adı geçersiz karakterler içeriyor!", Toast.LENGTH_SHORT).show();
             return;
         }
 

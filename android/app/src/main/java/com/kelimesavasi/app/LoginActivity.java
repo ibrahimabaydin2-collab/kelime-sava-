@@ -23,6 +23,7 @@ import com.google.firebase.Timestamp;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 import com.google.firebase.firestore.DocumentReference;
@@ -166,8 +167,44 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    private void firebaseAuthWithGoogle(String idToken) {
-        AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
+    private void firebaseAuthWithGoogle(final String idToken) {
+        final AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
+        final FirebaseUser currentUser = auth.getCurrentUser();
+
+        if (currentUser != null && currentUser.isAnonymous()) {
+            // HESAP BAĞLAMA (ACCOUNT LINKING) ALTYAPISI
+            Toast.makeText(this, "Misafir hesabı Google ile korunuyor...", Toast.LENGTH_SHORT).show();
+            currentUser.linkWithCredential(credential)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        if (task.isSuccessful()) {
+                            FirebaseUser user = auth.getCurrentUser();
+                            if (user != null) {
+                                // Linking succeeded, save/update user profile on Firestore
+                                checkAndSaveUserProfile(user);
+                            }
+                        } else {
+                            // CREDENTIAL_ALREADY_IN_USE (ZATEN KULLANIMDA) KONTROLÜ
+                            if (task.getException() instanceof FirebaseAuthUserCollisionException) {
+                                Log.w(TAG, "Google credential already in use, falling back to direct sign-in.");
+                                Toast.makeText(LoginActivity.this, "Bu Google hesabı zaten kullanımda. Mevcut hesaba giriş yapılıyor...", Toast.LENGTH_LONG).show();
+                                directGoogleSignIn(credential);
+                            } else {
+                                setButtonsEnabled(true);
+                                String errorMsg = task.getException() != null ? task.getException().getLocalizedMessage() : "Hesap bağlama başarısız.";
+                                Toast.makeText(LoginActivity.this, "Hata: " + errorMsg, Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    }
+                });
+        } else {
+            // Normal sign in
+            directGoogleSignIn(credential);
+        }
+    }
+
+    private void directGoogleSignIn(AuthCredential credential) {
         auth.signInWithCredential(credential)
             .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
                 @Override

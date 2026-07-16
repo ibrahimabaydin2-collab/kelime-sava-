@@ -17,8 +17,11 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.Timestamp;
+import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
+import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -127,8 +130,8 @@ public class EmailLoginActivity extends AppCompatActivity {
     }
 
     private void handleEmailSignUp() {
-        String email = etEmail.getText().toString().trim();
-        String password = etPassword.getText().toString().trim();
+        final String email = etEmail.getText().toString().trim();
+        final String password = etPassword.getText().toString().trim();
 
         if (email.isEmpty() || password.isEmpty()) {
             Toast.makeText(this, "E-posta ve şifre alanları boş bırakılamaz!", Toast.LENGTH_SHORT).show();
@@ -141,9 +144,61 @@ public class EmailLoginActivity extends AppCompatActivity {
         }
 
         setButtonsEnabled(false);
-        Toast.makeText(this, "Hesap oluşturuluyor, lütfen bekleyin...", Toast.LENGTH_SHORT).show();
+        
+        final FirebaseUser currentUser = auth.getCurrentUser();
+        if (currentUser != null && currentUser.isAnonymous()) {
+            // HESAP BAĞLAMA (ACCOUNT LINKING) ALTYAPISI
+            Toast.makeText(this, "Misafir hesabı e-posta ile korunuyor...", Toast.LENGTH_SHORT).show();
+            AuthCredential credential = EmailAuthProvider.getCredential(email, password);
+            
+            currentUser.linkWithCredential(credential)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        if (task.isSuccessful()) {
+                            FirebaseUser user = auth.getCurrentUser();
+                            if (user != null) {
+                                // Linking succeeded, update user profile on Firestore
+                                checkAndSaveUserProfile(user);
+                            }
+                        } else {
+                            // CREDENTIAL_ALREADY_IN_USE (ZATEN KULLANIMDA) KONTROLÜ
+                            if (task.getException() instanceof FirebaseAuthUserCollisionException) {
+                                Log.w(TAG, "Email already in use, falling back to direct login.");
+                                Toast.makeText(EmailLoginActivity.this, "Bu e-posta zaten kullanımda. Mevcut hesaba giriş yapılıyor...", Toast.LENGTH_LONG).show();
+                                directEmailSignIn(email, password);
+                            } else {
+                                setButtonsEnabled(true);
+                                String errorMsg = getReadableErrorMessage(task.getException(), "Hesap bağlama başarısız.");
+                                Toast.makeText(EmailLoginActivity.this, "Hata: " + errorMsg, Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    }
+                });
+        } else {
+            // Normal sign up
+            Toast.makeText(this, "Hesap oluşturuluyor, lütfen bekleyin...", Toast.LENGTH_SHORT).show();
+            auth.createUserWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        if (task.isSuccessful()) {
+                            FirebaseUser user = auth.getCurrentUser();
+                            if (user != null) {
+                                checkAndSaveUserProfile(user);
+                            }
+                        } else {
+                            setButtonsEnabled(true);
+                            String errorMsg = getReadableErrorMessage(task.getException(), "Kayıt başarısız.");
+                            Toast.makeText(EmailLoginActivity.this, "Kayıt Hatası: " + errorMsg, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
+        }
+    }
 
-        auth.createUserWithEmailAndPassword(email, password)
+    private void directEmailSignIn(String email, String password) {
+        auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
                 @Override
                 public void onComplete(@NonNull Task<AuthResult> task) {
@@ -154,11 +209,34 @@ public class EmailLoginActivity extends AppCompatActivity {
                         }
                     } else {
                         setButtonsEnabled(true);
-                        String errorMsg = task.getException() != null ? task.getException().getLocalizedMessage() : "Kayıt başarısız.";
-                        Toast.makeText(EmailLoginActivity.this, "Kayıt Hatası: " + errorMsg, Toast.LENGTH_LONG).show();
+                        String errorMsg = getReadableErrorMessage(task.getException(), "Giriş başarısız.");
+                        Toast.makeText(EmailLoginActivity.this, "Giriş Hatası: " + errorMsg, Toast.LENGTH_LONG).show();
                     }
                 }
             });
+    }
+
+    private String getReadableErrorMessage(Exception exception, String defaultMsg) {
+        if (exception == null) return defaultMsg;
+        
+        boolean isOpNotAllowed = false;
+        if (exception instanceof com.google.firebase.auth.FirebaseAuthException) {
+            com.google.firebase.auth.FirebaseAuthException e = (com.google.firebase.auth.FirebaseAuthException) exception;
+            String errorCode = e.getErrorCode();
+            if ("ERROR_OPERATION_NOT_ALLOWED".equals(errorCode) || (errorCode != null && errorCode.toLowerCase().contains("not_allowed"))) {
+                isOpNotAllowed = true;
+            }
+        }
+        String msg = exception.getMessage();
+        if (msg != null && (msg.contains("operation-not-allowed") || msg.contains("auth/operation-not-allowed") || msg.contains("OPERATION_NOT_ALLOWED") || msg.contains("not allowed"))) {
+            isOpNotAllowed = true;
+        }
+        
+        if (isOpNotAllowed) {
+            return "E-posta/Şifre girişi veya hesap bağlama aktif değil. Lütfen Firebase Console > Authentication > Sign-in method kısmından 'Email/Password' seçeneğini etkinleştirin veya geliştirici ayarlarını kontrol edin.";
+        }
+        
+        return exception.getLocalizedMessage() != null ? exception.getLocalizedMessage() : defaultMsg;
     }
 
     private void setButtonsEnabled(boolean enabled) {
