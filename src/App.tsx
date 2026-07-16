@@ -1939,7 +1939,7 @@ export default function App() {
   return (
     <div className={`h-screen max-h-screen overflow-hidden flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
       {/* Safe Space for Future Top Banner Ad */}
-      <div className="h-10 sm:h-12 w-full shrink-0 flex items-center justify-center border-b border-[#3E485A]/15 bg-black/35 text-[#FAF6E9]/40 font-mono text-[9px] tracking-widest select-none uppercase" id="top-ad-placeholder">
+      <div className="h-[50px] w-full shrink-0 flex items-center justify-center border-b border-[#3E485A]/15 bg-black/35 text-[#FAF6E9]/40 font-mono text-[9px] tracking-widest select-none uppercase" id="top-ad-placeholder">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 opacity-50 animate-pulse" />
         REKLAM ALANI
       </div>
@@ -2880,7 +2880,7 @@ export default function App() {
       )}
 
       {/* Safe Space for Future Bottom Banner Ad */}
-      <div className="h-12 sm:h-14 w-full shrink-0 flex items-center justify-center border-t border-[#3E485A]/15 bg-black/35 text-[#FAF6E9]/40 font-mono text-[9px] tracking-widest select-none uppercase mt-auto" id="bottom-ad-placeholder">
+      <div className="h-[50px] w-full shrink-0 flex items-center justify-center border-t border-[#3E485A]/15 bg-black/35 text-[#FAF6E9]/40 font-mono text-[9px] tracking-widest select-none uppercase mt-auto" id="bottom-ad-placeholder">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 opacity-50 animate-pulse" />
         REKLAM ALANI
       </div>

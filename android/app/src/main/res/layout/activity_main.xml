@@ -6,7 +6,13 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <!-- Google AdMob Banner View anchored to the top -->
+    <!-- Container for Capacitor's WebView - full screen to prevent resize loops -->
+    <FrameLayout
+        android:id="@+id/webview_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Google AdMob Banner View anchored to the top (overlay) -->
     <com.google.android.gms.ads.AdView
         android:id="@+id/adViewTop"
         android:layout_width="match_parent"
@@ -15,15 +21,7 @@
         ads:adSize="BANNER"
         ads:adUnitId="ca-app-pub-1284515268865249/2035597391" />
 
-    <!-- Container for Capacitor's WebView -->
-    <FrameLayout
-        android:id="@+id/webview_container"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@+id/adViewTop"
-        android:layout_above="@+id/adView" />
-
-    <!-- Google AdMob Banner View anchored to the bottom -->
+    <!-- Google AdMob Banner View anchored to the bottom (overlay) -->
     <com.google.android.gms.ads.AdView
         android:id="@+id/adView"
         android:layout_width="match_parent"
