@@ -84,66 +84,17 @@ const triggerVictoryCelebration = (soundEnabled: boolean) => {
   // Play grand synthesized victory chords/arpeggio
   playVictorySound(soundEnabled);
 
-  // Simple primary burst
-  confetti({
-    particleCount: 150,
-    spread: 80,
-    origin: { y: 0.6 },
-    colors: ['#10b981', '#34d399', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6']
-  });
-
-  // Left corner launch
-  setTimeout(() => {
+  // Extremely lightweight, single-frame burst of minimal particles to guarantee 0% WebView crashes/reloads
+  try {
     confetti({
-      particleCount: 100,
-      angle: 60,
-      spread: 60,
-      origin: { x: 0, y: 0.85 },
-      colors: ['#10b981', '#3b82f6', '#f59e0b']
+      particleCount: 30,
+      spread: 50,
+      origin: { y: 0.7 },
+      colors: ['#10b981', '#34d399', '#f59e0b']
     });
-  }, 250);
-
-  // Right corner launch
-  setTimeout(() => {
-    confetti({
-      particleCount: 100,
-      angle: 120,
-      spread: 60,
-      origin: { x: 1, y: 0.85 },
-      colors: ['#10b981', '#3b82f6', '#f59e0b']
-    });
-  }, 400);
-
-  // Multi-burst fireworks effect for 3.5 seconds
-  const duration = 3500;
-  const animationEnd = Date.now() + duration;
-  const defaults = { startVelocity: 35, spread: 360, ticks: 75, zIndex: 100 };
-
-  const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-  const interval = setInterval(() => {
-    const timeLeft = animationEnd - Date.now();
-
-    if (timeLeft <= 0) {
-      return clearInterval(interval);
-    }
-
-    const particleCount = 60 * (timeLeft / duration);
-    
-    // Left, center, and right random bursts mimicking grand firework shells
-    confetti({
-      ...defaults,
-      particleCount,
-      origin: { x: randomInRange(0.1, 0.4), y: Math.random() - 0.2 },
-      colors: ['#10b981', '#3b82f6', '#ec4899']
-    });
-    confetti({
-      ...defaults,
-      particleCount,
-      origin: { x: randomInRange(0.6, 0.9), y: Math.random() - 0.2 },
-      colors: ['#34d399', '#f59e0b', '#8b5cf6']
-    });
-  }, 350);
+  } catch (e) {
+    console.error('Confetti failed to trigger safely:', e);
+  }
 };
 
 const safeLocalStorage = {
@@ -1178,18 +1129,20 @@ export default function App() {
     }
   };
 
-  // Start a new solo game
-  const startNewGame = async (length: number = wordLength, isDaily: boolean = isDailyPuzzle) => {
-    setIsValidating(true);
+  // Yumuşak Sıfırlama (Soft Reset) Fonksiyonu
+  // WebView'da sıfırdan reload yapmadan, reklamları etkilemeden ve performansı bozmadan oyunu temizler.
+  const softResetGame = (length: number = wordLength, isDaily: boolean = isDailyPuzzle) => {
+    // 1. Deneme sayısı sıfırlansın (attempts array'ini boşaltmak deneme sayısını 0 yapar)
     setAttempts([]);
     setCurrentAttempt('');
-    setGameStatus('playing');
-    setSecondsLeft(20);
-    setWordDefinition('');
+    
+    // 2. Ekrandaki harf kutularının içindeki text'leri temizler ve CSS renk sınıflarını (yeşil/sarı/gri) kaldırır
+    // (attempts array'i ve currentAttempt temizlendiğinde React GameBoard component'i otomatik olarak her şeyi varsayılana sıfırlar)
+    
+    // 3. Oyun klavyesindeki harflerin (sarı/yeşil/gri) durumlarını sıfırla
     setLetterStatuses({});
-    setWordLength(length);
-    setActiveMatch(null); // Clear any active multiplayer match
-
+    
+    // 4. Listeden veya API'den yeni kelime değişkenini (targetWord) arka planda güncelle
     let picked = '';
     if (isDaily) {
       const dailyInfo = getDailyWordAndLength();
@@ -1197,13 +1150,22 @@ export default function App() {
       length = dailyInfo.length;
       setWordLength(length);
     } else {
-      // Choose target word instantly from the local curated wordlist to eliminate any network/roundtrip delay
       const isLevel1 = getLevelForScore(profile.dailyScore) === 1;
       picked = getRandomWord(length, isLevel1);
     }
 
     setTargetWord(picked);
-    setCurrentAttempt('');
+    setGameStatus('playing');
+    setSecondsLeft(20);
+    setWordDefinition('');
+    setActiveMatch(null); // Çoklu oyuncu oda bağlantısını temizle
+    setShowCongratsModal(false); // Tebrikler modalını kapat
+  };
+
+  // Start a new solo game
+  const startNewGame = async (length: number = wordLength, isDaily: boolean = isDailyPuzzle) => {
+    setIsValidating(true);
+    softResetGame(length, isDaily);
     setIsValidating(false);
   };
 
@@ -1955,8 +1917,6 @@ export default function App() {
     <div className={`h-screen max-h-screen overflow-hidden flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
       {/* Safe Space for Future Top Banner Ad */}
       <div className="h-[50px] w-full shrink-0 flex items-center justify-center border-b border-[#3E485A]/15 bg-black/35 text-[#FAF6E9]/40 font-mono text-[9px] tracking-widest select-none uppercase" id="top-ad-placeholder">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 opacity-50 animate-pulse" />
-        REKLAM ALANI
       </div>
 
       {/* Main Container */}
@@ -2959,8 +2919,6 @@ export default function App() {
 
       {/* Safe Space for Future Bottom Banner Ad */}
       <div className="h-[50px] w-full shrink-0 flex items-center justify-center border-t border-[#3E485A]/15 bg-black/35 text-[#FAF6E9]/40 font-mono text-[9px] tracking-widest select-none uppercase mt-auto" id="bottom-ad-placeholder">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 opacity-50 animate-pulse" />
-        REKLAM ALANI
       </div>
     </div>
   );
