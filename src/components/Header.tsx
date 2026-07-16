@@ -56,7 +56,7 @@ export default function Header({
           {/* Daily Score Display */}
           <div className="hidden sm:flex flex-col items-end mr-2">
             <span className="text-[10px] text-gray-400 uppercase tracking-wider font-mono">Skor</span>
-            <span className="text-sm font-semibold text-amber-400">{dailyScore} Puan</span>
+            <span id="score" className="text-sm font-semibold text-amber-400">{dailyScore} Puan</span>
           </div>
 
           {/* Player Name */}

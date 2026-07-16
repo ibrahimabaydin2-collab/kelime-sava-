@@ -29,6 +29,12 @@ public class MainActivity extends BridgeActivity {
         // Retrieve Capacitor's WebView instance
         WebView webView = getBridge().getWebView();
 
+        // Enable persistent WebView storage / database cache settings
+        if (webView != null && webView.getSettings() != null) {
+            webView.getSettings().setDomStorageEnabled(true);
+            webView.getSettings().setDatabaseEnabled(true);
+        }
+
         // Safe check and reparent the webview to our container
         if (webView.getParent() != null) {
             ((ViewGroup) webView.getParent()).removeView(webView);

@@ -11,6 +11,7 @@ import { getBaseUrl } from '../utils/api.js';
 import { validateUsername } from '../utils/usernameValidation.js';
 import { getDailyWordAndLength } from '../data/wordlist.js';
 import { getXPForLevel, getLevelForScore } from '../utils/scoring.js';
+import { fetchUsersWhoAddedMe, searchUserByName } from '../lib/firebase.js';
 
 interface WelcomeScreenProps {
   profile: UserProfile;
@@ -43,6 +44,7 @@ interface WelcomeScreenProps {
   onReconnect?: () => void;
   onStartDailyPuzzle?: () => void;
   isDailyPuzzleCompletedToday?: boolean;
+  onUpdateFriends?: (friends: string[]) => void;
 }
 
 export default function WelcomeScreen({
@@ -71,7 +73,8 @@ export default function WelcomeScreen({
   onAcceptChallenge,
   onDeclineChallenge,
   onStartDailyPuzzle,
-  isDailyPuzzleCompletedToday = false
+  isDailyPuzzleCompletedToday = false,
+  onUpdateFriends
 }: WelcomeScreenProps) {
   const [showHowToPlay, setShowHowToPlay] = useState<boolean>(false);
   const [showMissions, setShowMissions] = useState<boolean>(false);
@@ -84,14 +87,15 @@ export default function WelcomeScreen({
   const [showGameSetup, setShowGameSetup] = useState<boolean>(false);
   const [selectedTab, setSelectedTab] = useState<'solo' | 'pvp'>('solo');
 
-  // Friend list state with local storage persistence
-  const [friendsList, setFriendsList] = useState<{ id: string; name: string; avatarUrl?: string }[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('ks_friends_list') || '[]');
-    } catch {
-      return [];
-    }
-  });
+  // Real-time bidirectional friends and requests from Firestore
+  const [confirmedFriends, setConfirmedFriends] = useState<{ id: string; name: string; avatarUrl?: string }[]>([]);
+  const [incomingRequests, setIncomingRequests] = useState<{ id: string; name: string; avatarUrl?: string }[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState<boolean>(false);
+
+  // Search states for "Oyuncu Bul"
+  const [searchedPlayers, setSearchedPlayers] = useState<{ id: string; name: string; avatarUrl?: string }[]>([]);
+  const [searchHasRun, setSearchHasRun] = useState<boolean>(false);
+  const [searching, setSearching] = useState<boolean>(false);
 
   const [friendsTab, setFriendsTab] = useState<'friends' | 'find'>('friends');
   const [friendsSearchTerm, setFriendsSearchTerm] = useState<string>('');
@@ -143,20 +147,95 @@ export default function WelcomeScreen({
     return () => clearInterval(timerId);
   }, []);
 
-  const isFriend = (playerId: string) => friendsList.some(f => f.id === playerId);
+  const isFriend = (playerId: string) => (profile.friends || []).includes(playerId);
 
-  const addFriend = (player: LobbyPlayer) => {
-    if (isFriend(player.id)) return;
-    const updated = [...friendsList, { id: player.id, name: player.name, avatarUrl: player.avatarUrl }];
-    setFriendsList(updated);
-    localStorage.setItem('ks_friends_list', JSON.stringify(updated));
+  const addFriend = async (playerOrId: any) => {
+    const targetId = typeof playerOrId === 'string' ? playerOrId : playerOrId.id;
+    const currentFriends = profile.friends || [];
+    if (currentFriends.includes(targetId)) return;
+    
+    const updated = [...currentFriends, targetId];
+    if (onUpdateFriends) {
+      onUpdateFriends(updated);
+    }
   };
 
-  const removeFriend = (playerId: string) => {
-    const updated = friendsList.filter(f => f.id !== playerId);
-    setFriendsList(updated);
-    localStorage.setItem('ks_friends_list', JSON.stringify(updated));
+  const removeFriend = async (targetId: string) => {
+    const currentFriends = profile.friends || [];
+    const updated = currentFriends.filter(id => id !== targetId);
+    if (onUpdateFriends) {
+      onUpdateFriends(updated);
+    }
   };
+
+  const refreshFriendsList = async () => {
+    if (!isOnline || !profile?.id) return;
+    setLoadingFriends(true);
+    try {
+      const usersWhoAddedMe = await fetchUsersWhoAddedMe(profile.id);
+      const usersWhoAddedMeIds = usersWhoAddedMe.map(u => u.id);
+      const myFriends = profile.friends || [];
+
+      // Mutual friends (Onaylı Arkadaşlar): users I added and who also added me
+      const mutualIds = myFriends.filter(id => usersWhoAddedMeIds.includes(id));
+      const mutualList = mutualIds.map(id => {
+        const p = usersWhoAddedMe.find(u => u.id === id);
+        return {
+          id,
+          name: p?.name || 'Bilinmeyen Oyuncu',
+          avatarUrl: p?.avatarUrl
+        };
+      });
+
+      // Incoming requests (Gelen İstekler): users who added me, but I have not added them yet
+      const incomingIds = usersWhoAddedMeIds.filter(id => !myFriends.includes(id));
+      const incomingList = incomingIds.map(id => {
+        const p = usersWhoAddedMe.find(u => u.id === id);
+        return {
+          id,
+          name: p?.name || 'Bilinmeyen Oyuncu',
+          avatarUrl: p?.avatarUrl
+        };
+      });
+
+      setConfirmedFriends(mutualList);
+      setIncomingRequests(incomingList);
+    } catch (err) {
+      console.error('Error refreshing friends list:', err);
+    } finally {
+      setLoadingFriends(false);
+    }
+  };
+
+  const handleSearchPlayers = async () => {
+    const term = friendsSearchTerm.trim();
+    if (!term) {
+      setSearchedPlayers([]);
+      setSearchHasRun(false);
+      return;
+    }
+    setSearching(true);
+    setSearchHasRun(true);
+    try {
+      const results = await searchUserByName(term);
+      // Filter out ourself from search results
+      setSearchedPlayers(results.filter(u => u.id !== profile.id));
+    } catch (err) {
+      console.error('Failed searching players:', err);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showFriendsModal) {
+      refreshFriendsList();
+      // Clear search results upon opening modal
+      setFriendsSearchTerm('');
+      setSearchedPlayers([]);
+      setSearchHasRun(false);
+    }
+  }, [showFriendsModal, profile.friends]);
 
   // Profile Inline Editor State
   const [isEditing, setIsEditing] = useState<boolean>(false);
@@ -246,7 +325,7 @@ export default function WelcomeScreen({
   const otherPlayers = lobbyPlayers.filter(p => p.id !== profile.id);
 
   // Get all friends with status
-  const friendsWithStatus = friendsList.map(friend => {
+  const friendsWithStatus = confirmedFriends.map(friend => {
     const onlineInfo = lobbyPlayers.find(lp => lp.id === friend.id);
     return {
       ...friend,
@@ -259,11 +338,6 @@ export default function WelcomeScreen({
     if (!a.isOnline && b.isOnline) return 1;
     return a.name.localeCompare(b.name, 'tr-TR');
   });
-
-  const nonFriendsOnline = otherPlayers.filter(p => !isFriend(p.id));
-  const playersToSearch = nonFriendsOnline.filter(p => 
-    p.name.toLocaleLowerCase('tr-TR').includes(friendsSearchTerm.toLocaleLowerCase('tr-TR'))
-  );
 
   const winRate = profile.stats && profile.stats.gamesPlayed > 0 
     ? Math.round((profile.stats.gamesWon / profile.stats.gamesPlayed) * 100) 
@@ -886,7 +960,7 @@ export default function WelcomeScreen({
         >
           <Users size={20} className="text-[#2E3748] stroke-[2.5]" />
           <span className="text-[9px] font-black uppercase tracking-wider">ARKADAŞ</span>
-          {friendsList.some(f => lobbyPlayers.some(lp => lp.id === f.id)) && (
+          {confirmedFriends.some(f => lobbyPlayers.some(lp => lp.id === f.id)) && (
             <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse border-2 border-[#FAF6E9]" />
           )}
         </button>
@@ -1083,7 +1157,7 @@ export default function WelcomeScreen({
               <div>
                 <h3 className="text-base font-black text-[#FAF6E9] uppercase tracking-wide flex items-center gap-2">
                   <Users size={18} className="text-amber-400" />
-                  Arkadaşlarım
+                  Arkadaşlık Merkezi
                 </h3>
                 <p className="text-[10px] text-amber-100/50 font-mono font-bold uppercase mt-0.5">
                   LOBİDEKİ OYUNCULAR ({lobbyPlayers.length})
@@ -1107,7 +1181,7 @@ export default function WelcomeScreen({
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                Arkadaşlarım ({friendsList.length})
+                Arkadaşlarım ({confirmedFriends.length})
               </button>
               <button
                 onClick={() => setFriendsTab('find')}
@@ -1117,7 +1191,7 @@ export default function WelcomeScreen({
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                Oyuncu Bul ({nonFriendsOnline.length})
+                Oyuncu Bul
               </button>
             </div>
 
@@ -1157,14 +1231,26 @@ export default function WelcomeScreen({
 
             {/* Search input for adding friends tab */}
             {friendsTab === 'find' && (
-              <div className="relative">
+              <div className="flex gap-2">
                 <input
                   type="text"
                   placeholder="Oyuncu adı ile ara..."
                   value={friendsSearchTerm}
                   onChange={(e) => setFriendsSearchTerm(e.target.value)}
-                  className="w-full bg-black/25 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSearchPlayers();
+                    }
+                  }}
+                  className="flex-1 bg-black/25 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
                 />
+                <button
+                  disabled={searching}
+                  onClick={handleSearchPlayers}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black uppercase transition shrink-0 cursor-pointer disabled:opacity-55"
+                >
+                  {searching ? 'Aranıyor...' : 'Ara'}
+                </button>
               </div>
             )}
 
@@ -1175,23 +1261,159 @@ export default function WelcomeScreen({
                   <p className="text-[10px] mt-1 text-gray-400/85">Arkadaşlarını görebilmek ve savaş açabilmek için internet bağlantısı gerekir.</p>
                 </div>
               ) : friendsTab === 'friends' ? (
-                friendsWithStatus.length === 0 ? (
-                  otherPlayers.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400">
-                      <p className="text-xs font-black font-mono text-amber-450">HENÜZ ARKADAŞIN YOK 🏜️</p>
-                      <p className="text-[10px] mt-1 text-gray-400/85">
-                        Şu anda oyunda başka aktif oyuncu bulunmuyor. Daha sonra tekrar kontrol etmeyi deneyebilirsin!
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5 animate-fade-in">
-                      <div className="text-left py-1 text-amber-200/85 font-black uppercase text-[9px] tracking-wider font-mono">
-                        Aktif Oyuncular
+                loadingFriends ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                    <p className="text-[10px] font-mono uppercase tracking-wider">Arkadaşlar yükleniyor...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Gelen İstekler Section */}
+                    {incomingRequests.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="text-left py-1 text-emerald-400 font-black uppercase text-[9px] tracking-wider font-mono">
+                          📥 Gelen Arkadaşlık İstekleri ({incomingRequests.length})
+                        </div>
+                        {incomingRequests.map((request) => (
+                          <div key={request.id} className="p-2.5 bg-[#3D4756]/45 rounded-xl border border-white/5 flex items-center justify-between text-left animate-scale-up">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-[#3D4756] flex items-center justify-center font-bold text-xs border border-white/10 shrink-0">
+                                {request.avatarUrl ? (
+                                  request.avatarUrl.length < 4 ? (
+                                    <span className="text-sm select-none">{request.avatarUrl}</span>
+                                  ) : (
+                                    <img src={request.avatarUrl} alt="avatar" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                                  )
+                                ) : (
+                                  <span className="text-gray-400">{request.name.charAt(0).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <div>
+                                <span className="text-xs font-black text-[#FAF6E9] block leading-none">{request.name}</span>
+                                <span className="text-[8.5px] text-emerald-400 block font-mono mt-0.5 uppercase tracking-wide">
+                                  Sana İstek Gönderdi
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => addFriend(request.id)}
+                              className="text-[9.5px] px-2.5 py-1 rounded-lg font-black uppercase transition duration-150 flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm cursor-pointer"
+                            >
+                              <UserPlus size={10} />
+                              <span>Kabul Et</span>
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                      {otherPlayers.map((player) => (
-                        <div key={player.id} className="p-2.5 bg-[#3D4756]/45 rounded-xl border border-white/5 flex items-center justify-between text-left animate-scale-up">
+                    )}
+
+                    {/* Onaylı Arkadaşlar Section */}
+                    <div className="space-y-1.5">
+                      <div className="text-left py-1 text-amber-200/85 font-black uppercase text-[9px] tracking-wider font-mono">
+                        Onaylı Arkadaşlarım ({friendsWithStatus.length})
+                      </div>
+                      
+                      {friendsWithStatus.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400 bg-black/10 rounded-2xl p-4 border border-white/5">
+                          <p className="text-xs font-black font-mono text-amber-450">HENÜZ ONAYLI ARKADAŞIN YOK 🏜️</p>
+                          <p className="text-[10px] mt-1 text-gray-400/85">
+                            Burada sadece senin eklediğin ve seni geri ekleyen onaylı arkadaşların listelenir. Oyuncu bulmak için yan sekmeyi kullanabilirsin!
+                          </p>
+                        </div>
+                      ) : (
+                        friendsWithStatus.map((friend) => (
+                          <div key={friend.id} className="p-2.5 bg-[#3D4756]/45 rounded-xl border border-white/5 flex items-center justify-between text-left animate-scale-up">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-[#3D4756] flex items-center justify-center font-bold text-xs border border-white/10 shrink-0 relative">
+                                {friend.avatarUrl ? (
+                                  friend.avatarUrl.length < 4 ? (
+                                    <span className="text-sm select-none">{friend.avatarUrl}</span>
+                                  ) : (
+                                    <img src={friend.avatarUrl} alt="avatar" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                                  )
+                                ) : (
+                                  <span className="text-gray-400">{friend.name.charAt(0).toUpperCase()}</span>
+                                )}
+                                <span className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-[#2E3748] ${
+                                  friend.isOnline ? 'bg-emerald-500' : 'bg-gray-500'
+                                }`} />
+                              </div>
+                              <div>
+                                <span className="text-xs font-black text-[#FAF6E9] block leading-none">{friend.name}</span>
+                                <span className="text-[8.5px] text-gray-400 block font-mono mt-0.5 uppercase tracking-wide">
+                                  {friend.isOnline ? (
+                                    friend.status === 'playing' ? '🎮 Oyunda' : friend.status === 'challenging' ? '⚔️ Sırada' : '🟢 Boşta'
+                                  ) : (
+                                    '⚪ Çevrimdışı'
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              {friend.isOnline && (
+                                <button
+                                  disabled={friend.status !== 'idle'}
+                                  onClick={() => {
+                                    const originalPlayer = lobbyPlayers.find(p => p.id === friend.id);
+                                    if (originalPlayer) {
+                                      onChallenge?.(originalPlayer, wordLength);
+                                      setShowFriendsModal(false);
+                                    }
+                                  }}
+                                  className={`text-[9.5px] px-2.5 py-1 rounded-lg font-black uppercase transition duration-150 flex items-center gap-1 cursor-pointer ${
+                                    friend.status === 'idle'
+                                      ? 'bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] shadow-sm'
+                                      : 'bg-[#3D4756]/20 text-gray-500 cursor-not-allowed'
+                                  }`}
+                                >
+                                  <Swords size={10} />
+                                  <span>Meydan Oku</span>
+                                </button>
+                              )}
+                              <button
+                                onClick={() => removeFriend(friend.id)}
+                                className="p-1.5 rounded-lg text-rose-400/80 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                                title="Arkadaşı Sil"
+                              >
+                                <UserMinus size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )
+              ) : (
+                /* Find Players Tab (Oyuncu Bul) */
+                searching ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                    <p className="text-[10px] font-mono uppercase tracking-wider">Oyuncu aranıyor...</p>
+                  </div>
+                ) : !searchHasRun ? (
+                  /* Empty state before searching is performed */
+                  null
+                ) : searchedPlayers.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <p className="text-xs font-black font-mono text-amber-450">OYUNCU BULUNAMADI 🔍</p>
+                    <p className="text-[10px] mt-1 text-gray-400/85">
+                      Girdiğiniz kullanıcı adıyla eşleşen bir oyuncu bulunamadı. Lütfen tam adını doğru yazdığınızdan emin olun.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {searchedPlayers.map((player) => {
+                      const isAlreadyFriend = (profile.friends || []).includes(player.id);
+                      const hasAddedMe = incomingRequests.some(r => r.id === player.id);
+                      const isMutual = confirmedFriends.some(f => f.id === player.id);
+                      
+                      return (
+                        <div key={player.id} className="p-2.5 bg-[#3D4756]/45 rounded-xl border border-white/5 flex items-center justify-between text-left">
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-[#3D4756] flex items-center justify-center font-bold text-xs border border-white/10 shrink-0 relative">
+                            <div className="w-8 h-8 rounded-full bg-[#3D4756] flex items-center justify-center font-bold text-xs border border-white/10 shrink-0">
                               {player.avatarUrl ? (
                                 player.avatarUrl.length < 4 ? (
                                   <span className="text-sm select-none">{player.avatarUrl}</span>
@@ -1201,149 +1423,31 @@ export default function WelcomeScreen({
                               ) : (
                                 <span className="text-gray-400">{player.name.charAt(0).toUpperCase()}</span>
                               )}
-                              <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full border border-[#2E3748] bg-emerald-500 animate-pulse" />
                             </div>
                             <div>
                               <span className="text-xs font-black text-[#FAF6E9] block leading-none">{player.name}</span>
                               <span className="text-[8.5px] text-gray-400 block font-mono mt-0.5 uppercase tracking-wide">
-                                {player.status === 'playing' ? '🎮 Oyunda' : player.status === 'challenging' ? '⚔️ Sırada' : '🟢 Boşta'}
+                                {isMutual ? '🟢 ARKADAŞINIZ' : '👤 OYUNCU'}
                               </span>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1.5 font-sans">
+                          {isMutual ? (
+                            <span className="text-[9.5px] text-emerald-400 font-bold uppercase">✓ Arkadaşsınız</span>
+                          ) : isAlreadyFriend ? (
+                            <span className="text-[9.5px] text-amber-400 font-bold uppercase">✓ İstek Gönderildi</span>
+                          ) : (
                             <button
-                              disabled={player.status !== 'idle'}
-                              onClick={() => {
-                                onChallenge?.(player, wordLength);
-                                setShowFriendsModal(false);
-                              }}
-                              className={`text-[9.5px] px-2.5 py-1 rounded-lg font-black uppercase transition duration-150 flex items-center gap-1 cursor-pointer ${
-                                player.status === 'idle'
-                                  ? 'bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] shadow-sm'
-                                  : 'bg-[#3D4756]/20 text-gray-500 cursor-not-allowed'
-                              }`}
+                              onClick={() => addFriend(player.id)}
+                              className="text-[9.5px] px-2.5 py-1 rounded-lg font-black uppercase transition duration-150 flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm cursor-pointer"
                             >
-                              <Swords size={10} />
-                              <span>Meydan Oku</span>
-                            </button>
-                            <button
-                              onClick={() => addFriend(player)}
-                              className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition cursor-pointer"
-                              title="Arkadaş Ekle"
-                            >
-                              <UserPlus size={13} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                ) : (
-                  <div className="space-y-1.5">
-                    {friendsWithStatus.map((friend) => (
-                      <div key={friend.id} className="p-2.5 bg-[#3D4756]/45 rounded-xl border border-white/5 flex items-center justify-between text-left">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-[#3D4756] flex items-center justify-center font-bold text-xs border border-white/10 shrink-0 relative">
-                            {friend.avatarUrl ? (
-                              friend.avatarUrl.length < 4 ? (
-                                <span className="text-sm select-none">{friend.avatarUrl}</span>
-                              ) : (
-                                <img src={friend.avatarUrl} alt="avatar" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
-                              )
-                            ) : (
-                              <span className="text-gray-400">{friend.name.charAt(0).toUpperCase()}</span>
-                            )}
-                            <span className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-[#2E3748] ${
-                              friend.isOnline ? 'bg-emerald-500' : 'bg-gray-500'
-                            }`} />
-                          </div>
-                          <div>
-                            <span className="text-xs font-black text-[#FAF6E9] block leading-none">{friend.name}</span>
-                            <span className="text-[8.5px] text-gray-400 block font-mono mt-0.5 uppercase tracking-wide">
-                              {friend.isOnline ? (
-                                friend.status === 'playing' ? '🎮 Oyunda' : friend.status === 'challenging' ? '⚔️ Sırada' : '🟢 Boşta'
-                              ) : (
-                                '⚪ Çevrimdışı'
-                              )}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          {friend.isOnline && (
-                            <button
-                              disabled={friend.status !== 'idle'}
-                              onClick={() => {
-                                const originalPlayer = lobbyPlayers.find(p => p.id === friend.id);
-                                if (originalPlayer) {
-                                  onChallenge?.(originalPlayer, wordLength);
-                                  setShowFriendsModal(false);
-                                }
-                              }}
-                              className={`text-[9.5px] px-2.5 py-1 rounded-lg font-black uppercase transition duration-150 flex items-center gap-1 cursor-pointer ${
-                                friend.status === 'idle'
-                                  ? 'bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] shadow-sm'
-                                  : 'bg-[#3D4756]/20 text-gray-500 cursor-not-allowed'
-                              }`}
-                            >
-                              <Swords size={10} />
-                              <span>Meydan Oku</span>
+                              <UserPlus size={10} />
+                              <span>{hasAddedMe ? 'Kabul Et' : 'Arkadaş Ekle'}</span>
                             </button>
                           )}
-                          <button
-                            onClick={() => removeFriend(friend.id)}
-                            className="p-1.5 rounded-lg text-rose-400/80 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
-                            title="Arkadaşı Sil"
-                          >
-                            <UserMinus size={13} />
-                          </button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )
-              ) : (
-                playersToSearch.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
-                    <p className="text-xs font-black font-mono text-amber-450">OYUNCU YOK 🏜️</p>
-                    <p className="text-[10px] mt-1 text-gray-400/85">
-                      Şu anda ekleyebileceğiniz aktif başka çevrimiçi oyuncu bulunmuyor. Arkadaşlarınızı davet edebilirsiniz!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {playersToSearch.map((player) => (
-                      <div key={player.id} className="p-2.5 bg-[#3D4756]/45 rounded-xl border border-white/5 flex items-center justify-between text-left">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-[#3D4756] flex items-center justify-center font-bold text-xs border border-white/10 shrink-0">
-                            {player.avatarUrl ? (
-                              player.avatarUrl.length < 4 ? (
-                                <span className="text-sm select-none">{player.avatarUrl}</span>
-                              ) : (
-                                <img src={player.avatarUrl} alt="avatar" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
-                              )
-                            ) : (
-                              <span className="text-gray-400">{player.name.charAt(0).toUpperCase()}</span>
-                            )}
-                          </div>
-                          <div>
-                            <span className="text-xs font-black text-[#FAF6E9] block leading-none">{player.name}</span>
-                            <span className="text-[8.5px] text-gray-400 block font-mono mt-0.5 uppercase tracking-wide">
-                              🟢 ÇEVRİMİÇİ
-                            </span>
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => addFriend(player)}
-                          className="text-[9.5px] px-2.5 py-1 rounded-lg font-black uppercase transition duration-150 flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm cursor-pointer"
-                        >
-                          <UserPlus size={10} />
-                          <span>Arkadaş Ekle</span>
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )
               )}

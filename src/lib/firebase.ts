@@ -500,4 +500,42 @@ export async function linkGuestWithFacebook(): Promise<User> {
   return result.user;
 }
 
+/**
+ * Fetches user profiles of users who have added the current user to their friends list
+ */
+export async function fetchUsersWhoAddedMe(uid: string): Promise<UserProfile[]> {
+  try {
+    const usersCollection = collection(db, 'users');
+    const q = query(usersCollection, where('friends', 'array-contains', uid));
+    const querySnapshot = await getDocs(q);
+    const results: UserProfile[] = [];
+    querySnapshot.forEach((docSnap) => {
+      results.push(docSnap.data() as UserProfile);
+    });
+    return results;
+  } catch (error) {
+    console.error('Failed to fetch users who added me:', error);
+    return [];
+  }
+}
+
+/**
+ * Searches for user profiles matching a specific username exactly
+ */
+export async function searchUserByName(name: string): Promise<UserProfile[]> {
+  try {
+    const usersCollection = collection(db, 'users');
+    const q = query(usersCollection, where('name', '==', name));
+    const querySnapshot = await getDocs(q);
+    const results: UserProfile[] = [];
+    querySnapshot.forEach((docSnap) => {
+      results.push(docSnap.data() as UserProfile);
+    });
+    return results;
+  } catch (error) {
+    console.error('Failed to search user by name:', error);
+    return [];
+  }
+}
+
 export { onAuthStateChanged, signInWithCredential, FacebookAuthProvider, GoogleAuthProvider, linkWithCredential };

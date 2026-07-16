@@ -383,11 +383,6 @@ export default function App() {
   // Welcome Screen & Dictionary Mode State
   const [hasEnteredGame, setHasEnteredGame] = useState<boolean>(false);
 
-  // Force sign out on initial load so the user always starts fresh at the login screen
-  useEffect(() => {
-    signOutUser().catch(err => console.error('Initial signOutUser failed:', err));
-  }, []);
-
   const [dictionaryMode, setDictionaryMode] = useState<'tdk_online' | 'no_validation'>(() => {
     const saved = safeLocalStorage.getItem('kelimesavasi_dict_mode');
     return saved === 'no_validation' ? 'no_validation' : 'tdk_online';
@@ -595,6 +590,9 @@ export default function App() {
             }
             safeLocalStorage.removeItem('pending_restoration_profile');
             safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+            if (updatedProfile.name) {
+              safeLocalStorage.setItem('saved_username', updatedProfile.name);
+            }
             showToast(`Profiliniz başarıyla geri yüklendi: ${updatedProfile.name}! 🎉`, 'success');
           } else {
             // Normal fetch
@@ -608,6 +606,9 @@ export default function App() {
                 }
                 setProfile(dbProfile);
                 safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(dbProfile));
+                if (dbProfile.name) {
+                  safeLocalStorage.setItem('saved_username', dbProfile.name);
+                }
               } else {
                 // No profile exists for this UID. Let's trigger device profile recovery now that we are successfully authenticated!
                 try {
@@ -627,18 +628,34 @@ export default function App() {
                       await deleteUserProfile(existingProfile.id);
                     }
                     safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+                    if (updatedProfile.name) {
+                      safeLocalStorage.setItem('saved_username', updatedProfile.name);
+                    }
                     showToast(`Profiliniz başarıyla geri yüklendi: ${updatedProfile.name}! 🎉`, 'success');
                   } else {
                     // No existing profile found with this deviceId. Sync current profile state
+                    const savedUsername = safeLocalStorage.getItem('saved_username');
+                    const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
+                    let finalName = savedUsername || profile.name;
+                    if (savedProfileStr) {
+                      try {
+                        const parsed = JSON.parse(savedProfileStr);
+                        if (parsed && parsed.name) finalName = parsed.name;
+                      } catch (e) {}
+                    }
                     const updatedProfile = {
                       ...profile,
                       id: user.uid,
+                      name: finalName,
                       deviceId: deviceId,
                       nameSet: true
                     };
                     setProfile(updatedProfile);
                     await saveUserProfileToFirestore(updatedProfile);
                     safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+                    if (updatedProfile.name) {
+                      safeLocalStorage.setItem('saved_username', updatedProfile.name);
+                    }
                   }
                 } catch (deviceCheckErr) {
                   console.error('Error during automatic device profile recovery after auth:', deviceCheckErr);
@@ -656,15 +673,41 @@ export default function App() {
               }
             }
           }
+          if (active && !resolved) {
+            resolved = true;
+            setAuthLoading(false);
+            clearTimeout(timeoutId);
+          }
         } else {
           if (active) {
             setFirebaseUser(null);
-            // We do not check deviceId or perform any Firestore queries when unauthenticated.
+            const savedUsername = safeLocalStorage.getItem('saved_username');
+            const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
+            if (savedUsername || savedProfileStr) {
+              console.log('Returning anonymous or registered user session detected. Auto-signing in as guest to prevent AuthScreen flash...');
+              try {
+                await signInAsGuest();
+                console.log('Auto-sign in as guest succeeded inside Auth listener.');
+              } catch (guestErr) {
+                console.error('Auto guest login failed in Auth listener:', guestErr);
+                if (active && !resolved) {
+                  resolved = true;
+                  setAuthLoading(false);
+                  clearTimeout(timeoutId);
+                }
+              }
+            } else {
+              // Truly new visitor. Stop loading and show registration/login.
+              if (active && !resolved) {
+                resolved = true;
+                setAuthLoading(false);
+                clearTimeout(timeoutId);
+              }
+            }
           }
         }
       } catch (err) {
         console.error('Error during onAuthStateChanged processing:', err);
-      } finally {
         if (active && !resolved) {
           resolved = true;
           setAuthLoading(false);
@@ -1540,10 +1583,18 @@ export default function App() {
         winDistribution: newDistribution
       };
 
+      const newScore = prev.dailyScore + scoreAwarded;
+      setTimeout(() => {
+        const scoreEl = document.getElementById('score');
+        if (scoreEl) {
+          scoreEl.innerText = `${newScore} Puan`;
+        }
+      }, 0);
+
       return {
         ...prev,
         stats: updatedStats,
-        dailyScore: prev.dailyScore + scoreAwarded,
+        dailyScore: newScore,
         lastUpdated: new Date().toISOString()
       };
     });
@@ -1628,10 +1679,19 @@ export default function App() {
 
   // Update Daily Score
   const updateDailyScore = (score: number) => {
-    setProfile((prev) => ({
-      ...prev,
-      dailyScore: prev.dailyScore + score
-    }));
+    setProfile((prev) => {
+      const newScore = prev.dailyScore + score;
+      setTimeout(() => {
+        const scoreEl = document.getElementById('score');
+        if (scoreEl) {
+          scoreEl.innerText = `${newScore} Puan`;
+        }
+      }, 0);
+      return {
+        ...prev,
+        dailyScore: newScore
+      };
+    });
   };
 
   // Reset User stats
@@ -1640,6 +1700,12 @@ export default function App() {
       'İstatistikleri Sıfırla',
       'Tüm ilerleme ve istatistiklerinizi sıfırlamak istediğinize emin misiniz? Bu işlem geri alınamaz.',
       () => {
+        setTimeout(() => {
+          const scoreEl = document.getElementById('score');
+          if (scoreEl) {
+            scoreEl.innerText = '0 Puan';
+          }
+        }, 0);
         setProfile((prev) => ({
           ...prev,
           stats: INITIAL_STATS,
@@ -1969,6 +2035,14 @@ export default function App() {
           <WelcomeScreen
             profile={profile}
             onUpdateProfile={handleUpdateProfile}
+            onUpdateFriends={async (newFriends: string[]) => {
+              const updated = {
+                ...profile,
+                friends: newFriends
+              };
+              setProfile(updated);
+              await saveUserProfileToFirestore(updated);
+            }}
             dictionaryMode={dictionaryMode}
             onChangeDictionaryMode={setDictionaryMode}
             gameMode={gameMode}

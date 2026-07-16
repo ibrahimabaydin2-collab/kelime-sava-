@@ -35,6 +35,7 @@ export interface UserProfile {
   lastUpdated: string;
   nameSet?: boolean;
   deviceId?: string;
+  friends?: string[];
 }
 
 export interface GameAttempt {
