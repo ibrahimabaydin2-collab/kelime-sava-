@@ -823,7 +823,7 @@ const setupWebSocket = (server: any) => {
                   id: matchId,
                   wordLength: challenge.wordLength,
                   targetWord,
-                  matchWordsCount: 3,
+                  matchWordsCount: 1,
                   currentRound: 1,
                   roundsWon: {
                     [challenge.challengerId]: 0,
@@ -954,7 +954,7 @@ const setupWebSocket = (server: any) => {
                   }
                 }
 
-                // Under the new ASYNCHRONOUS race mechanic:
+                // Under the new Single Round (Tek Tur) mechanic:
                 // If the player completed their current word (either won or failed/timed out)
                 if (completed) {
                   if (!match.roundsWon) {
@@ -982,19 +982,42 @@ const setupWebSocket = (server: any) => {
                   // Increment roundsPlayed for this player
                   match.roundsPlayed[playerId] = (match.roundsPlayed[playerId] || 1) + 1;
 
-                  const playerWordsCount = match.roundsWon[playerId] || 0;
-                  const targetWordsLimit = Number(match.matchWordsCount || 3);
+                  // Check if both players have completed the single word round
+                  const allCompleted = Object.values(match.players).every(p => p.completed);
 
-                  // 2. Check if this player has reached the win limit
-                  if (won && playerWordsCount >= targetWordsLimit) {
-                    // This player wins the entire match!
+                  if (allCompleted) {
+                    // This is the end of the single-round match!
                     match.status = 'ended';
-                    match.winnerId = playerId;
+                    
+                    const playerIds = Object.keys(match.players);
+                    const p1Id = playerIds[0];
+                    const p2Id = playerIds[1];
+                    
+                    const p1 = match.players[p1Id];
+                    const p2 = p2Id ? match.players[p2Id] : null;
+                    
+                    let winnerId: string | null = null;
+                    
+                    if (p2) {
+                      if (p1.won && !p2.won) {
+                        winnerId = p1Id;
+                      } else if (p2.won && !p1.won) {
+                        winnerId = p2Id;
+                      } else {
+                        // Both won or both lost -> Draw!
+                        winnerId = 'draw';
+                      }
+                    } else {
+                      // Only 1 player in match (rare fallback)
+                      winnerId = p1.won ? p1Id : 'draw';
+                    }
+                    
+                    match.winnerId = winnerId;
 
                     const endPayload = JSON.stringify({
                       type: 'match_end',
                       matchId,
-                      winnerId: playerId,
+                      winnerId,
                       roundsWon: match.roundsWon,
                       players: match.players
                     });
@@ -1011,50 +1034,6 @@ const setupWebSocket = (server: any) => {
                     }
 
                     broadcastLobby();
-                  } else {
-                    // 3. Player hasn't won the entire match yet. Give them their next word!
-                    // Let's generate a new random word for this player
-                    const nextTargetWord = getRandomWord(match.wordLength);
-                    
-                    // Reset this specific player's guess state so they start clean for the next word
-                    player.attempts = [];
-                    player.currentAttempt = 0;
-                    player.completed = false;
-                    player.won = false;
-                    player.timeRemaining = 20;
-
-                    // Send the new word exclusively to this player
-                    const selfClient = clients.get(playerId);
-                    if (selfClient && selfClient.ws.readyState === WebSocket.OPEN) {
-                      selfClient.ws.send(JSON.stringify({
-                        type: 'match_next_word',
-                        matchId,
-                        targetWord: nextTargetWord,
-                        roundsWon: match.roundsWon,
-                        currentRound: match.roundsPlayed[playerId] || (playerWordsCount + 1) // Next round index
-                      }));
-                    }
-
-                    // Send an update to the opponent about this player's cleared state for the next word
-                    if (opponentId) {
-                      const opponent = clients.get(opponentId);
-                      if (opponent && opponent.ws.readyState === WebSocket.OPEN) {
-                        opponent.ws.send(JSON.stringify({
-                          type: 'match_update',
-                          matchId,
-                          playerUpdate: {
-                            id: playerId,
-                            attempts: [],
-                            currentAttempt: 0,
-                            completed: false,
-                            won: false,
-                            score: player.score,
-                            timeRemaining: 20
-                          },
-                          roundsWon: match.roundsWon
-                        }));
-                      }
-                    }
                   }
                 }
               }
@@ -1146,7 +1125,7 @@ const setupWebSocket = (server: any) => {
 
                 // Use the player's requested wordLength or fallback
                 const finalWordLength = wordLength || opponentInfo.wordLength || 5;
-                const finalMatchWordsCount = requestedWordsCount || opponentInfo.matchWordsCount || 3;
+                const finalMatchWordsCount = 1;
                 const targetWord = getRandomWord(finalWordLength);
                 const matchId = `match_${Date.now()}`;
 
@@ -1154,7 +1133,7 @@ const setupWebSocket = (server: any) => {
                   id: matchId,
                   wordLength: finalWordLength,
                   targetWord,
-                  matchWordsCount: finalMatchWordsCount,
+                  matchWordsCount: 1,
                   currentRound: 1,
                   roundsWon: {
                     [playerId]: 0,

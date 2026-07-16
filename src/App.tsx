@@ -16,7 +16,6 @@ import Lobby from './components/Lobby.js';
 import StatsModal from './components/StatsModal.js';
 import MissionsModal from './components/MissionsModal.js';
 import WelcomeScreen from './components/WelcomeScreen.js';
-import GroupRace from './components/GroupRace.js';
 import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import AuthScreen from './components/AuthScreen.js';
 import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
@@ -452,8 +451,6 @@ export default function App() {
   }, [gameMode]);
 
   const [matchmakingStatus, setMatchmakingStatus] = useState<'idle' | 'queued'>('idle');
-  const [isGroupRaceActive, setIsGroupRaceActive] = useState<boolean>(false);
-  const [groupRaceInitialMode, setGroupRaceInitialMode] = useState<'online' | 'offline' | undefined>(undefined);
 
   // Settings state moved up to avoid block scope issues with notification effects
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -624,7 +621,6 @@ export default function App() {
         setCurrentAttempt('');
         setGameStatus('idle');
         setIsValidating(false);
-        setIsGroupRaceActive(false);
 
         if (user) {
           setFirebaseUser(user);
@@ -1030,25 +1026,28 @@ export default function App() {
                   ...prev,
                   status: 'ended',
                   winnerId,
-                  roundsWon: rw || prev.roundsWon
+                  roundsWon: rw || prev.roundsWon,
+                  players: finalPlayers || prev.players
                 };
               });
+
+              if (targetWord) {
+                fetchTargetWordDefinition(targetWord);
+              }
 
               if (winnerId === profile.id) {
                 showToast('TEBRİKLER! Savaşı Kazandın!', 'success');
                 // Award Gladiator Badge
                 unlockBadge('gladiator');
                 updateDailyScore(200);
+                triggerVictoryCelebration(settings.soundEnabled);
               } else if (winnerId === 'draw') {
                 showToast('Maç berabere bitti!', 'info');
                 updateDailyScore(50);
               } else {
                 showToast('Maçı rakibin kazandı. Daha hızlı olmalısın!', 'error');
+                playDefeatSound(settings.soundEnabled);
               }
-
-              // Redirect directly back to the "Oyun Kurma Paneli" (Lobby) page
-              setActiveMatch(null);
-              setHasEnteredGame(false);
               break;
             }
 
@@ -1226,7 +1225,8 @@ export default function App() {
 
   // Countdown timer logic
   useEffect(() => {
-    if (gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || activeMatch || (gameMode === 'untimed' && !activeMatch)) {
+    // In activeMatch we do want the timer to run
+    if (gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch)) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
@@ -1234,9 +1234,14 @@ export default function App() {
     timerRef.current = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
-          // Time expired - lose game
+          // Time expired - lose game or complete word in active match
           clearInterval(timerRef.current!);
-          handleGameLoss('Süre Sınırı Aşıldı');
+          if (activeMatch) {
+            showToast(`Süre bitti! Rakibin tamamlaması bekleniyor...`, 'error');
+            syncMatchState(attempts, attempts.length, true, false, 0);
+          } else {
+            handleGameLoss('Süre Sınırı Aşıldı');
+          }
           return 0;
         }
         const nextSec = prev - 1;
@@ -1250,7 +1255,7 @@ export default function App() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch, isDailyPuzzle]); // Resets interval on attempt submission or validation change or exit or gameMode change
+  }, [gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch, isDailyPuzzle, targetWord]); // Resets interval on attempt submission or validation change or exit or gameMode change
 
   // Fetch direct definition for the target word when the game ends (won or lost)
   const fetchTargetWordDefinition = async (wordToFetch: string) => {
@@ -1388,6 +1393,11 @@ export default function App() {
 
   // Submit Guessed Word
   const submitGuess = async () => {
+    const localCompleted = activeMatch?.players[profile.id]?.completed;
+    if (localCompleted || gameStatus !== 'playing') {
+      return;
+    }
+
     if (currentAttempt.length !== wordLength) {
       showToast('Lütfen tüm harfleri doldurun!', 'error');
       playErrorSound(settings.soundEnabled);
@@ -1494,11 +1504,11 @@ export default function App() {
 
       if (activeMatch) {
         if (hasWon) {
-          showToast(`DOĞRU BİLDİNİZ! +${scoreAwarded} Puan. Sıradaki kelimeye geçiliyor...`, 'success');
+          showToast(`DOĞRU BİLDİNİZ! Rakibin kelimeyi tamamlaması bekleniyor...`, 'success');
           playEnterSound(settings.soundEnabled);
           syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded);
         } else if (updatedAttempts.length >= 6) {
-          showToast(`6 denemede bulamadın! Sıradaki kelimeye geçiliyor... Doğru kelime: ${targetWord}`, 'error');
+          showToast(`Kelimeyi bulamadınız! Rakibin tamamlaması bekleniyor... Doğru kelime: ${targetWord}`, 'error');
           playDefeatSound(settings.soundEnabled);
           syncMatchState(updatedAttempts, updatedAttempts.length, true, false, 0);
         } else {
@@ -1679,7 +1689,8 @@ export default function App() {
 
   // Handle Character keys typed on physical or virtual keyboard
   const onChar = (char: string) => {
-    if (gameStatus !== 'playing' || isValidating) return;
+    const localCompleted = activeMatch?.players[profile.id]?.completed;
+    if (gameStatus !== 'playing' || isValidating || localCompleted) return;
     const normalized = turkishUpper(char);
     if (currentAttempt.length < wordLength && /^[A-ZÇĞİÖŞÜ]$/i.test(normalized)) {
       setCurrentAttempt((prev) => prev + normalized);
@@ -1689,7 +1700,8 @@ export default function App() {
 
   // Handle Backspace
   const onDelete = () => {
-    if (gameStatus !== 'playing' || isValidating) return;
+    const localCompleted = activeMatch?.players[profile.id]?.completed;
+    if (gameStatus !== 'playing' || isValidating || localCompleted) return;
     if (currentAttempt.length > 0) {
       playDeleteSound(settings.soundEnabled);
     }
@@ -1990,25 +2002,6 @@ export default function App() {
             }}
             lobbyPlayers={lobbyPlayers}
           />
-        ) : isGroupRaceActive ? (
-          <GroupRace
-            profile={profile}
-            initialMode={groupRaceInitialMode}
-            onUpdateScore={(points) => {
-              setProfile((prev) => ({
-                ...prev,
-                dailyScore: prev.dailyScore + points,
-                lastUpdated: new Date().toISOString()
-              }));
-              updateMissionProgress('play', 1);
-            }}
-            onExit={() => {
-              setIsGroupRaceActive(false);
-              setGroupRaceInitialMode(undefined);
-            }}
-            showToast={showToast}
-            dictionaryMode={dictionaryMode}
-          />
         ) : !hasEnteredGame ? (
           <WelcomeScreen
             profile={profile}
@@ -2037,10 +2030,6 @@ export default function App() {
             onChallenge={handleChallengePlayer}
             onAcceptChallenge={handleAcceptChallenge}
             onDeclineChallenge={handleDeclineChallenge}
-            onStartGroupRace={(mode) => {
-              setGroupRaceInitialMode(mode);
-              setIsGroupRaceActive(true);
-            }}
             onStartDailyPuzzle={handleStartDailyPuzzle}
             isDailyPuzzleCompletedToday={isDailyPuzzleCompletedToday}
           />
@@ -2439,7 +2428,7 @@ export default function App() {
           )}
 
           {/* Action Buttons Above Keyboard */}
-          {gameStatus === 'playing' && (
+          {gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
             <BottomBar
               currentGuess={currentAttempt}
               wordLength={wordLength}
@@ -2455,12 +2444,12 @@ export default function App() {
           )}
 
           {/* Spacer C */}
-          {gameStatus === 'playing' && (
+          {gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
             <div className="flex-1 min-h-[0.25rem] sm:min-h-[0.5rem]" />
           )}
 
           {/* Virtual Keyboard */}
-          {gameStatus === 'playing' && (
+          {gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
             <Keyboard
               onChar={onChar}
               onDelete={onDelete}
@@ -2469,6 +2458,137 @@ export default function App() {
               keyboardLayout={settings.keyboardLayout}
               boardTheme={settings.boardTheme}
             />
+          )}
+
+          {/* Waiting for Opponent Card */}
+          {activeMatch && activeMatch.players[profile.id]?.completed && activeMatch.status !== 'ended' && (
+            <div className="w-full max-w-sm mx-auto bg-slate-900/95 border border-amber-500/25 rounded-3xl p-5 text-center space-y-4 shadow-xl animate-scale-up" id="opponent-waiting-container">
+              <div className="flex flex-col items-center">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full border-4 border-amber-400/20 border-t-amber-400 animate-spin flex items-center justify-center">
+                    <Hourglass size={18} className="text-amber-400 animate-pulse" />
+                  </div>
+                </div>
+                <h3 className="text-sm font-black text-[#FAF6E9] tracking-wide mt-3 uppercase">RAKİP BEKLENİYOR...</h3>
+                <p className="text-[10px] text-gray-400 mt-1 max-w-xs leading-normal">
+                  Siz kelimeyi tamamladınız. Rakibinizin de kelimeyi bitirmesi bekleniyor. Lütfen bekleyin.
+                </p>
+              </div>
+
+              {/* Opponent Status Display */}
+              {Object.entries(activeMatch.players).map(([pId, pState]: [string, any]) => {
+                const isOpponent = pId !== profile.id;
+                if (!isOpponent) return null;
+                return (
+                  <div key={pId} className="bg-black/25 rounded-2xl border border-white/5 p-3 flex justify-between items-center text-xs">
+                    <span className="font-bold text-gray-300 uppercase tracking-wide">{pState.name}</span>
+                    <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                      <span className="text-amber-400 font-bold uppercase">Tahmin Yapıyor...</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Multiplayer Results Card (Tek Tur Sonuç Ekranı) */}
+          {activeMatch && activeMatch.status === 'ended' && (
+            <div className="w-full max-w-md mx-auto bg-slate-900/95 border-2 border-amber-500/30 rounded-3xl p-5 text-center space-y-4 shadow-2xl animate-scale-up" id="multiplayer-results-container">
+              <div className="flex justify-center">
+                {activeMatch.winnerId === profile.id ? (
+                  <div className="relative flex flex-col items-center">
+                    <div className="w-14 h-14 bg-gradient-to-tr from-amber-500 to-yellow-400 rounded-full flex items-center justify-center border border-yellow-300 shadow-lg animate-bounce">
+                      <Trophy size={28} className="text-slate-950 stroke-[2.5]" />
+                    </div>
+                    <span className="text-xs font-black text-amber-400 uppercase tracking-widest mt-2 font-mono">DÜELLO GALİBİ</span>
+                    <h2 className="text-2xl font-black text-[#FAF6E9] uppercase tracking-wide leading-none mt-1">ZAFER SENİN!</h2>
+                  </div>
+                ) : activeMatch.winnerId === 'draw' ? (
+                  <div className="relative flex flex-col items-center">
+                    <div className="w-14 h-14 bg-slate-800 rounded-full flex items-center justify-center border border-white/10 shadow-lg">
+                      <Swords size={28} className="text-amber-400 stroke-[2.5]" />
+                    </div>
+                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest mt-2 font-mono font-bold">DURUM</span>
+                    <h2 className="text-2xl font-black text-amber-300 uppercase tracking-wide leading-none mt-1">BERABERE!</h2>
+                  </div>
+                ) : (
+                  <div className="relative flex flex-col items-center">
+                    <div className="w-14 h-14 bg-[#1E1E1E] rounded-full flex items-center justify-center border border-rose-500/25 shadow-lg">
+                      <X size={28} className="text-rose-500 stroke-[2.5]" />
+                    </div>
+                    <span className="text-xs font-black text-rose-400 uppercase tracking-widest mt-2 font-mono">DÜELLO MAĞLUBU</span>
+                    <h2 className="text-2xl font-black text-rose-500 uppercase tracking-wide leading-none mt-1">KAYBETTİNİZ</h2>
+                  </div>
+                )}
+              </div>
+
+              {/* Word Definition Section inside Results Card */}
+              <div className="bg-black/30 border border-white/5 rounded-2xl p-4 space-y-2 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider font-mono">ARANAN SÖZCÜK</span>
+                  <span className="text-[10px] font-mono text-amber-400 font-bold">{targetWord.length} Harfli</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <strong className="text-2xl font-black tracking-widest text-[#FAF6E9] uppercase leading-none">{targetWord}</strong>
+                  <button
+                    onClick={() => {
+                      setShowDefinitionModal(true);
+                      playClickSound(settings.soundEnabled);
+                    }}
+                    className="p-1 rounded-full text-amber-400 hover:bg-amber-400/10 transition active:scale-95"
+                    title="Anlamını Gör"
+                  >
+                    <Info size={16} className="stroke-[2.5]" />
+                  </button>
+                </div>
+                {wordDefinition && wordDefinition !== 'loading' ? (
+                  <p className="text-[11px] text-gray-300 italic font-serif leading-relaxed line-clamp-3">
+                    "{wordDefinition}"
+                  </p>
+                ) : wordDefinition === 'loading' ? (
+                  <p className="text-[11px] text-gray-400 italic animate-pulse">Sözlük anlamı yükleniyor...</p>
+                ) : null}
+              </div>
+
+              {/* Player Round Statistics */}
+              <div className="bg-black/25 rounded-2xl border border-white/5 p-3.5 space-y-3">
+                <h4 className="text-[10px] font-black text-amber-300/80 tracking-widest uppercase font-mono text-left font-bold">OYUNCU DETAYLARI</h4>
+                {Object.entries(activeMatch.players).map(([pId, playerState]: [string, any]) => {
+                  const isSelf = pId === profile.id;
+                  return (
+                    <div key={pId} className="flex justify-between items-center text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${playerState.won ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                        <span className={`font-black uppercase tracking-wider ${isSelf ? 'text-amber-400' : 'text-gray-300'}`}>
+                          {playerState.name} {isSelf ? '(Sen)' : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 font-mono font-bold">
+                        <span className="text-gray-400">Deneme:</span>
+                        <span className={playerState.won ? 'text-emerald-400' : 'text-rose-400'}>
+                          {playerState.won ? `${playerState.attempts.length} / 6` : 'BAŞARISIZ'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Redirect Button */}
+              <button
+                onClick={() => {
+                  playClickSound(settings.soundEnabled);
+                  setActiveMatch(null);
+                  setHasEnteredGame(false);
+                }}
+                className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] text-[#2E3748] font-black text-xs sm:text-sm py-2.5 px-4 rounded-xl shadow-md transition-all uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2"
+                id="back-to-menu-from-match-btn"
+              >
+                <ArrowLeft size={16} className="stroke-[2.5]" />
+                <span>Lobiye Geri Dön</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

@@ -28,7 +28,6 @@ interface WelcomeScreenProps {
   onOpenMissions?: () => void;
   matchmakingStatus: 'idle' | 'queued';
   isOnline: boolean;
-  onStartGroupRace?: (mode?: 'online' | 'offline') => void;
   
   // New Header integration props
   onOpenStats?: () => void;
@@ -63,7 +62,6 @@ export default function WelcomeScreen({
   matchmakingStatus,
   isOnline,
   onReconnect,
-  onStartGroupRace,
   onOpenStats,
   darkMode,
   onToggleDarkMode,
@@ -84,7 +82,7 @@ export default function WelcomeScreen({
   
   // Game setup states
   const [showGameSetup, setShowGameSetup] = useState<boolean>(false);
-  const [selectedTab, setSelectedTab] = useState<'solo' | 'pvp' | 'group'>('solo');
+  const [selectedTab, setSelectedTab] = useState<'solo' | 'pvp'>('solo');
 
   // Friend list state with local storage persistence
   const [friendsList, setFriendsList] = useState<{ id: string; name: string; avatarUrl?: string }[]>(() => {
@@ -317,7 +315,7 @@ export default function WelcomeScreen({
           <div className="space-y-3 flex-1 flex flex-col justify-between min-h-0" id="game-setup-wizard">
             
             {/* Giant Premium Mode Cards */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {/* Solo Card */}
               <button
                 onClick={() => setSelectedTab('solo')}
@@ -343,26 +341,10 @@ export default function WelcomeScreen({
                 <Swords className={`w-5 h-5 ${selectedTab === 'pvp' ? 'text-amber-600' : 'text-amber-400'}`} />
                 <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider leading-none">CANLI DÜELLO</span>
               </button>
-
-              {/* Group Card */}
-              {onStartGroupRace && (
-                <button
-                  onClick={() => setSelectedTab('group')}
-                  className={`py-2.5 px-2 rounded-[1.2rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer active:scale-95 hover:scale-[1.02] ${
-                    selectedTab === 'group'
-                      ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] font-black shadow-[0_5px_10px_rgba(250,246,233,0.15)] ring-2 ring-amber-400/20'
-                      : 'bg-[#3D4756]/40 text-[#FAF6E9]/80 border-white/5 hover:bg-[#3D4756]/70'
-                  }`}
-                >
-                  <Trophy className={`w-5 h-5 ${selectedTab === 'group' ? 'text-amber-600' : 'text-amber-400'}`} />
-                  <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider leading-none">GRUP YARIŞI</span>
-                </button>
-              )}
             </div>
 
             {/* Parameter Controls specific to selected mode with enlarged fonts and cream highlights */}
-            {selectedTab !== 'group' ? (
-              <div className="space-y-3 bg-[#3D4756]/30 p-4 sm:p-4.5 rounded-[1.5rem] border border-white/5">
+            <div className="space-y-3 bg-[#3D4756]/30 p-4 sm:p-4.5 rounded-[1.5rem] border border-white/5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Word Length Selector */}
                   <div className="space-y-1.5 text-left">
@@ -415,7 +397,7 @@ export default function WelcomeScreen({
                 </div>
 
                 {/* Mode-specific secondary settings */}
-                {selectedTab === 'solo' ? (
+                {selectedTab === 'solo' && (
                   <div className="space-y-1.5 text-left border-t border-white/5 pt-2">
                     <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase flex items-center gap-1">
                       <Zap size={10} className="text-amber-400 animate-pulse fill-amber-400/20" /> SÜRE VE ZAMAN KURALI
@@ -443,119 +425,25 @@ export default function WelcomeScreen({
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-1.5 text-left border-t border-white/5 pt-2">
-                    <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase flex items-center gap-1">
-                      <Swords size={10} className="text-amber-400" /> DÜELLO SÜRESİNCEKİ TUR SAYISI
-                    </span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => setSelectedMatchWords(3)}
-                        className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1 border active:scale-95 cursor-pointer ${
-                          selectedMatchWords === 3
-                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
-                            : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
-                        }`}
-                      >
-                        <span>3 Kelime (Hızlı)</span>
-                      </button>
-                      <button
-                        onClick={() => setSelectedMatchWords(5)}
-                        className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1 border active:scale-95 cursor-pointer ${
-                          selectedMatchWords === 5
-                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
-                            : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
-                        }`}
-                      >
-                        <span>5 Kelime (Uzun)</span>
-                      </button>
-                    </div>
-                  </div>
                 )}
               </div>
-            ) : (
-              <div className="space-y-3 bg-[#3D4756]/35 p-4 rounded-[1.5rem] border border-white/10 animate-scale-up text-left relative overflow-hidden shadow-2xl">
-                <div className="absolute top-0 right-0 -translate-y-8 translate-x-8 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
-                
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  <span className="text-[9px] font-black text-amber-300 font-mono tracking-wider uppercase">
-                    Grup Yarışı Oyun Modunu Seçin
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Option 1: Çevrimiçi Savaş */}
-                  <button
-                    onClick={() => {
-                      onStartGroupRace && onStartGroupRace('online');
-                      setShowGameSetup(false);
-                    }}
-                    className="group bg-[#1E2532]/90 hover:bg-[#1E2532] border border-white/5 hover:border-emerald-500/50 rounded-[1.2rem] p-2.5 text-left transition-all duration-300 hover:shadow-[0_4px_25px_rgba(16,185,129,0.15)] active:scale-[0.98] cursor-pointer relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 right-0 -translate-y-4 translate-x-4 w-12 h-12 bg-emerald-500/5 group-hover:bg-emerald-500/10 rounded-full blur-lg transition duration-300"></div>
-                    <div className="flex items-center gap-2.5 relative z-10">
-                      <div className="p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400 group-hover:scale-110 group-hover:text-emerald-300 transition duration-300 shadow-inner shrink-0 animate-fade-in">
-                        <Globe size={16} className="stroke-[2.5]" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-extrabold text-[#FAF6E9] group-hover:text-emerald-300 transition duration-300 flex items-center gap-1.5 leading-tight">
-                          Çevrimiçi Savaş
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                        </h4>
-                        <p className="text-[9px] text-slate-400 font-medium leading-normal mt-0.5">
-                          Oda kodu ile canlı bağlanıp düello yapın.
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Option 2: Yapay Zekaya Karşı */}
-                  <button
-                    onClick={() => {
-                      onStartGroupRace && onStartGroupRace('offline');
-                      setShowGameSetup(false);
-                    }}
-                    className="group bg-[#1E2532]/90 hover:bg-[#1E2532] border border-white/5 hover:border-amber-500/50 rounded-[1.2rem] p-2.5 text-left transition-all duration-300 hover:shadow-[0_4px_25px_rgba(245,158,11,0.15)] active:scale-[0.98] cursor-pointer relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 right-0 -translate-y-4 translate-x-4 w-12 h-12 bg-amber-500/5 group-hover:bg-amber-500/10 rounded-full blur-lg transition duration-300"></div>
-                    <div className="flex items-center gap-2.5 relative z-10">
-                      <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-400 group-hover:scale-110 group-hover:text-amber-300 transition duration-300 shadow-inner shrink-0 animate-fade-in">
-                        <Bot size={16} className="stroke-[2.5]" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-extrabold text-[#FAF6E9] group-hover:text-amber-300 transition duration-300 leading-tight">
-                          Yapay Zekaya Karşı
-                        </h4>
-                        <p className="text-[9px] text-slate-400 font-medium leading-normal mt-0.5">
-                          19 akıllı bota karşı hemen oynayın.
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Sleek Dark Info Panel */}
             <div className="bg-black/35 border border-white/5 rounded-2xl p-3 text-left space-y-0.5 relative overflow-hidden" id="mode-info-panel">
               <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
                 {selectedTab === 'solo' && <Zap size={30} />}
                 {selectedTab === 'pvp' && <Swords size={30} />}
-                {selectedTab === 'group' && <Trophy size={30} />}
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                 <span className="text-[9px] font-black text-amber-300 uppercase tracking-widest font-mono">
                   {selectedTab === 'solo' && 'SOLO PRATİK MODU AÇIKLAMASI'}
                   {selectedTab === 'pvp' && 'CANLI DÜELLO MODU AÇIKLAMASI'}
-                  {selectedTab === 'group' && 'GRUP YARIŞI MODU AÇIKLAMASI'}
                 </span>
               </div>
               <p className="text-[11px] text-gray-300 leading-snug font-sans">
                 {selectedTab === 'solo' && 'Kendi başınıza pratik yapıp kendinizi test edin! Süreli veya süresiz oynayarak kelime haznenizi genişletin ve yeni rekorlara koşun.'}
                 {selectedTab === 'pvp' && 'Canlı rakiplerle kıyasıya rekabet edin! Aynı gizli kelimeyi en az denemede ve en kısa sürede çözerek liderlik sıralamasında yükselin.'}
-                {selectedTab === 'group' && 'Arkadaşlarınızla aynı oda koduyla canlı bağlanın! Kimin daha hızlı ve usta bir kelime bükücü olduğunu herkese kanıtlayın.'}
               </p>
             </div>
 
@@ -1152,7 +1040,7 @@ export default function WelcomeScreen({
               <div className="bg-[#3D4756]/40 p-3.5 rounded-xl border border-white/5 space-y-1.5">
                 <div className="flex items-center gap-2 font-bold text-amber-300">
                   <Swords size={14} />
-                  <span>5. Canlı Düello & Grup Yarışları</span>
+                  <span>5. Canlı Düellolar</span>
                 </div>
                 <p className="text-[11px] leading-normal text-gray-300">
                   Arkadaşlarınızla lobide buluşarak veya rastgele eşleşme ile canlı düello başlatabilirsiniz. İki taraf da aynı gizli kelimeyi çözmeye çalışır. Kelimeyi en az denemede ve en kısa sürede çözen taraf düelloyu kazanır ve hanesine devasa <strong className="text-amber-400">+100 Savaş Puanı</strong> yazdırır!
