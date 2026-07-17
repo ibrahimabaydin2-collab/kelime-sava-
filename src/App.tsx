@@ -1547,7 +1547,7 @@ export default function App() {
 
   // Submit Guessed Word
   const submitGuess = async () => {
-    const localCompleted = activeMatch?.players[profile.id]?.completed;
+    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended';
     if (localCompleted || gameStatus !== 'playing') {
       return;
     }
@@ -1738,7 +1738,9 @@ export default function App() {
         winDistribution: newDistribution
       };
 
-      const newScore = prev.dailyScore + scoreAwarded;
+      // Beş puandan fazla ödül hiçbir şekilde verilmesin. Puan silme diye de bir ceza olmasın.
+      const cappedScoreAwarded = scoreAwarded > 0 ? Math.min(scoreAwarded, 5) : 0;
+      const newScore = prev.dailyScore + cappedScoreAwarded;
       setTimeout(() => {
         const scoreEl = document.getElementById('score');
         if (scoreEl) {
@@ -1933,8 +1935,11 @@ export default function App() {
 
   // Update Daily Score
   const updateDailyScore = (score: number) => {
+    // Beş puandan fazla ödül hiçbir şekilde verilmesin. Puan silme diye de bir ceza olmasın.
+    if (score <= 0) return;
+    const cappedScore = Math.min(score, 5);
     setProfile((prev) => {
-      const newScore = prev.dailyScore + score;
+      const newScore = prev.dailyScore + cappedScore;
       setTimeout(() => {
         const scoreEl = document.getElementById('score');
         if (scoreEl) {
@@ -1974,7 +1979,7 @@ export default function App() {
 
   // Handle Character keys typed on physical or virtual keyboard
   const onChar = (char: string) => {
-    const localCompleted = activeMatch?.players[profile.id]?.completed;
+    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended';
     if (gameStatus !== 'playing' || isValidating || localCompleted) return;
     const normalized = turkishUpper(char);
     if (currentAttempt.length < wordLength && /^[A-ZÇĞİÖŞÜ]$/i.test(normalized)) {
@@ -1985,7 +1990,7 @@ export default function App() {
 
   // Handle Backspace
   const onDelete = () => {
-    const localCompleted = activeMatch?.players[profile.id]?.completed;
+    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended';
     if (gameStatus !== 'playing' || isValidating || localCompleted) return;
     if (currentAttempt.length > 0) {
       playDeleteSound(settings.soundEnabled);
