@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Shield, X, Mail, ChevronRight, Lock, Eye, FileText, Globe } from 'lucide-react';
+import { Shield, X, Mail, ChevronRight, Send, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+import { getApiUrl } from '../utils/api.js';
 
 interface PrivacyPolicyModalProps {
   isOpen: boolean;
@@ -8,8 +9,74 @@ interface PrivacyPolicyModalProps {
 
 export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyModalProps) {
   const [activeLang, setActiveLang] = useState<'tr' | 'en'>('tr');
+  const [email, setEmail] = useState('');
+  const [category, setCategory] = useState<'bug' | 'suggestion' | 'deletion' | 'other'>('bug');
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   if (!isOpen) return null;
+
+  const handleSubmitContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim()) return;
+
+    setSubmitting(true);
+    setSubmitSuccess(false);
+    setSubmitError('');
+
+    try {
+      let username = 'Guest';
+      let userId = 'unknown';
+      try {
+        const localSaved = window.localStorage.getItem('kelimesavasi_profile');
+        if (localSaved) {
+          const parsed = JSON.parse(localSaved);
+          if (parsed) {
+            username = parsed.name || 'Guest';
+            userId = parsed.id || 'unknown';
+          }
+        }
+      } catch (err) {}
+
+      const response = await fetch(getApiUrl('/api/support'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          category,
+          message: message.trim(),
+          username,
+          userId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setSubmitSuccess(true);
+        setMessage('');
+        setEmail('');
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (err: any) {
+      console.error('Contact submission failed:', err);
+      setSubmitError(
+        activeLang === 'tr'
+          ? 'Mesajınız gönderilemedi. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.'
+          : 'Failed to send message. Please check your internet connection and try again.'
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
@@ -35,6 +102,7 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
             {/* Language Selector */}
             <div className="flex bg-black/40 rounded-lg p-0.5 border border-white/5 text-[10px]">
               <button
+                type="button"
                 onClick={() => setActiveLang('tr')}
                 className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
                   activeLang === 'tr' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-400'
@@ -43,6 +111,7 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
                 TR
               </button>
               <button
+                type="button"
                 onClick={() => setActiveLang('en')}
                 className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
                   activeLang === 'en' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-400'
@@ -53,6 +122,7 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
             </div>
 
             <button
+              type="button"
               onClick={onClose}
               className="p-2 hover:bg-white/5 rounded-xl text-slate-400 hover:text-white transition cursor-pointer"
             >
@@ -143,14 +213,103 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
                   <ChevronRight size={14} className="text-amber-400" />
                   5. İletişim ve Veri Silme Talepleri
                 </h4>
-                <div className="pl-5 space-y-2 text-xs text-slate-300/90">
+                <div className="pl-5 space-y-3.5 text-xs text-slate-300/90">
                   <p>
-                    Kişisel verilerinizin (varsa e-posta kaydınızın veya misafir cihaz kimliğinizin) silinmesini talep etmek, gizlilik haklarınızla ilgili soru sormak veya geri bildirimde bulunmak için aşağıdaki resmi e-posta adresimiz üzerinden bizimle her zaman iletişime geçebilirsiniz. Talepleriniz en geç 48 saat içerisinde işleme alınarak verileriniz kalıcı olarak sistemlerimizden silinecektir.
+                    Kişisel verilerinizin (varsa e-posta kaydınızın veya misafir cihaz kimliğinizin) silinmesini talep etmek, gizlilik haklarınızla ilgili soru sormak veya her türlü arıza, öneri ve destek bildirimi için aşağıdaki iletişim formunu kullanabilirsiniz. Mesajınız doğrudan ve güvenli bir şekilde geliştirici ekibine iletilecektir. Talepleriniz en geç 48 saat içerisinde incelenerek gerekli işlemler yapılacaktır.
                   </p>
-                  <div className="mt-3 p-3 bg-amber-500/5 rounded-xl border border-amber-500/10 flex items-center gap-2.5 text-amber-400 font-semibold">
-                    <Mail size={14} />
-                    <span>ibrahimabaydin2@gmail.com</span>
-                  </div>
+
+                  {submitSuccess ? (
+                    <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex flex-col items-center text-center gap-2 animate-fade-in">
+                      <CheckCircle2 size={32} className="text-emerald-400 animate-bounce" />
+                      <span className="font-bold text-sm">Mesajınız Başarıyla İletildi!</span>
+                      <p className="text-[11px] text-slate-400 max-w-sm">
+                        İletiniz güvenli kanallarımız üzerinden geliştirici ekibimize ulaştı. Sorunuz veya talebiniz en geç 48 saat içinde incelenecektir.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setSubmitSuccess(false)}
+                        className="mt-2 text-[10px] text-emerald-400 font-bold hover:underline underline-offset-4 cursor-pointer"
+                      >
+                        Yeni Bir Mesaj Gönder
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSubmitContact} className="space-y-3 bg-black/30 border border-white/5 p-4 rounded-2xl text-left">
+                      {submitError && (
+                        <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-xl text-[10px] font-semibold flex items-center gap-2">
+                          <AlertTriangle size={14} className="text-rose-400 shrink-0" />
+                          <span>{submitError}</span>
+                        </div>
+                      )}
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Email */}
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                            E-Posta Adresiniz (Cevap Alabilmek İçin)
+                          </label>
+                          <input
+                            type="email"
+                            required
+                            placeholder="ornek@mail.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full px-3 py-2 text-xs bg-[#151a2e] border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all"
+                          />
+                        </div>
+
+                        {/* Category */}
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                            İletişim Nedeni
+                          </label>
+                          <select
+                            value={category}
+                            onChange={(e: any) => setCategory(e.target.value)}
+                            className="w-full px-3 py-2 text-xs bg-[#151a2e] border border-white/10 rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all cursor-pointer"
+                          >
+                            <option value="bug">Arıza / Hata Bildirimi (Bug)</option>
+                            <option value="suggestion">Öneri / İstek Bildirimi</option>
+                            <option value="deletion">Veri Silme Talebi (Data Deletion)</option>
+                            <option value="other">Diğer Destek Konuları (Other)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Message */}
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                          Mesajınız
+                        </label>
+                        <textarea
+                          required
+                          rows={3}
+                          placeholder="Arıza detaylarını, önerinizi veya veri silme isteğinizi buraya yazınız..."
+                          value={message}
+                          onChange={(e) => setMessage(e.target.value)}
+                          className="w-full px-3 py-2 text-xs bg-[#151a2e] border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all resize-none"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-500/40 disabled:text-slate-500/60 text-slate-950 font-black text-xs rounded-xl transition duration-200 flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-[0.98]"
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            <span>Gönderiliyor...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send size={12} />
+                            <span>Mesajı Gönder</span>
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  )}
                 </div>
               </div>
             </>
@@ -233,14 +392,103 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
                   <ChevronRight size={14} className="text-amber-400" />
                   5. Contact & Data Deletion
                 </h4>
-                <div className="pl-5 space-y-2 text-xs text-slate-300/90">
+                <div className="pl-5 space-y-3.5 text-xs text-slate-300/90">
                   <p>
-                    To request permanent deletion of your credentials, guest profiles, or ask any privacy-related queries, email us. Requests are processed within 48 hours.
+                    To request permanent deletion of your credentials, guest profiles, or ask any privacy-related, bug, or support queries, you can submit a message securely using the form below. Your ticket will be directed directly and securely to the development team without exposing email addresses in public code.
                   </p>
-                  <div className="mt-3 p-3 bg-amber-500/5 rounded-xl border border-amber-500/10 flex items-center gap-2.5 text-amber-400 font-semibold">
-                    <Mail size={14} />
-                    <span>ibrahimabaydin2@gmail.com</span>
-                  </div>
+
+                  {submitSuccess ? (
+                    <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex flex-col items-center text-center gap-2 animate-fade-in">
+                      <CheckCircle2 size={32} className="text-emerald-400 animate-bounce" />
+                      <span className="font-bold text-sm">Message Sent Successfully!</span>
+                      <p className="text-[11px] text-slate-400 max-w-sm">
+                        Your message has been safely delivered to our developer desk. We will review and respond to your request within 48 hours.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setSubmitSuccess(false)}
+                        className="mt-2 text-[10px] text-emerald-400 font-bold hover:underline underline-offset-4 cursor-pointer"
+                      >
+                        Send Another Message
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSubmitContact} className="space-y-3 bg-black/30 border border-white/5 p-4 rounded-2xl text-left">
+                      {submitError && (
+                        <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-xl text-[10px] font-semibold flex items-center gap-2">
+                          <AlertTriangle size={14} className="text-rose-400 shrink-0" />
+                          <span>{submitError}</span>
+                        </div>
+                      )}
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Email */}
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                            Your Email (To receive a reply)
+                          </label>
+                          <input
+                            type="email"
+                            required
+                            placeholder="you@example.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full px-3 py-2 text-xs bg-[#151a2e] border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all"
+                          />
+                        </div>
+
+                        {/* Category */}
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                            Reason for Inquiry
+                          </label>
+                          <select
+                            value={category}
+                            onChange={(e: any) => setCategory(e.target.value)}
+                            className="w-full px-3 py-2 text-xs bg-[#151a2e] border border-white/10 rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all cursor-pointer"
+                          >
+                            <option value="bug">Report an Issue (Bug)</option>
+                            <option value="suggestion">Suggestion / Feedback</option>
+                            <option value="deletion">Data Deletion Request</option>
+                            <option value="other">Other Inquiry</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Message */}
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                          Your Message
+                        </label>
+                        <textarea
+                          required
+                          rows={3}
+                          placeholder="Please specify bug details, suggestion, or data deletion requests here..."
+                          value={message}
+                          onChange={(e) => setMessage(e.target.value)}
+                          className="w-full px-3 py-2 text-xs bg-[#151a2e] border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all resize-none"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-500/40 disabled:text-slate-500/60 text-slate-950 font-black text-xs rounded-xl transition duration-200 flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-[0.98]"
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            <span>Sending...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send size={12} />
+                            <span>Send Message</span>
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  )}
                 </div>
               </div>
             </>
@@ -254,6 +502,7 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
             Kelime Savaşı © 2026
           </span>
           <button
+            type="button"
             onClick={onClose}
             className="px-5 py-2.5 bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] text-xs font-black rounded-xl transition active:scale-95 cursor-pointer uppercase tracking-wider"
           >

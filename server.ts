@@ -649,6 +649,38 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+// Endpoint for secure user support messages / contact form (Google Play Compliance)
+app.post('/api/support', async (req, res) => {
+  try {
+    const { email, category, message, username, userId } = req.body;
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Mesaj alanı zorunludur.' });
+    }
+
+    const ticketId = 'ticket_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    const docRef = doc(db, 'support_messages', ticketId);
+
+    const supportPayload = {
+      id: ticketId,
+      email: email || 'anonymous',
+      category: category || 'general',
+      message: message,
+      username: username || 'Guest',
+      userId: userId || 'unknown',
+      createdAt: new Date().toISOString(),
+      status: 'new'
+    };
+
+    await setDoc(docRef, supportPayload);
+    console.log(`[Support Message Saved] ID: ${ticketId}, Category: ${category}, Email: ${email}`);
+
+    res.json({ success: true, ticketId });
+  } catch (error: any) {
+    console.error('Support API Error:', error);
+    res.status(500).json({ error: 'Mesaj iletilemedi. Sunucu hatası oluştu.' });
+  }
+});
+
 // WebSocket Server Integration for Real-time Battles and Online Friends
 const clients = new Map<string, { ws: WebSocket; name: string; avatarUrl?: string; status: 'idle' | 'playing' }>();
 const matchmakingQueue = new Map<string, { wordLength: number; matchWordsCount?: number }>();
