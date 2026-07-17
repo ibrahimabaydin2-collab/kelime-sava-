@@ -14,6 +14,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     // private AdView mAdViewTop;
     // private AdView mAdViewBottom;
+    private WebView mWebView;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -29,26 +30,26 @@ public class MainActivity extends BridgeActivity {
         FrameLayout webviewContainer = findViewById(R.id.webview_container);
 
         // Retrieve Capacitor's WebView instance
-        WebView webView = getBridge().getWebView();
+        mWebView = getBridge().getWebView();
 
         // Enable persistent WebView storage / database cache settings & JS support
-        if (webView != null) {
-            WebSettings webSettings = webView.getSettings();
+        if (mWebView != null) {
+            WebSettings webSettings = mWebView.getSettings();
             if (webSettings != null) {
                 webSettings.setJavaScriptEnabled(true);
                 webSettings.setDomStorageEnabled(true);
                 webSettings.setDatabaseEnabled(true);
                 webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
             }
-            webView.setWebChromeClient(new WebChromeClient());
+            mWebView.setWebChromeClient(new WebChromeClient());
         }
 
         // Safe check and reparent the webview to our container
-        if (webView != null) {
-            if (webView.getParent() != null) {
-                ((ViewGroup) webView.getParent()).removeView(webView);
+        if (mWebView != null) {
+            if (mWebView.getParent() != null) {
+                ((ViewGroup) mWebView.getParent()).removeView(mWebView);
             }
-            webviewContainer.addView(webView);
+            webviewContainer.addView(mWebView);
         }
 
         // Load AdMob banners - DISABLED TO PREVENT FREEZING
@@ -67,24 +68,32 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onPause() {
-        // if (mAdViewTop != null) {
-        //     mAdViewTop.pause();
-        // }
-        // if (mAdViewBottom != null) {
-        //     mAdViewBottom.pause();
-        // }
+        // Pause WebView JS execution, CSS transitions, and Web Audio context
+        if (mWebView != null) {
+            mWebView.onPause();
+            mWebView.pauseTimers();
+        }
         super.onPause();
+    }
+
+    @Override
+    public void onStop() {
+        // Ensure web view is paused when the activity is stopped
+        if (mWebView != null) {
+            mWebView.onPause();
+            mWebView.pauseTimers();
+        }
+        super.onStop();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        // if (mAdViewTop != null) {
-        //     mAdViewTop.resume();
-        // }
-        // if (mAdViewBottom != null) {
-        //     mAdViewBottom.resume();
-        // }
+        // Resume WebView JS execution, CSS transitions, and Web Audio context
+        if (mWebView != null) {
+            mWebView.onResume();
+            mWebView.resumeTimers();
+        }
     }
 
     @Override

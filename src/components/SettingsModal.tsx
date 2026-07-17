@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, LobbyPlayer } from '../types.js';
 import { validateUsername, validatePassword } from '../utils/usernameValidation.js';
+import PrivacyPolicyModal from './PrivacyPolicyModal.js';
 import { 
   auth, 
   linkGuestToEmailAndPassword, 
@@ -69,6 +70,7 @@ export default function SettingsModal({
   onUpdateProfile
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('account');
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState<boolean>(false);
   const [editName, setEditName] = useState<string>(profile.name);
   const [selectedAvatar, setSelectedAvatar] = useState<string>(profile.avatarUrl || '🧠');
   const [showAvatarPresets, setShowAvatarPresets] = useState<boolean>(false);
@@ -1095,8 +1097,30 @@ export default function SettingsModal({
                 </div>
               )}
 
+              {/* Card 5: Gizlilik Politikası ve Güvenlik (Google Play Compliance) */}
+              <div className="inner-theme border border-theme rounded-2xl p-4.5 space-y-3 text-left shadow-md">
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                  <Shield size={14} className="text-amber-400 animate-pulse" />
+                  Gizlilik Politikası & Güvenlik
+                </h4>
+                <p className="text-[10px] text-slate-300/80 leading-normal">
+                  Kişisel veri güvenliğiniz, Google Play Store politikaları uyumluluğu, kamera/ses izinleri ve veri saklama koşulları hakkında ayrıntılı bilgi edinin.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsPrivacyOpen(true)}
+                  className="w-full mt-1.5 py-3 px-4 rounded-xl border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-amber-400 text-xs font-black transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Shield size={14} />
+                  <span>Gizlilik Politikasını Görüntüle</span>
+                </button>
+              </div>
+
             </div>
           )}
+
+          {/* Privacy Policy Modal */}
+          <PrivacyPolicyModal isOpen={isPrivacyOpen} onClose={() => setIsPrivacyOpen(false)} />
 
         </div>
 

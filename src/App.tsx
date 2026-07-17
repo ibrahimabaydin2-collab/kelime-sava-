@@ -7,7 +7,9 @@ import {
   playErrorSound,
   playVictorySound,
   playDefeatSound,
-  playCountdownBeepSound
+  playCountdownBeepSound,
+  suspendAudioContext,
+  resumeAudioContext
 } from './utils/soundEffects.js';
 import GameBoard from './components/GameBoard.js';
 import BottomBar from './components/BottomBar.js';
@@ -27,6 +29,7 @@ import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/
 import { getApiUrl, getWsUrl, validateWordClientSide } from './utils/api.js';
 import { calculateDynamicScore, verifyScoringAccuracy, getLevelForScore } from './utils/scoring.js';
 import { getCachedWord, setCachedWord } from './utils/wordCache.js';
+import { scheduleDailyNotifications } from './utils/notifications.js';
 
 const INITIAL_STATS = {
   gamesPlayed: 0,
@@ -419,6 +422,7 @@ export default function App() {
   const [currentAttempt, setCurrentAttempt] = useState<string>('');
   const [gameStatus, setGameStatus] = useState<'idle' | 'playing' | 'won' | 'lost'>('idle');
   const [secondsLeft, setSecondsLeft] = useState<number>(20);
+  const [isAppActive, setIsAppActive] = useState<boolean>(true);
   const [isValidating, setIsValidating] = useState<boolean>(false);
   const [wordDefinition, setWordDefinition] = useState<string>('');
   const [letterStatuses, setLetterStatuses] = useState<{ [key: string]: 'green' | 'orange' | 'grey' }>({});
@@ -507,6 +511,42 @@ export default function App() {
     }
     
     safeLocalStorage.setItem('kelimesavasi_last_active_time', new Date().toISOString());
+  }, [settings.notificationEnabled]);
+
+  // Manage app background / foreground state (visibility change, focus/blur)
+  useEffect(() => {
+    const handleAppActive = () => {
+      setIsAppActive(true);
+      resumeAudioContext();
+    };
+
+    const handleAppInactive = () => {
+      setIsAppActive(false);
+      suspendAudioContext();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleAppActive();
+      } else {
+        handleAppInactive();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleAppActive);
+    window.addEventListener('blur', handleAppInactive);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleAppActive);
+      window.removeEventListener('blur', handleAppInactive);
+    };
+  }, []);
+
+  // Daily Puzzle Morning Notification scheduler effect
+  useEffect(() => {
+    scheduleDailyNotifications();
   }, [settings.notificationEnabled]);
 
   // Expose retention notification simulator helper
@@ -1299,9 +1339,8 @@ export default function App() {
 
   // Countdown timer logic
   useEffect(() => {
-    // In activeMatch we do want the timer to run - wait, user says:
-    // "Süreyi Kökten Kaldır: Canlı Düello yarışındaki gizli veya açık tüm süre sayaçlarını tamamen iptal et. Oyun %100 süresiz olacak."
-    if (gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch) || activeMatch) {
+    // Pause timer if app is not active (backgrounded)
+    if (!isAppActive || gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch) || activeMatch) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
@@ -1330,7 +1369,7 @@ export default function App() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch, isDailyPuzzle, targetWord]); // Resets interval on attempt submission or validation change or exit or gameMode change
+  }, [isAppActive, gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch, isDailyPuzzle, targetWord]); // Resets interval on attempt submission or validation change or exit or gameMode change
 
   // Fetch direct definition for the target word
   const fetchTargetWordDefinition = async (wordToFetch: string) => {
@@ -1419,6 +1458,7 @@ export default function App() {
       const { dateStr } = getDailyWordAndLength();
       safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
       syncDailyPuzzleProgress(attempts, false, true);
+      scheduleDailyNotifications();
     }
 
     // Increment gamesPlayed and reset streak
@@ -1761,6 +1801,7 @@ export default function App() {
         const { dateStr } = getDailyWordAndLength();
         safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
         badgesToUnlock.add('daily_puzzle_solver');
+        scheduleDailyNotifications();
       }
       if (updatedStats.gamesWon >= 10) {
         badgesToUnlock.add('word_detective');
@@ -2130,6 +2171,7 @@ export default function App() {
       if (data.solved || data.failed) {
         showToast('Bugünkü Günlük Bulmacayı zaten çözdünüz/bitirdiniz! Yarın yeni bir kelime için tekrar gelin.', 'info');
         safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dailyInfo.dateStr);
+        scheduleDailyNotifications();
         setIsValidating(false);
         return;
       }

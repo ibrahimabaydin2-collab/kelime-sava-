@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Sparkles, Swords, User, Mail, Lock, ShieldAlert, LogIn, AlertCircle, Smartphone, ArrowLeft } from 'lucide-react';
 import { UserProfile, LobbyPlayer } from '../types.js';
 import { validateUsername, validatePassword } from '../utils/usernameValidation.js';
+import PrivacyPolicyModal from './PrivacyPolicyModal.js';
 import { 
   signInAsGuest, 
   registerWithEmailAndPassword, 
@@ -30,6 +31,7 @@ type AuthMode = 'guest' | 'login' | 'register' | 'phone';
 
 export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>('guest');
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState<boolean>(false);
   
   // Fields
   const [username, setUsername] = useState<string>('');
@@ -1018,6 +1020,20 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         </div>
 
       </form>
+
+      {/* Google Play Compliance Privacy Policy Link */}
+      <div className="mt-6 text-center animate-fade-in relative z-10">
+        <button
+          type="button"
+          onClick={() => setIsPrivacyOpen(true)}
+          className="text-[10px] text-slate-400 hover:text-amber-400 font-bold tracking-wider uppercase underline decoration-dashed underline-offset-4 transition cursor-pointer"
+        >
+          Gizlilik Politikası ve Kullanım Koşulları
+        </button>
+      </div>
+
+      {/* Privacy Policy Modal */}
+      <PrivacyPolicyModal isOpen={isPrivacyOpen} onClose={() => setIsPrivacyOpen(false)} />
     </div>
   );
 }

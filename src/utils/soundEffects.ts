@@ -28,6 +28,24 @@ function getAudioContext(): AudioContext | null {
 }
 
 /**
+ * Suspends the sound synthesizer context when app goes to background
+ */
+export function suspendAudioContext() {
+  if (audioCtx && audioCtx.state === 'running') {
+    audioCtx.suspend().catch(e => console.warn('Failed to suspend AudioContext:', e));
+  }
+}
+
+/**
+ * Resumes the sound synthesizer context when app comes to foreground
+ */
+export function resumeAudioContext() {
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(e => console.warn('Failed to resume AudioContext:', e));
+  }
+}
+
+/**
  * Play a standard key press/click sound
  */
 export function playClickSound(enabled: boolean) {
