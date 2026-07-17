@@ -969,7 +969,7 @@ export default function App() {
                 id: matchId,
                 wordLength: len,
                 targetWord: sharedWord,
-                matchWordsCount: matchWordsCount || 3,
+                matchWordsCount: matchWordsCount || 1,
                 currentRound: currentRound || 1,
                 roundsWon: roundsWon || { [profile.id]: 0, [opponentId]: 0 },
                 players: {
@@ -2127,7 +2127,7 @@ export default function App() {
         socketRef.current.send(JSON.stringify({
           type: 'join_matchmaking',
           wordLength,
-          matchWordsCount: matchWordsCount || 3
+          matchWordsCount: matchWordsCount || 1
         }));
       }
     }

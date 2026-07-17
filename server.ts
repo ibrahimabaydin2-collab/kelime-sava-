@@ -940,7 +940,7 @@ const setupWebSocket = (server: any) => {
                   matchId,
                   targetWord,
                   wordLength: challenge.wordLength,
-                  matchWordsCount: 3,
+                  matchWordsCount: 1,
                   currentRound: 1,
                   roundsWon: {
                     [challenge.challengerId]: 0,
@@ -959,7 +959,7 @@ const setupWebSocket = (server: any) => {
                   matchId,
                   targetWord,
                   wordLength: challenge.wordLength,
-                  matchWordsCount: 3,
+                  matchWordsCount: 1,
                   currentRound: 1,
                   roundsWon: {
                     [challenge.challengerId]: 0,
@@ -1103,7 +1103,7 @@ const setupWebSocket = (server: any) => {
                 const newMatchId = 'match_' + Math.random().toString(36).substring(2, 9);
                 const finalWordLength = match.wordLength || 5;
                 const targetWord = getRandomWord(finalWordLength);
-                const matchWordsCount = match.matchWordsCount || 3;
+                const matchWordsCount = match.matchWordsCount || 1;
 
                 const playerIds = Object.keys(match.players);
                 const p1Id = playerIds[0];
@@ -1236,7 +1236,7 @@ const setupWebSocket = (server: any) => {
             const selfClient = clients.get(playerId);
             if (!selfClient || selfClient.status === 'playing') break;
 
-            const requestedWordsCount = matchWordsCount || 3;
+            const requestedWordsCount = matchWordsCount || 1;
             console.log(`Player joined matchmaking queue: ${selfClient.name} (${playerId}) for ${wordLength} letters, ${requestedWordsCount} words`);
             matchmakingQueue.set(playerId, { wordLength, matchWordsCount: requestedWordsCount });
 

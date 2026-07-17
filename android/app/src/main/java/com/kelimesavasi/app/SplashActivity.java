@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
@@ -13,17 +14,23 @@ import com.google.firebase.auth.FirebaseAuth;
 public class SplashActivity extends AppCompatActivity {
 
     private static final String TAG = "SplashActivity";
+    private TextView tvLoadingStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
 
+        tvLoadingStatus = findViewById(R.id.splash_loading_text);
+        if (tvLoadingStatus != null) {
+            tvLoadingStatus.setText("Sistem hazırlanıyor...");
+        }
+
         // Safely initialize Firebase so that the app never crashes on startup,
         // even if google-services.json is missing or not processed.
         initializeFirebaseSafely();
 
-        // Sleek 1.5-second splash screen transition delay
+        // Sleek 1.5-second splash screen transition delay to show branding and perform check
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -34,6 +41,9 @@ public class SplashActivity extends AppCompatActivity {
 
     private void initializeFirebaseSafely() {
         try {
+            if (tvLoadingStatus != null) {
+                tvLoadingStatus.setText("Oturum servisleri bağlanıyor...");
+            }
             if (FirebaseApp.getApps(this).isEmpty()) {
                 FirebaseOptions options = new FirebaseOptions.Builder()
                     .setProjectId("premium-realm-47c1c")
@@ -52,12 +62,21 @@ public class SplashActivity extends AppCompatActivity {
 
     private void checkUserSession() {
         try {
+            if (tvLoadingStatus != null) {
+                tvLoadingStatus.setText("Oturum kontrol ediliyor...");
+            }
             FirebaseAuth auth = FirebaseAuth.getInstance();
             if (auth.getCurrentUser() != null) {
-                // User is already logged in, skip login screen and launch Main lobby
+                if (tvLoadingStatus != null) {
+                    tvLoadingStatus.setText("Giriş başarılı! Oyun yükleniyor...");
+                }
+                // User is already logged in, skip login screen and launch MainActivity directly
                 Intent intent = new Intent(this, MainActivity.class);
                 startActivity(intent);
             } else {
+                if (tvLoadingStatus != null) {
+                    tvLoadingStatus.setText("Giriş sayfasına yönlendiriliyorsunuz...");
+                }
                 // No active session, prompt user with the login/guest entrance screen
                 Intent intent = new Intent(this, LoginActivity.class);
                 startActivity(intent);

@@ -38,6 +38,15 @@
             android:indeterminate="true"
             android:indeterminateTint="#3b82f6" /> <!-- blue-500 tint -->
 
+        <TextView
+            android:id="@+id/splash_loading_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Kullanıcı oturumu hazırlanıyor..."
+            android:textColor="#64748b"
+            android:textSize="12sp"
+            android:layout_marginTop="16dp" />
+
     </LinearLayout>
 
     <TextView

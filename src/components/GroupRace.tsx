@@ -288,6 +288,7 @@ export default function GroupRace({
         currentRound: 1,
         wordLength: 5,
         targetWord: '',
+        winnerId: '',
         createdAt: new Date().toISOString()
       });
 
@@ -496,6 +497,23 @@ export default function GroupRace({
         setIsHost(true);
       }
 
+      // Real-time winner verification:
+      // If a player successfully solves the word first, stop the game instantly.
+      if (data.winnerId && data.winnerId !== '') {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+        setUserFinished(true);
+        if (data.winnerId === profile.id) {
+          setUserSolved(true);
+        } else {
+          setUserSolved(false);
+          showToast('Kaybettiniz! Rakibiniz kelimeyi sizden önce buldu.', 'error');
+        }
+        setPhase('ended');
+        return; // Halt any other stage transitions
+      }
+
       if (data.status === 'playing' && phase !== 'playing') {
         setupOnlinePlayingRound(data.currentRound, data.wordLength || 5, data.targetWord || '');
       } else if (data.status === 'elimination' && phase !== 'elimination') {
@@ -615,6 +633,15 @@ export default function GroupRace({
         currentAttempt: finalGuesses.length,
         attemptsFeedback: finalGuesses.map(g => evaluateGuessLocally(g, targetWord))
       });
+
+      if (solved) {
+        // "Bir oyuncu doğru kelimeyi bulduğu an Firebase üzerinde 'winner' alanına kendi ID'sini yazmalı ve oyun durumunu bitirmeli."
+        const roomRef = doc(db, 'rooms', roomId);
+        await updateDoc(roomRef, {
+          winnerId: profile.id,
+          status: 'ended'
+        });
+      }
     } catch (err) {
       console.error("Error writing local end round results to Firestore:", err);
     }
@@ -670,10 +697,8 @@ export default function GroupRace({
         
         let scoreIncrement = 0;
         if (!isEliminatedNow) {
-          scoreIncrement = currentRound * 15;
-          if (targetSurvivors === 1 && activeOnlinePlayers.length > 1) {
-            scoreIncrement += 100; // Champion bonus
-          }
+          // Beş puandan fazla ödül hiçbir şekilde verilmesin
+          scoreIncrement = 5;
         }
 
         await updateDoc(playerRef, {
@@ -734,7 +759,8 @@ export default function GroupRace({
         status: 'playing',
         currentRound: nextRoundNum,
         wordLength: nextWordLength,
-        targetWord: newWord
+        targetWord: newWord,
+        winnerId: ''
       });
     } catch (err) {
       console.error("Error starting next online round:", err);
@@ -1201,6 +1227,7 @@ export default function GroupRace({
 
   // Submit guess
   const submitUserGuess = async () => {
+    if (userFinished) return;
     if (currentGuess.length !== wordLength) {
       showToast(`Lütfen ${wordLength} harfli bir kelime girin!`, 'error');
       return;
