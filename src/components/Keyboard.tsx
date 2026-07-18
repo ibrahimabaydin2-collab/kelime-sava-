@@ -8,6 +8,7 @@ interface KeyboardProps {
   letterStatuses: { [key: string]: 'green' | 'orange' | 'grey' };
   keyboardLayout?: 'Q' | 'F';
   boardTheme?: 'classic' | 'ocean' | 'neon' | 'autumn' | 'pastel';
+  disabled?: boolean;
 }
 
 export default function Keyboard({
@@ -16,7 +17,8 @@ export default function Keyboard({
   onEnter,
   letterStatuses,
   keyboardLayout = 'Q',
-  boardTheme = 'classic'
+  boardTheme = 'classic',
+  disabled = false
 }: KeyboardProps) {
   const qRows = [
     ['E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ğ', 'Ü'],
@@ -84,9 +86,10 @@ export default function Keyboard({
               const isAction = char === 'ENTER' || char === 'SIL';
               return (
                 <motion.button
-                  whileTap={{ scale: 0.95 }}
+                  whileTap={disabled ? undefined : { scale: 0.95 }}
                   key={char}
                   onClick={() => {
+                    if (disabled) return;
                     if (char === 'ENTER') {
                       onEnter();
                     } else if (char === 'SIL') {
@@ -95,8 +98,9 @@ export default function Keyboard({
                       onChar(char);
                     }
                   }}
-                  className={getKeyClass(char)}
+                  className={`${getKeyClass(char)} ${disabled ? 'opacity-70 pointer-events-none select-none touch-none' : ''}`}
                   id={`key-${char}`}
+                  disabled={disabled}
                 >
                   {char === 'SIL' ? (
                     <div className="flex items-center gap-0.5">

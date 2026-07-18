@@ -28,10 +28,22 @@
         android:textSize="18sp"
         android:textStyle="bold"
         android:gravity="center"
-        android:layout_marginBottom="32dp"
+        android:layout_marginBottom="16dp"
         android:paddingHorizontal="16dp"
         android:paddingVertical="8dp"
         android:background="#1e293b" />
+
+    <TextView
+        android:id="@+id/tv_result_status_banner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Kazandınız, Tebrikler!"
+        android:textColor="#10b981"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="32dp"
+        android:visibility="visible" />
 
     <!-- Results Panel Container -->
     <LinearLayout

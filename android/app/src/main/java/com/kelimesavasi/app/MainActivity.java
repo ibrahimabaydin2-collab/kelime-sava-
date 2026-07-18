@@ -58,7 +58,7 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 @android.webkit.JavascriptInterface
-                public void redirectToResultActivity(String winnerId, String winnerName, int winnerScore, String loserId, String loserName, int loserScore, String word) {
+                public void redirectToResultActivity(String winnerId, String winnerName, int winnerScore, String loserId, String loserName, int loserScore, String word, boolean isWinner) {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         try {
                             android.content.Intent intent = new android.content.Intent(MainActivity.this, ResultActivity.class);
@@ -69,6 +69,7 @@ public class MainActivity extends BridgeActivity {
                             intent.putExtra("LOSER_NAME", loserName);
                             intent.putExtra("LOSER_SCORE", loserScore);
                             intent.putExtra("TARGET_WORD", word);
+                            intent.putExtra("IS_WINNER", isWinner);
                             MainActivity.this.startActivity(intent);
                         } catch (Exception e) {
                             e.printStackTrace();
@@ -156,6 +157,12 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         if (mAdViewTop != null) {
@@ -168,6 +175,15 @@ public class MainActivity extends BridgeActivity {
         if (mWebView != null) {
             mWebView.onResume();
             mWebView.resumeTimers();
+
+            // Check if we need to reset the game state to welcome/menu screen
+            android.content.Intent intent = getIntent();
+            if (intent != null && intent.getBooleanExtra("RESET_TO_MENU", false)) {
+                intent.removeExtra("RESET_TO_MENU");
+                mWebView.post(() -> {
+                    mWebView.evaluateJavascript("javascript:if(window.anaMenuyeDon){window.anaMenuyeDon();}", null);
+                });
+            }
         }
     }
 

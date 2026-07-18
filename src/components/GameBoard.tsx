@@ -28,13 +28,13 @@ export default function GameBoard({
         feedback: []
       });
     }
-    
-    while (rows.length < maxAttempts) {
-      rows.push({
-        word: ' '.repeat(wordLength),
-        feedback: []
-      });
-    }
+  }
+  
+  while (rows.length < maxAttempts) {
+    rows.push({
+      word: ' '.repeat(wordLength),
+      feedback: []
+    });
   }
 
   // Determine dynamic cell sizing based on word length to scale perfectly on mobile devices
@@ -116,6 +116,20 @@ export default function GameBoard({
             {wordChars.map((char, charIndex) => {
               const feedback = row.feedback?.[charIndex];
               const cellClass = getCellClass(char, charIndex, isSubmitted, feedback);
+
+              if (isGameOver) {
+                return (
+                  <div
+                    key={charIndex}
+                    className={cellClass}
+                    id={`cell-${rowIndex}-${charIndex}`}
+                  >
+                    <span className="font-sans font-bold">
+                      {char !== ' ' ? char : ''}
+                    </span>
+                  </div>
+                );
+              }
 
               return (
                 <motion.div

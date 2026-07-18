@@ -1334,8 +1334,28 @@ export default function App() {
       console.log('Android Native integration triggered: yeniKelimeyeBasla');
       startNewGame(wordLength);
     };
+    (window as any).anaMenuyeDon = () => {
+      console.log('Android Native integration triggered: anaMenuyeDon');
+      setHasEnteredGame(false);
+      setIsDailyPuzzle(false);
+      setActiveMatch(null);
+      setGameStatus('idle');
+      setAttempts([]);
+      setCurrentAttempt('');
+      setSecondsLeft(20);
+      setShowCongratsModal(false);
+      if (socketRef.current) {
+        try {
+          socketRef.current.close();
+        } catch (e) {
+          console.error("Error closing socket in anaMenuyeDon:", e);
+        }
+        socketRef.current = null;
+      }
+    };
     return () => {
       delete (window as any).yeniKelimeyeBasla;
+      delete (window as any).anaMenuyeDon;
     };
   }, [wordLength]);
 
@@ -1661,9 +1681,61 @@ export default function App() {
 
       if (activeMatch) {
         if (hasWon) {
-          showToast(`DOĞRU BİLDİNİZ! Rakibin kelimeyi tamamlaması bekleniyor...`, 'success');
+          showToast(`TEBRİKLER! Savaşı Kazandın!`, 'success');
           playEnterSound(settings.soundEnabled);
+          
+          // Get opponent info
+          const opponentEntry = Object.entries(activeMatch.players).find(([pId]) => pId !== profile.id);
+          const loserId = opponentEntry ? opponentEntry[0] : 'rakip_id';
+          const loserName = opponentEntry ? (opponentEntry[1] as any).name : 'Rakip';
+          const loserScore = opponentEntry ? ((opponentEntry[1] as any).score || 0) : 0;
+          
+          // Sync match state first
           syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded, Date.now());
+
+          // Stop all timer intervals
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          
+          // Set game status to block keyboard listeners
+          setGameStatus('idle');
+          
+          // Force set isMatchEndedRef.current to true so keyboard listener ignores any events
+          isMatchEndedRef.current = true;
+          
+          // Close the websocket to stop receiving or sending any more messages
+          if (socketRef.current) {
+            try {
+              socketRef.current.close();
+            } catch (e) {
+              console.error("Error closing socket:", e);
+            }
+            socketRef.current = null;
+          }
+
+          // Redirect instantly to ResultActivity via AndroidBridge
+          if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+            try {
+              (window as any).AndroidBridge.loadAdBackground();
+              if ((window as any).AndroidBridge.redirectToResultActivity) {
+                console.log("Instantly directing winner to native ResultActivity via AndroidBridge...");
+                (window as any).AndroidBridge.redirectToResultActivity(
+                  profile.id,
+                  profile.name,
+                  scoreAwarded,
+                  loserId,
+                  loserName,
+                  loserScore,
+                  activeMatch.targetWord || targetWord || '',
+                  true // isWinner = true
+                );
+              }
+            } catch (e) {
+              console.error("Error calling native AndroidBridge:", e);
+            }
+          }
         } else if (updatedAttempts.length >= 6) {
           showToast(`6 tahmin hakkınız tükendi! Rakibin de tamamlaması bekleniyor... Doğru kelime: ${targetWord}`, 'info');
           playDefeatSound(settings.soundEnabled);
@@ -2288,6 +2360,25 @@ export default function App() {
       // Force block game input states immediately
       setGameStatus('idle');
 
+      // Stop all timer intervals
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      
+      // Force set isMatchEndedRef.current to true so keyboard listener ignores any events
+      isMatchEndedRef.current = true;
+      
+      // Close the websocket to stop receiving or sending any more messages
+      if (socketRef.current) {
+        try {
+          socketRef.current.close();
+        } catch (e) {
+          console.error("Error closing socket in useEffect:", e);
+        }
+        socketRef.current = null;
+      }
+
       // Identify Winner & Loser
       const playersList = Object.entries(activeMatch.players);
       let winnerId = '';
@@ -2300,41 +2391,41 @@ export default function App() {
       const winnerEntry = playersList.find(([_, pState]: [string, any]) => pState.won);
       if (winnerEntry) {
         winnerId = winnerEntry[0];
-        winnerName = winnerEntry[1].name || 'Oyuncu';
-        winnerScore = winnerEntry[1].score || 0;
+        winnerName = (winnerEntry[1] as any).name || 'Oyuncu';
+        winnerScore = (winnerEntry[1] as any).score || 0;
 
         const loserEntry = playersList.find(([pId, _]: [string, any]) => pId !== winnerId);
         if (loserEntry) {
           loserId = loserEntry[0];
-          loserName = loserEntry[1].name || 'Oyuncu';
-          loserScore = loserEntry[1].score || 0;
+          loserName = (loserEntry[1] as any).name || 'Oyuncu';
+          loserScore = (loserEntry[1] as any).score || 0;
         }
       } else if (activeMatch.winnerId && activeMatch.winnerId !== 'draw') {
         winnerId = activeMatch.winnerId;
         const winnerPlayer = activeMatch.players[winnerId];
         if (winnerPlayer) {
-          winnerName = winnerPlayer.name || 'Oyuncu';
-          winnerScore = winnerPlayer.score || 0;
+          winnerName = (winnerPlayer as any).name || 'Oyuncu';
+          winnerScore = (winnerPlayer as any).score || 0;
         }
 
         const loserEntry = playersList.find(([pId, _]: [string, any]) => pId !== winnerId);
         if (loserEntry) {
           loserId = loserEntry[0];
-          loserName = loserEntry[1].name || 'Oyuncu';
-          loserScore = loserEntry[1].score || 0;
+          loserName = (loserEntry[1] as any).name || 'Oyuncu';
+          loserScore = (loserEntry[1] as any).score || 0;
         }
       } else {
         // Fallback or Tie
         const sorted = [...playersList].sort((a: any, b: any) => (b[1].score || 0) - (a[1].score || 0));
         if (sorted[0]) {
           winnerId = sorted[0][0];
-          winnerName = sorted[0][1].name || 'Oyuncu';
-          winnerScore = sorted[0][1].score || 0;
+          winnerName = (sorted[0][1] as any).name || 'Oyuncu';
+          winnerScore = (sorted[0][1] as any).score || 0;
         }
         if (sorted[1]) {
           loserId = sorted[1][0];
-          loserName = sorted[1][1].name || 'Oyuncu';
-          loserScore = sorted[1][1].score || 0;
+          loserName = (sorted[1][1] as any).name || 'Oyuncu';
+          loserScore = (sorted[1][1] as any).score || 0;
         }
       }
 
@@ -2350,7 +2441,8 @@ export default function App() {
               loserId,
               loserName,
               loserScore,
-              activeMatch.targetWord || ''
+              activeMatch.targetWord || '',
+              winnerId === profile.id // isWinner
             );
           }
         } catch (e) {
@@ -2773,7 +2865,7 @@ export default function App() {
           )}
 
           {/* Action Buttons Above Keyboard */}
-          {!isMatchEnded && gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
+          {!isMatchEnded && (gameStatus === 'playing' || !activeMatch) && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
             <BottomBar
               currentGuess={currentAttempt}
               wordLength={wordLength}
@@ -2785,16 +2877,17 @@ export default function App() {
                 }
               }}
               onSubmit={submitGuess}
+              disabled={gameStatus !== 'playing'}
             />
           )}
 
           {/* Spacer C */}
-          {!isMatchEnded && gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
+          {!isMatchEnded && (gameStatus === 'playing' || !activeMatch) && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
             <div className="flex-1 min-h-[0.25rem] sm:min-h-[0.5rem]" />
           )}
 
           {/* Virtual Keyboard */}
-          {!isMatchEnded && gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
+          {!isMatchEnded && (gameStatus === 'playing' || !activeMatch) && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
             <Keyboard
               onChar={onChar}
               onDelete={onDelete}
@@ -2802,6 +2895,7 @@ export default function App() {
               letterStatuses={letterStatuses}
               keyboardLayout={settings.keyboardLayout}
               boardTheme={settings.boardTheme}
+              disabled={gameStatus !== 'playing'}
             />
           )}
 
