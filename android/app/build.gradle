@@ -46,6 +46,7 @@ dependencies {
     
     // Google AdMob SDK for displaying ads
     implementation 'com.google.android.gms:play-services-ads:23.0.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
 
     // Google Play Services Auth for native Google Sign-In
     implementation 'com.google.android.gms:play-services-auth:21.2.0'
