@@ -2268,60 +2268,27 @@ export default function App() {
     setReconnectCounter((prev) => prev + 1);
   };
 
-  const handleStartMatchmaking = async (matchWordsCount?: number) => {
+  const handleStartMatchmaking = (matchWordsCount?: number) => {
     if (!isOnline) {
       showToast('Kuyruğa girmek için sunucuya bağlı olmalısınız. Lütfen bekleyin veya çevrimdışı modu oynayın.', 'error');
       return;
     }
 
-    if (matchmakingStatus === 'queued') {
-      // User is cancelling matchmaking, let's leave.
-      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      if (matchmakingStatus === 'queued') {
         socketRef.current.send(JSON.stringify({
           type: 'leave_matchmaking'
         }));
+        setMatchmakingStatus('idle');
+      } else {
+        socketRef.current.send(JSON.stringify({
+          type: 'join_matchmaking',
+          wordLength,
+          matchWordsCount: matchWordsCount || 1
+        }));
+        setMatchmakingStatus('queued');
       }
-      setMatchmakingStatus('idle');
-      pendingMatchmakingRef.current = null;
-      return;
     }
-
-    // 1. Temizlik/Sıfırlama Aşaması (Cleanup/Reset Phase)
-    // Clear local matchmaking statuses first
-    setMatchmakingStatus('idle');
-    setActiveMatch(null);
-    pendingMatchmakingRef.current = matchWordsCount || 1;
-
-    // Asynchronously clear player's matchmaking status/room details on Firestore database and wait for completion.
-    try {
-      console.log('Matchmaking start requested. Executing full async database and local cleanup...');
-      if (profile && profile.id) {
-        await clearMatchmakingState(profile.id);
-      }
-    } catch (dbError) {
-      console.warn('Non-blocking db cleanup error before starting matchmaking:', dbError);
-    }
-
-    // 2. Temiz Başlangıç & 3. Dinleyicileri Kaldırma (Clean Start & Detach Listeners)
-    // To ensure old data streams or listener hooks do not sabotage the new match/search, we fully close and dispose
-    // of the old socket connection, stripping all callback listeners first.
-    console.log('Detaching all previous socket listeners and establishing a 0-kilometer connection...');
-    if (socketRef.current) {
-      try {
-        socketRef.current.onopen = null;
-        socketRef.current.onmessage = null;
-        socketRef.current.onerror = null;
-        socketRef.current.onclose = null;
-        socketRef.current.close();
-      } catch (e) {
-        // ignore
-      }
-      socketRef.current = null;
-    }
-
-    // Triggering reconnectCounter forces the useEffect dependency to rebuild a fresh, clean-slate WebSocket.
-    // The ws.onopen callback inside that fresh connection will handle the actual matchmaking join trigger perfectly!
-    setReconnectCounter((prev) => prev + 1);
   };
 
   const syncDailyPuzzleProgress = async (updatedAttempts: GameAttempt[], solved: boolean, failed: boolean) => {
@@ -3539,11 +3506,10 @@ export default function App() {
                 <span>Yeni Kelimeye Başla</span>
               </button>
 
-              <button
+               <button
                 onClick={() => {
                   playClickSound(settings.soundEnabled);
-                  setHasEnteredGame(false);
-                  setIsDailyPuzzle(false);
+                  handleLeaveMatchToMenu();
                   setShowCongratsModal(false);
                 }}
                 className="w-full bg-slate-700/80 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs py-2.5 px-4 rounded-xl border border-[#3E485A] transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider"
