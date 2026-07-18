@@ -312,3 +312,29 @@ html.dark {
     font-size: 1.2rem !important;
   }
 }
+
+/* --- FIXED AD BANNER PLACEHOLDERS CONTROLS --- */
+#top-ad-placeholder, #bottom-ad-placeholder {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 50px !important;
+  display: flex !important;
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+}
+
+#top-ad-placeholder {
+  top: 0 !important;
+}
+
+#bottom-ad-placeholder {
+  bottom: 0 !important;
+}
+
+/* Ensure main content doesn't get covered by the fixed banners */
+main {
+  padding-top: 50px !important;
+  padding-bottom: 50px !important;
+}
