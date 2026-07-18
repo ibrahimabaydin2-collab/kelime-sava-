@@ -11,7 +11,7 @@
     <com.google.android.gms.ads.AdView
         android:id="@+id/adViewTop"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="50dp"
         ads:adSize="BANNER"
         ads:adUnitId="ca-app-pub-1284519280145258/1638549372"
         app:layout_constraintTop_toTopOf="parent"
@@ -32,7 +32,7 @@
     <com.google.android.gms.ads.AdView
         android:id="@+id/adViewBottom"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="50dp"
         ads:adSize="BANNER"
         ads:adUnitId="ca-app-pub-1284519280145258/9871650431"
         app:layout_constraintBottom_toBottomOf="parent"

@@ -1,6 +1,8 @@
 package com.kelimesavasi.app;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.ViewGroup;
 import android.webkit.WebView;
 import android.webkit.WebSettings;
@@ -15,13 +17,11 @@ public class MainActivity extends BridgeActivity {
     private AdView mAdViewTop;
     private AdView mAdViewBottom;
     private WebView mWebView;
+    private boolean mAdsInitialized = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // Initialize Google Mobile Ads SDK
-        MobileAds.initialize(this, initializationStatus -> {});
 
         // Set our custom layout
         setContentView(R.layout.activity_main);
@@ -52,18 +52,37 @@ public class MainActivity extends BridgeActivity {
             webviewContainer.addView(mWebView);
         }
 
-        // Load AdMob banners
-        AdRequest adRequest = new AdRequest.Builder().build();
-
         mAdViewTop = findViewById(R.id.adViewTop);
-        if (mAdViewTop != null) {
-            mAdViewTop.loadAd(adRequest);
-        }
-
         mAdViewBottom = findViewById(R.id.adViewBottom);
-        if (mAdViewBottom != null) {
-            mAdViewBottom.loadAd(adRequest);
-        }
+
+        // Defer AdMob initialization to a background handler to ensure the main UI rendering thread is completely untouched and free of latency
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            try {
+                // Initialize Google Mobile Ads SDK asynchronously
+                MobileAds.initialize(MainActivity.this, initializationStatus -> {
+                    mAdsInitialized = true;
+                    loadBanners();
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, 600); // 600ms delay gives WebView enough time to render completely and prevents layout flickering or white flashes
+    }
+
+    private void loadBanners() {
+        runOnUiThread(() -> {
+            try {
+                AdRequest adRequest = new AdRequest.Builder().build();
+                if (mAdViewTop != null) {
+                    mAdViewTop.loadAd(adRequest);
+                }
+                if (mAdViewBottom != null) {
+                    mAdViewBottom.loadAd(adRequest);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
 
     @Override
