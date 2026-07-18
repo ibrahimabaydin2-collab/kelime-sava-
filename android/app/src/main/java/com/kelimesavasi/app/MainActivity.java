@@ -40,8 +40,23 @@ public class MainActivity extends BridgeActivity {
                 webSettings.setDomStorageEnabled(true);
                 webSettings.setDatabaseEnabled(true);
                 webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
+                // Optimize rendering speed and graphics performance
+                webSettings.setRenderPriority(WebSettings.RenderPriority.HIGH);
             }
             mWebView.setWebChromeClient(new WebChromeClient());
+            
+            // Forces hardware accelerated rendering context to relieve graphics memory and prevent white screens or flickering
+            mWebView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
+
+            // Register a custom Javascript interface to support safe, completely asynchronous AdMob refresh calls
+            mWebView.addJavascriptInterface(new Object() {
+                @android.webkit.JavascriptInterface
+                public void loadAdBackground() {
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        loadBannersAsync();
+                    }, 120); // Safe delay to let active UI transition completely finalize
+                }
+            }, "AndroidBridge");
         }
 
         // Safe check and reparent the webview to our container
@@ -52,8 +67,8 @@ public class MainActivity extends BridgeActivity {
             webviewContainer.addView(mWebView);
         }
 
-        mAdViewTop = findViewById(R.id.adViewTop);
-        mAdViewBottom = findViewById(R.id.adViewBottom);
+        mAdViewTop = findViewById(R.id.ust_banner);
+        mAdViewBottom = findViewById(R.id.alt_banner);
 
         // Defer AdMob initialization to a background handler to ensure the main UI rendering thread is completely untouched and free of latency
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
@@ -70,14 +85,24 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void loadBanners() {
-        runOnUiThread(() -> {
+        loadBannersAsync();
+    }
+
+    private void loadBannersAsync() {
+        if (mAdViewTop == null && mAdViewBottom == null) return;
+        
+        // Dispatches the loading task entirely as an asynchronous post message on the Main Looper
+        // This ensures the main UI thread continues rendering current frames at 60/120Hz without hitching
+        new Handler(Looper.getMainLooper()).post(() -> {
             try {
-                AdRequest adRequest = new AdRequest.Builder().build();
-                if (mAdViewTop != null) {
-                    mAdViewTop.loadAd(adRequest);
-                }
-                if (mAdViewBottom != null) {
-                    mAdViewBottom.loadAd(adRequest);
+                if (mAdsInitialized) {
+                    AdRequest adRequest = new AdRequest.Builder().build();
+                    if (mAdViewTop != null) {
+                        mAdViewTop.loadAd(adRequest);
+                    }
+                    if (mAdViewBottom != null) {
+                        mAdViewBottom.loadAd(adRequest);
+                    }
                 }
             } catch (Exception e) {
                 e.printStackTrace();

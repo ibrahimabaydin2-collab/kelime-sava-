@@ -1252,7 +1252,8 @@ export default function App() {
     currAttemptNum: number,
     completed: boolean,
     won: boolean,
-    score: number
+    score: number,
+    kelime_bulundu_zamani?: number | null
   ) => {
     if (activeMatch && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
@@ -1263,7 +1264,8 @@ export default function App() {
         completed,
         won,
         score,
-        timeRemaining: secondsLeft
+        timeRemaining: secondsLeft,
+        kelime_bulundu_zamani: kelime_bulundu_zamani || null
       }));
     }
   };
@@ -1547,7 +1549,8 @@ export default function App() {
 
   // Submit Guessed Word
   const submitGuess = async () => {
-    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended';
+    const isAnyPlayerSolved = activeMatch ? Object.values(activeMatch.players).some((p: any) => p.won) : false;
+    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended' || isAnyPlayerSolved;
     if (localCompleted || gameStatus !== 'playing') {
       return;
     }
@@ -1660,7 +1663,7 @@ export default function App() {
         if (hasWon) {
           showToast(`DOĞRU BİLDİNİZ! Rakibin kelimeyi tamamlaması bekleniyor...`, 'success');
           playEnterSound(settings.soundEnabled);
-          syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded);
+          syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded, Date.now());
         } else if (updatedAttempts.length >= 6) {
           showToast(`6 tahmin hakkınız tükendi! Rakibin de tamamlaması bekleniyor... Doğru kelime: ${targetWord}`, 'info');
           playDefeatSound(settings.soundEnabled);
@@ -1972,7 +1975,8 @@ export default function App() {
 
   // Handle Character keys typed on physical or virtual keyboard
   const onChar = (char: string) => {
-    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended';
+    const isAnyPlayerSolved = activeMatch ? Object.values(activeMatch.players).some((p: any) => p.won) : false;
+    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended' || isAnyPlayerSolved;
     if (gameStatus !== 'playing' || isValidating || localCompleted) return;
     const normalized = turkishUpper(char);
     if (currentAttempt.length < wordLength && /^[A-ZÇĞİÖŞÜ]$/i.test(normalized)) {
@@ -1983,7 +1987,8 @@ export default function App() {
 
   // Handle Backspace
   const onDelete = () => {
-    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended';
+    const isAnyPlayerSolved = activeMatch ? Object.values(activeMatch.players).some((p: any) => p.won) : false;
+    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended' || isAnyPlayerSolved;
     if (gameStatus !== 'playing' || isValidating || localCompleted) return;
     if (currentAttempt.length > 0) {
       playDeleteSound(settings.soundEnabled);
@@ -2270,7 +2275,21 @@ export default function App() {
   };
 
   const opponent = activeMatch ? Object.values(activeMatch.players).find(p => (p as any).name !== profile.name) as any : null;
-  const isMatchEnded = !!(activeMatch && activeMatch.status === 'ended');
+  const isMatchEnded = !!(activeMatch && (activeMatch.status === 'ended' || Object.values(activeMatch.players).some((p: any) => p.won)));
+
+  // Triggers when 1v1 match ends (isMatchEnded turns true) or when user exits a match, loading AdMob asynchronously in the background and freeing layout calculations
+  useEffect(() => {
+    if (isMatchEnded) {
+      console.log("1v1 Match ended. Executing layout freeze and scheduling background AdMob banner load.");
+      if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+        try {
+          (window as any).AndroidBridge.loadAdBackground();
+        } catch (e) {
+          console.error("Error calling native AndroidBridge.loadAdBackground:", e);
+        }
+      }
+    }
+  }, [isMatchEnded]);
 
   return (
     <div className={`h-screen max-h-screen overflow-hidden flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>

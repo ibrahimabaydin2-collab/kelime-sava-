@@ -40,6 +40,7 @@ interface Competitor {
   eliminated: boolean;
   speedFactor: number; // multiplier for action speeds
   targetSolveAttempt: number; // 1-6, or 0 if they fail to solve
+  kelime_bulundu_zamani?: number;
 }
 
 const TURKISH_BOTS = [
@@ -154,6 +155,8 @@ export default function GroupRace({
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const simulationRef = useRef<NodeJS.Timeout | null>(null);
+  const unsubRoomRef = useRef<(() => void) | null>(null);
+  const unsubPlayersRef = useRef<(() => void) | null>(null);
   const logContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Real-time log synchronization for other players and bots (Online & Offline)
@@ -529,6 +532,8 @@ export default function GroupRace({
       console.error("Firestore room snap error:", error);
     });
 
+    unsubRoomRef.current = unsubRoom;
+
     // 2. Listen to players subcollection
     const playersColRef = collection(db, 'rooms', roomId, 'players');
     const unsubPlayers = onSnapshot(playersColRef, (snapshot) => {
@@ -581,9 +586,17 @@ export default function GroupRace({
       console.error("Firestore players subcol snap error:", error);
     });
 
+    unsubPlayersRef.current = unsubPlayers;
+
     return () => {
-      unsubRoom();
-      unsubPlayers();
+      if (unsubRoomRef.current) {
+        unsubRoomRef.current();
+        unsubRoomRef.current = null;
+      }
+      if (unsubPlayersRef.current) {
+        unsubPlayersRef.current();
+        unsubPlayersRef.current = null;
+      }
     };
   }, [roomId, isOnlineMode, phase, isHost]);
 
@@ -633,7 +646,8 @@ export default function GroupRace({
         solvedRound: solved ? solvedRound : 0,
         solveTime: solved ? roundTimer : 0,
         currentAttempt: finalGuesses.length,
-        attemptsFeedback: finalGuesses.map(g => evaluateGuessLocally(g, targetWord))
+        attemptsFeedback: finalGuesses.map(g => evaluateGuessLocally(g, targetWord)),
+        kelime_bulundu_zamani: solved ? Date.now() : null
       });
 
       if (solved) {
@@ -641,7 +655,8 @@ export default function GroupRace({
         const roomRef = doc(db, 'rooms', roomId);
         await updateDoc(roomRef, {
           winnerId: profile.id,
-          status: 'ended'
+          status: 'ended',
+          kelime_bulundu_zamani: Date.now()
         });
       }
     } catch (err) {
@@ -676,7 +691,9 @@ export default function GroupRace({
         if (a.solved && !b.solved) return -1;
         if (!a.solved && b.solved) return 1;
         if (a.solved && b.solved) {
-          if (a.solvedRound !== b.solvedRound) return a.solvedRound - b.solvedRound;
+          if (a.kelime_bulundu_zamani && b.kelime_bulundu_zamani) {
+            return a.kelime_bulundu_zamani - b.kelime_bulundu_zamani;
+          }
           return b.solveTime - a.solveTime;
         }
         return b.currentAttempt - a.currentAttempt;
@@ -1015,7 +1032,8 @@ export default function GroupRace({
                 solvedRound: nextAttemptNum,
                 solveTime: currentTimer,
                 currentAttempt: nextAttemptNum,
-                attemptsFeedback: [...c.attemptsFeedback, feedback]
+                attemptsFeedback: [...c.attemptsFeedback, feedback],
+                kelime_bulundu_zamani: Date.now()
               });
             } else if (nextAttemptNum >= 6) {
               // Bot failed
@@ -1059,7 +1077,8 @@ export default function GroupRace({
                   solvedRound: nextAttemptNum,
                   solveTime: currentTimer,
                   currentAttempt: nextAttemptNum,
-                  attemptsFeedback: [...c.attemptsFeedback, feedback]
+                  attemptsFeedback: [...c.attemptsFeedback, feedback],
+                  kelime_bulundu_zamani: Date.now()
                 };
               } else if (nextAttemptNum >= 6) {
                 // Bot failed all attempts
@@ -1116,7 +1135,8 @@ export default function GroupRace({
           solvedRound: userSolved ? userGuesses.length : 0,
           solveTime: userSolved ? roundTimer : undefined,
           currentAttempt: userGuesses.length,
-          attemptsFeedback: userGuesses.map(g => evaluateGuessLocally(g, targetWord))
+          attemptsFeedback: userGuesses.map(g => evaluateGuessLocally(g, targetWord)),
+          kelime_bulundu_zamani: userSolved ? (updated[userCompIndex].kelime_bulundu_zamani || Date.now()) : undefined
         };
       }
 
@@ -1132,17 +1152,17 @@ export default function GroupRace({
       const roundParticipants = updated.filter(c => !c.eliminated);
       
       // Sort round participants
-      // 1. Solved: fewer attempts first, then more time remaining (higher solveTime) first
+      // 1. Solved: faster completion (lower kelime_bulundu_zamani or higher solveTime) first
       // 2. Unsolved: higher currentAttempt (more effort) first
       const sortedParticipants = [...roundParticipants].sort((a, b) => {
         if (a.solved && !b.solved) return -1;
         if (!a.solved && b.solved) return 1;
         
         if (a.solved && b.solved) {
-          if (a.solvedRound !== b.solvedRound) {
-            return a.solvedRound - b.solvedRound; // Less attempts wins
+          if (a.kelime_bulundu_zamani && b.kelime_bulundu_zamani) {
+            return a.kelime_bulundu_zamani - b.kelime_bulundu_zamani;
           }
-          return (b.solveTime || 0) - (a.solveTime || 0); // More seconds left wins
+          return (b.solveTime || 0) - (a.solveTime || 0);
         }
         
         // Neither solved
@@ -1371,8 +1391,52 @@ export default function GroupRace({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (simulationRef.current) clearInterval(simulationRef.current);
+      if (unsubRoomRef.current) {
+        unsubRoomRef.current();
+        unsubRoomRef.current = null;
+      }
+      if (unsubPlayersRef.current) {
+        unsubPlayersRef.current();
+        unsubPlayersRef.current = null;
+      }
     };
   }, []);
+
+  // Handle auto-cleanup and asynchronous background AdMob load on game end or transition
+  useEffect(() => {
+    if (phase === 'ended') {
+      console.log("GroupRace ended phase triggered. Detaching all Firestore listeners, stopping timers and loading ads in background.");
+      
+      // Stop all active timers and simulations immediately to stop sizing or UI redraws
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      if (simulationRef.current) {
+        clearInterval(simulationRef.current);
+        simulationRef.current = null;
+      }
+
+      // Detach all Firebase Snapshot Listeners
+      if (unsubRoomRef.current) {
+        unsubRoomRef.current();
+        unsubRoomRef.current = null;
+      }
+      if (unsubPlayersRef.current) {
+        unsubPlayersRef.current();
+        unsubPlayersRef.current = null;
+      }
+
+      // Completely asynchronous background AdMob loading via the native WebView JS interface
+      if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+        try {
+          (window as any).AndroidBridge.loadAdBackground();
+        } catch (e) {
+          console.error("Error calling native AndroidBridge.loadAdBackground:", e);
+        }
+      }
+    }
+  }, [phase]);
 
   // Filter survivors and eliminated
   const activeCompetitors = competitors.filter(c => !c.eliminated || c.isUser);
@@ -2166,7 +2230,9 @@ export default function GroupRace({
                 if (!a.solved && b.solved) return 1;
                 
                 if (a.solved && b.solved) {
-                  if (a.solvedRound !== b.solvedRound) return a.solvedRound - b.solvedRound;
+                  if (a.kelime_bulundu_zamani && b.kelime_bulundu_zamani) {
+                    return a.kelime_bulundu_zamani - b.kelime_bulundu_zamani;
+                  }
                   return (b.solveTime || 0) - (a.solveTime || 0);
                 }
                 return b.currentAttempt - a.currentAttempt;

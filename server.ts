@@ -996,7 +996,7 @@ const setupWebSocket = (server: any) => {
           }
 
           case 'game_update': {
-            const { matchId, attempts, currentAttempt, completed, won, score, timeRemaining } = data;
+            const { matchId, attempts, currentAttempt, completed, won, score, timeRemaining, kelime_bulundu_zamani } = data;
             const match = matches.get(matchId);
 
             if (match && match.status === 'playing') {
@@ -1008,6 +1008,9 @@ const setupWebSocket = (server: any) => {
                 player.won = won;
                 player.score = score;
                 player.timeRemaining = timeRemaining;
+                if (won) {
+                  (player as any).kelime_bulundu_zamani = kelime_bulundu_zamani || Date.now();
+                }
 
                 // Sync update with opponent
                 const opponentId = Object.keys(match.players).find(id => id !== playerId);
@@ -1024,7 +1027,8 @@ const setupWebSocket = (server: any) => {
                         completed,
                         won,
                         score,
-                        timeRemaining
+                        timeRemaining,
+                        kelime_bulundu_zamani: won ? (kelime_bulundu_zamani || Date.now()) : null
                       },
                       roundsWon: match.roundsWon || { [playerId]: 0, [opponentId]: 0 }
                     }));
@@ -1047,13 +1051,15 @@ const setupWebSocket = (server: any) => {
                   match.roundsWon[playerId] = (match.roundsWon[playerId] || 0) + 1;
                   match.status = 'ended';
                   match.winnerId = playerId;
+                  (match as any).kelime_bulundu_zamani = kelime_bulundu_zamani || Date.now();
 
                   const endPayload = JSON.stringify({
                     type: 'match_end',
                     matchId,
                     winnerId: playerId,
                     roundsWon: match.roundsWon,
-                    players: match.players
+                    players: match.players,
+                    kelime_bulundu_zamani: (match as any).kelime_bulundu_zamani
                   });
 
                   // Notify both players and reset statuses to idle
