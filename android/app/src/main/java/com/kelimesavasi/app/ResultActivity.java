@@ -7,6 +7,13 @@ import android.widget.Button;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FirebaseFirestore;
+import java.util.HashMap;
+
 public class ResultActivity extends AppCompatActivity {
 
     private TextView tvTargetWord;
@@ -20,6 +27,7 @@ public class ResultActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ImmersiveModeHelper.enableImmersiveMode(this);
         setContentView(R.layout.activity_result);
 
         tvTargetWord = findViewById(R.id.tv_result_target_word);
@@ -66,6 +74,25 @@ public class ResultActivity extends AppCompatActivity {
         btnBackToMenu.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                // Clear the old room/match ID and player's matchmaking/playing state in the database and locally
+                try {
+                    FirebaseAuth auth = FirebaseAuth.getInstance();
+                    FirebaseUser currentUser = auth.getCurrentUser();
+                    if (currentUser != null) {
+                        FirebaseFirestore db = FirebaseFirestore.getInstance(FirebaseApp.getInstance(), "ai-studio-kelimesava-50aadbd1-03ed-4d0c-9769-866981f84d1c");
+                        DocumentReference userRef = db.collection("users").document(currentUser.getUid());
+                        HashMap<String, Object> updates = new HashMap<>();
+                        updates.put("roomId", null);
+                        updates.put("activeRoomId", null);
+                        updates.put("isPlaying", false);
+                        updates.put("isInRoom", false);
+                        updates.put("matchmakingStatus", "idle");
+                        userRef.update(updates);
+                    }
+                } catch (Exception e) {
+                    android.util.Log.e("ResultActivity", "Failed to clear room status in Firestore: " + e.getMessage());
+                }
+
                 // Return to MainActivity cleanly and reset game state in WebView
                 Intent intent = new Intent(ResultActivity.this, MainActivity.class);
                 intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -78,12 +105,44 @@ public class ResultActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        super.onBackPressed();
+        // Clear the old room/match ID and player's matchmaking/playing state in the database and locally on back pressed
+        try {
+            FirebaseAuth auth = FirebaseAuth.getInstance();
+            FirebaseUser currentUser = auth.getCurrentUser();
+            if (currentUser != null) {
+                FirebaseFirestore db = FirebaseFirestore.getInstance(FirebaseApp.getInstance(), "ai-studio-kelimesava-50aadbd1-03ed-4d0c-9769-866981f84d1c");
+                DocumentReference userRef = db.collection("users").document(currentUser.getUid());
+                HashMap<String, Object> updates = new HashMap<>();
+                updates.put("roomId", null);
+                updates.put("activeRoomId", null);
+                updates.put("isPlaying", false);
+                updates.put("isInRoom", false);
+                updates.put("matchmakingStatus", "idle");
+                userRef.update(updates);
+            }
+        } catch (Exception e) {
+            android.util.Log.e("ResultActivity", "Failed to clear room status on back press in Firestore: " + e.getMessage());
+        }
+
         // Go back to main activity on system back press and reset game state in WebView
         Intent intent = new Intent(ResultActivity.this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         intent.putExtra("RESET_TO_MENU", true);
         startActivity(intent);
         finish();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        ImmersiveModeHelper.enableImmersiveMode(this);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            ImmersiveModeHelper.enableImmersiveMode(this);
+        }
     }
 }

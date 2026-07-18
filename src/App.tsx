@@ -1340,6 +1340,7 @@ export default function App() {
       setIsDailyPuzzle(false);
       setActiveMatch(null);
       setGameStatus('idle');
+      setMatchmakingStatus('idle');
       setAttempts([]);
       setCurrentAttempt('');
       setSecondsLeft(20);

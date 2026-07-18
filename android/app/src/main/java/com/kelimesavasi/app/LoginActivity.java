@@ -52,6 +52,7 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ImmersiveModeHelper.enableImmersiveMode(this);
         
         // Safe dynamic Firebase initialization
         initializeFirebaseSafely();
@@ -313,5 +314,19 @@ public class LoginActivity extends AppCompatActivity {
         btnGuestLogin.setEnabled(enabled);
         btnSocialLogin.setEnabled(enabled);
         btnEmailLogin.setEnabled(enabled);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        ImmersiveModeHelper.enableImmersiveMode(this);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            ImmersiveModeHelper.enableImmersiveMode(this);
+        }
     }
 }

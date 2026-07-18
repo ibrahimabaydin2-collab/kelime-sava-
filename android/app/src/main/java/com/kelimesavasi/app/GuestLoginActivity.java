@@ -42,6 +42,7 @@ public class GuestLoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ImmersiveModeHelper.enableImmersiveMode(this);
         setContentView(R.layout.activity_guest_login);
 
         // Safe dynamic Firebase initializer
@@ -220,5 +221,19 @@ public class GuestLoginActivity extends AppCompatActivity {
                     ).show();
                 }
             });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        ImmersiveModeHelper.enableImmersiveMode(this);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            ImmersiveModeHelper.enableImmersiveMode(this);
+        }
     }
 }

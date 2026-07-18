@@ -19,6 +19,7 @@ public class SplashActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ImmersiveModeHelper.enableImmersiveMode(this);
         setContentView(R.layout.activity_splash);
 
         tvLoadingStatus = findViewById(R.id.splash_loading_text);
@@ -87,5 +88,19 @@ public class SplashActivity extends AppCompatActivity {
             startActivity(intent);
         }
         finish();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        ImmersiveModeHelper.enableImmersiveMode(this);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            ImmersiveModeHelper.enableImmersiveMode(this);
+        }
     }
 }

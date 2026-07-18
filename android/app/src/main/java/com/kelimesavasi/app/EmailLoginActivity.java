@@ -47,6 +47,7 @@ public class EmailLoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ImmersiveModeHelper.enableImmersiveMode(this);
         setContentView(R.layout.activity_email_login);
 
         // Safe dynamic Firebase initializer
@@ -331,5 +332,19 @@ public class EmailLoginActivity extends AppCompatActivity {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        ImmersiveModeHelper.enableImmersiveMode(this);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            ImmersiveModeHelper.enableImmersiveMode(this);
+        }
     }
 }

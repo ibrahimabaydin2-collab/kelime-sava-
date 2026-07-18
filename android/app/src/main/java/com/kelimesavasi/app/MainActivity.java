@@ -23,6 +23,9 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Enable full screen sticky immersive mode immediately
+        ImmersiveModeHelper.enableImmersiveMode(this);
+
         // Set our custom layout
         setContentView(R.layout.activity_main);
 
@@ -165,6 +168,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
+        ImmersiveModeHelper.enableImmersiveMode(this);
         if (mAdViewTop != null) {
             mAdViewTop.resume();
         }
@@ -184,6 +188,14 @@ public class MainActivity extends BridgeActivity {
                     mWebView.evaluateJavascript("javascript:if(window.anaMenuyeDon){window.anaMenuyeDon();}", null);
                 });
             }
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            ImmersiveModeHelper.enableImmersiveMode(this);
         }
     }
 
