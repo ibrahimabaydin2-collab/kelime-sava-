@@ -56,6 +56,25 @@ public class MainActivity extends BridgeActivity {
                         loadBannersAsync();
                     }, 120); // Safe delay to let active UI transition completely finalize
                 }
+
+                @android.webkit.JavascriptInterface
+                public void redirectToResultActivity(String winnerId, String winnerName, int winnerScore, String loserId, String loserName, int loserScore, String word) {
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        try {
+                            android.content.Intent intent = new android.content.Intent(MainActivity.this, ResultActivity.class);
+                            intent.putExtra("WINNER_ID", winnerId);
+                            intent.putExtra("WINNER_NAME", winnerName);
+                            intent.putExtra("WINNER_SCORE", winnerScore);
+                            intent.putExtra("LOSER_ID", loserId);
+                            intent.putExtra("LOSER_NAME", loserName);
+                            intent.putExtra("LOSER_SCORE", loserScore);
+                            intent.putExtra("TARGET_WORD", word);
+                            MainActivity.this.startActivity(intent);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    });
+                }
             }, "AndroidBridge");
         }
 

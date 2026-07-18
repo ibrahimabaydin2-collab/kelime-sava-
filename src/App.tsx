@@ -2008,6 +2008,7 @@ export default function App() {
   const onCharRef = useRef(onChar);
   const onDeleteRef = useRef(onDelete);
   const submitGuessRef = useRef(submitGuess);
+  const isMatchEndedRef = useRef(false);
 
   useEffect(() => {
     currentAttemptRef.current = currentAttempt;
@@ -2021,6 +2022,7 @@ export default function App() {
     onCharRef.current = onChar;
     onDeleteRef.current = onDelete;
     submitGuessRef.current = submitGuess;
+    isMatchEndedRef.current = isMatchEnded;
   });
 
   // Bind physical keyboard listeners exactly once on mount to prevent double keypresses and WebView input lag
@@ -2035,7 +2037,8 @@ export default function App() {
         showLobbyModalRef.current ||
         showCongratsModalRef.current ||
         gameStatusRef.current !== 'playing' ||
-        isValidatingRef.current
+        isValidatingRef.current ||
+        isMatchEndedRef.current
       ) {
         return;
       }
@@ -2279,17 +2282,83 @@ export default function App() {
 
   // Triggers when 1v1 match ends (isMatchEnded turns true) or when user exits a match, loading AdMob asynchronously in the background and freeing layout calculations
   useEffect(() => {
-    if (isMatchEnded) {
+    if (isMatchEnded && activeMatch) {
       console.log("1v1 Match ended. Executing layout freeze and scheduling background AdMob banner load.");
+      
+      // Force block game input states immediately
+      setGameStatus('idle');
+
+      // Identify Winner & Loser
+      const playersList = Object.entries(activeMatch.players);
+      let winnerId = '';
+      let winnerName = 'Bilinmeyen Oyuncu';
+      let winnerScore = 0;
+      let loserId = '';
+      let loserName = 'Bilinmeyen Oyuncu';
+      let loserScore = 0;
+
+      const winnerEntry = playersList.find(([_, pState]: [string, any]) => pState.won);
+      if (winnerEntry) {
+        winnerId = winnerEntry[0];
+        winnerName = winnerEntry[1].name || 'Oyuncu';
+        winnerScore = winnerEntry[1].score || 0;
+
+        const loserEntry = playersList.find(([pId, _]: [string, any]) => pId !== winnerId);
+        if (loserEntry) {
+          loserId = loserEntry[0];
+          loserName = loserEntry[1].name || 'Oyuncu';
+          loserScore = loserEntry[1].score || 0;
+        }
+      } else if (activeMatch.winnerId && activeMatch.winnerId !== 'draw') {
+        winnerId = activeMatch.winnerId;
+        const winnerPlayer = activeMatch.players[winnerId];
+        if (winnerPlayer) {
+          winnerName = winnerPlayer.name || 'Oyuncu';
+          winnerScore = winnerPlayer.score || 0;
+        }
+
+        const loserEntry = playersList.find(([pId, _]: [string, any]) => pId !== winnerId);
+        if (loserEntry) {
+          loserId = loserEntry[0];
+          loserName = loserEntry[1].name || 'Oyuncu';
+          loserScore = loserEntry[1].score || 0;
+        }
+      } else {
+        // Fallback or Tie
+        const sorted = [...playersList].sort((a: any, b: any) => (b[1].score || 0) - (a[1].score || 0));
+        if (sorted[0]) {
+          winnerId = sorted[0][0];
+          winnerName = sorted[0][1].name || 'Oyuncu';
+          winnerScore = sorted[0][1].score || 0;
+        }
+        if (sorted[1]) {
+          loserId = sorted[1][0];
+          loserName = sorted[1][1].name || 'Oyuncu';
+          loserScore = sorted[1][1].score || 0;
+        }
+      }
+
       if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
         try {
           (window as any).AndroidBridge.loadAdBackground();
+          if ((window as any).AndroidBridge.redirectToResultActivity) {
+            console.log("Directing both players to native ResultActivity...");
+            (window as any).AndroidBridge.redirectToResultActivity(
+              winnerId,
+              winnerName,
+              winnerScore,
+              loserId,
+              loserName,
+              loserScore,
+              activeMatch.targetWord || ''
+            );
+          }
         } catch (e) {
-          console.error("Error calling native AndroidBridge.loadAdBackground:", e);
+          console.error("Error calling native AndroidBridge:", e);
         }
       }
     }
-  }, [isMatchEnded]);
+  }, [isMatchEnded, activeMatch]);
 
   return (
     <div className={`h-screen max-h-screen overflow-hidden flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
@@ -2565,6 +2634,14 @@ export default function App() {
           {/* Subtle atmospheric ambient glow inside the card */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
+
+          {isMatchEnded && (
+            <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+              <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4" />
+              <h2 className="text-xl font-black text-white tracking-wide mb-2 uppercase">DÜELLO TAMAMLANDI!</h2>
+              <p className="text-xs text-slate-400">Sonuç ekranına güvenli bir şekilde yönlendiriliyorsunuz...</p>
+            </div>
+          )}
 
           {/* Top Timer & Attempts Tracker */}
           {!isMatchEnded && (
