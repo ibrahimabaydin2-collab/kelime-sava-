@@ -13,7 +13,7 @@
         android:layout_width="0dp"
         android:layout_height="50dp"
         ads:adSize="BANNER"
-        ads:adUnitId="ca-app-pub-1284519280145258/1638549372"
+        ads:adUnitId="ca-app-pub-1284515268865249/2035597391"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
@@ -34,7 +34,7 @@
         android:layout_width="0dp"
         android:layout_height="50dp"
         ads:adSize="BANNER"
-        ads:adUnitId="ca-app-pub-1284519280145258/9871650431"
+        ads:adUnitId="ca-app-pub-1284515268865249/5480586606"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
