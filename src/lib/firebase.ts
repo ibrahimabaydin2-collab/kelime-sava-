@@ -34,7 +34,8 @@ import {
   where,
   getDocs,
   limit,
-  getDocFromServer
+  getDocFromServer,
+  updateDoc
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { UserProfile } from '../types.js';
@@ -298,6 +299,42 @@ export async function saveUserProfileToFirestore(profile: UserProfile): Promise<
   } catch (error) {
     console.error('Failed to save user profile:', error);
     handleFirestoreError(error, OperationType.WRITE, `users/${profile.id}`);
+  }
+}
+
+/**
+ * Resets/Clears user matchmaking and room statuses in Firestore cleanly
+ */
+export async function clearMatchmakingState(uid: string): Promise<void> {
+  if (!uid) return;
+  const userDocRef = doc(db, 'users', uid);
+  try {
+    await updateDoc(userDocRef, {
+      roomId: null,
+      activeRoomId: null,
+      isPlaying: false,
+      isInRoom: false,
+      isSearching: false,
+      matchmakingStatus: 'idle',
+      lastUpdated: new Date().toISOString()
+    });
+    console.log('Successfully cleared matchmaking state in Firestore for:', uid);
+  } catch (error) {
+    console.warn('Failed to clear matchmaking state in Firestore via updateDoc, trying merge:', error);
+    try {
+      await setDoc(userDocRef, {
+        roomId: null,
+        activeRoomId: null,
+        isPlaying: false,
+        isInRoom: false,
+        isSearching: false,
+        matchmakingStatus: 'idle',
+        lastUpdated: new Date().toISOString()
+      }, { merge: true });
+      console.log('Successfully cleared matchmaking state in Firestore via setDoc merge for:', uid);
+    } catch (fallbackError) {
+      console.error('Fallback clear matchmaking state failed:', fallbackError);
+    }
   }
 }
 

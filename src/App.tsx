@@ -21,7 +21,7 @@ import WelcomeScreen from './components/WelcomeScreen.js';
 import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import AuthScreen from './components/AuthScreen.js';
 import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
-import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser, fetchUserProfileByDeviceId, deleteUserProfile, signInAsGuest } from './lib/firebase.js';
+import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser, fetchUserProfileByDeviceId, deleteUserProfile, signInAsGuest, clearMatchmakingState } from './lib/firebase.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play, Home } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './data/wordlist.js';
@@ -615,6 +615,7 @@ export default function App() {
   const socketRef = useRef<WebSocket | null>(null);
   const wasOnlineRef = useRef<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingMatchmakingRef = useRef<number | null>(null);
 
   const handleManualReconnect = () => {
     showToast('Sunucuya yeniden bağlanılıyor...', 'info');
@@ -893,6 +894,19 @@ export default function App() {
           name: profile.name,
           avatarUrl: profile.avatarUrl
         }));
+
+        // If there is a pending matchmaking start, trigger it on this brand new clean socket
+        if (pendingMatchmakingRef.current !== null) {
+          const matchWordsCount = pendingMatchmakingRef.current;
+          pendingMatchmakingRef.current = null;
+          console.log(`Auto-triggering pending matchmaking join on new connection for ${wordLength} letters, ${matchWordsCount} words.`);
+          ws.send(JSON.stringify({
+            type: 'join_matchmaking',
+            wordLength,
+            matchWordsCount
+          }));
+          setMatchmakingStatus('queued');
+        }
 
         // Heartbeat to keep connection alive on serverless platforms (Cloud Run)
         if (pingInterval) clearInterval(pingInterval);
@@ -1334,7 +1348,7 @@ export default function App() {
       console.log('Android Native integration triggered: yeniKelimeyeBasla');
       startNewGame(wordLength);
     };
-    (window as any).anaMenuyeDon = () => {
+    (window as any).anaMenuyeDon = async () => {
       console.log('Android Native integration triggered: anaMenuyeDon');
       setHasEnteredGame(false);
       setIsDailyPuzzle(false);
@@ -1345,14 +1359,33 @@ export default function App() {
       setCurrentAttempt('');
       setSecondsLeft(20);
       setShowCongratsModal(false);
+      pendingMatchmakingRef.current = null;
+
+      // 1. Detach old socket listeners to prevent any interference
       if (socketRef.current) {
         try {
+          socketRef.current.onopen = null;
+          socketRef.current.onmessage = null;
+          socketRef.current.onerror = null;
+          socketRef.current.onclose = null;
           socketRef.current.close();
         } catch (e) {
           console.error("Error closing socket in anaMenuyeDon:", e);
         }
         socketRef.current = null;
       }
+
+      // 2. Perform database cleanup asynchronously to clear active states in Firestore
+      try {
+        if (profile && profile.id) {
+          await clearMatchmakingState(profile.id);
+        }
+      } catch (err) {
+        console.warn('Database cleanup failed in anaMenuyeDon:', err);
+      }
+
+      // 3. Trigger a clean WebSocket reconnect for future menu features / lobby
+      setReconnectCounter((prev) => prev + 1);
     };
     return () => {
       delete (window as any).yeniKelimeyeBasla;
@@ -2180,7 +2213,7 @@ export default function App() {
     }
   };
 
-  const handleLeaveMatch = () => {
+  const handleLeaveMatch = async () => {
     if (activeMatch && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
         type: 'leave_match',
@@ -2188,28 +2221,107 @@ export default function App() {
       }));
     }
     setActiveMatch(null);
+    setHasEnteredGame(false);
     startNewGame(wordLength);
+
+    // Clean up matchmaking and room states in Firestore
+    try {
+      if (profile && profile.id) {
+        await clearMatchmakingState(profile.id);
+      }
+    } catch (err) {
+      console.warn('Database cleanup failed in handleLeaveMatch:', err);
+    }
   };
 
-  const handleStartMatchmaking = (matchWordsCount?: number) => {
+  const handleLeaveMatchToMenu = async () => {
+    setActiveMatch(null);
+    setHasEnteredGame(false);
+    setShowLobbyModal(false);
+    setMatchmakingStatus('idle');
+    pendingMatchmakingRef.current = null;
+
+    // Detach old socket listeners to prevent any interference
+    if (socketRef.current) {
+      try {
+        socketRef.current.onopen = null;
+        socketRef.current.onmessage = null;
+        socketRef.current.onerror = null;
+        socketRef.current.onclose = null;
+        socketRef.current.close();
+      } catch (e) {
+        console.error("Error closing socket in handleLeaveMatchToMenu:", e);
+      }
+      socketRef.current = null;
+    }
+
+    // Clean up matchmaking and room states in Firestore
+    try {
+      if (profile && profile.id) {
+        await clearMatchmakingState(profile.id);
+      }
+    } catch (err) {
+      console.warn('Database cleanup failed in handleLeaveMatchToMenu:', err);
+    }
+
+    // Reconnect cleanly to have lobby features active on the menu
+    setReconnectCounter((prev) => prev + 1);
+  };
+
+  const handleStartMatchmaking = async (matchWordsCount?: number) => {
     if (!isOnline) {
       showToast('Kuyruğa girmek için sunucuya bağlı olmalısınız. Lütfen bekleyin veya çevrimdışı modu oynayın.', 'error');
       return;
     }
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      if (matchmakingStatus === 'queued') {
+
+    if (matchmakingStatus === 'queued') {
+      // User is cancelling matchmaking, let's leave.
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
         socketRef.current.send(JSON.stringify({
           type: 'leave_matchmaking'
         }));
-        setMatchmakingStatus('idle');
-      } else {
-        socketRef.current.send(JSON.stringify({
-          type: 'join_matchmaking',
-          wordLength,
-          matchWordsCount: matchWordsCount || 1
-        }));
       }
+      setMatchmakingStatus('idle');
+      pendingMatchmakingRef.current = null;
+      return;
     }
+
+    // 1. Temizlik/Sıfırlama Aşaması (Cleanup/Reset Phase)
+    // Clear local matchmaking statuses first
+    setMatchmakingStatus('idle');
+    setActiveMatch(null);
+    pendingMatchmakingRef.current = matchWordsCount || 1;
+
+    // Asynchronously clear player's matchmaking status/room details on Firestore database and wait for completion.
+    try {
+      console.log('Matchmaking start requested. Executing full async database and local cleanup...');
+      if (profile && profile.id) {
+        await clearMatchmakingState(profile.id);
+      }
+    } catch (dbError) {
+      console.warn('Non-blocking db cleanup error before starting matchmaking:', dbError);
+    }
+
+    // 2. Temiz Başlangıç & 3. Dinleyicileri Kaldırma (Clean Start & Detach Listeners)
+    // To ensure old data streams or listener hooks do not sabotage the new match/search, we fully close and dispose
+    // of the old socket connection, stripping all callback listeners first.
+    console.log('Detaching all previous socket listeners and establishing a 0-kilometer connection...');
+    if (socketRef.current) {
+      try {
+        socketRef.current.onopen = null;
+        socketRef.current.onmessage = null;
+        socketRef.current.onerror = null;
+        socketRef.current.onclose = null;
+        socketRef.current.close();
+      } catch (e) {
+        // ignore
+      }
+      socketRef.current = null;
+    }
+
+    // Triggering reconnectCounter forces the useEffect dependency to rebuild a fresh, clean-slate WebSocket.
+    // The ws.onopen callback inside that fresh connection will handle the actual matchmaking join trigger perfectly!
+    setReconnectCounter((prev) => prev + 1);
   };
 
   const syncDailyPuzzleProgress = async (updatedAttempts: GameAttempt[], solved: boolean, failed: boolean) => {
@@ -3055,8 +3167,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       playClickSound(settings.soundEnabled);
-                      setActiveMatch(null);
-                      setHasEnteredGame(false);
+                      handleLeaveMatchToMenu();
                     }}
                     className="bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-[#FAF6E9] font-black text-xs py-2 px-3 rounded-xl shadow-md transition-all uppercase tracking-widest cursor-pointer flex items-center justify-center gap-1.5 border border-white/5"
                     id="match-back-btn"
@@ -3068,9 +3179,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       playClickSound(settings.soundEnabled);
-                      setActiveMatch(null);
-                      setHasEnteredGame(false);
-                      setShowLobbyModal(false);
+                      handleLeaveMatchToMenu();
                     }}
                     className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] text-[#2E3748] font-black text-xs py-2 px-3 rounded-xl shadow-md transition-all uppercase tracking-widest cursor-pointer flex items-center justify-center gap-1.5"
                     id="match-home-btn"
