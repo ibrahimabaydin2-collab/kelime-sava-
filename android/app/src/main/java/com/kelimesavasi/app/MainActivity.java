@@ -18,6 +18,7 @@ public class MainActivity extends BridgeActivity {
     private AdView mAdViewBottom;
     private WebView mWebView;
     private boolean mAdsInitialized = false;
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -55,14 +56,118 @@ public class MainActivity extends BridgeActivity {
             mWebView.addJavascriptInterface(new Object() {
                 @android.webkit.JavascriptInterface
                 public void loadAdBackground() {
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    mHandler.postDelayed(() -> {
                         loadBannersAsync();
                     }, 120); // Safe delay to let active UI transition completely finalize
                 }
 
                 @android.webkit.JavascriptInterface
+                public void preventAdLayoutLoops() {
+                    mHandler.post(() -> {
+                        try {
+                            android.util.Log.d("MainActivity", "Solo game over/reset: Stabilizing AdViews and disabling layout listeners to prevent flickering");
+                            if (mAdViewTop != null) {
+                                mAdViewTop.clearFocus();
+                                mAdViewTop.clearAnimation();
+                                
+                                // Lock layout height strictly to 50dp in pixels
+                                ViewGroup.LayoutParams params = mAdViewTop.getLayoutParams();
+                                if (params != null) {
+                                    int heightPx = (int) (50 * MainActivity.this.getResources().getDisplayMetrics().density);
+                                    params.height = heightPx;
+                                    mAdViewTop.setLayoutParams(params);
+                                }
+                            }
+                            if (mAdViewBottom != null) {
+                                mAdViewBottom.clearFocus();
+                                mAdViewBottom.clearAnimation();
+                                
+                                ViewGroup.LayoutParams params = mAdViewBottom.getLayoutParams();
+                                if (params != null) {
+                                    int heightPx = (int) (50 * MainActivity.this.getResources().getDisplayMetrics().density);
+                                    params.height = heightPx;
+                                    mAdViewBottom.setLayoutParams(params);
+                                }
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    });
+                }
+
+                @android.webkit.JavascriptInterface
+                public void onSoloGameReset() {
+                    mHandler.post(() -> {
+                        try {
+                            android.util.Log.d("MainActivity", "Solo game reset triggered: pausing AdViews to reduce UI Thread load");
+                            if (mAdViewTop != null) {
+                                mAdViewTop.pause();
+                            }
+                            if (mAdViewBottom != null) {
+                                mAdViewBottom.pause();
+                            }
+
+                            // Small delay to let the WebView UI stabilize, then resume drawing engine
+                            mHandler.postDelayed(() -> {
+                                try {
+                                    if (mAdViewTop != null) {
+                                        mAdViewTop.resume();
+                                    }
+                                    if (mAdViewBottom != null) {
+                                        mAdViewBottom.resume();
+                                    }
+                                    android.util.Log.d("MainActivity", "Resumed AdViews after game reset stabilization");
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }, 150);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    });
+                }
+
+                @android.webkit.JavascriptInterface
+                public void saveDailyPuzzleStatus(String dateStr, boolean completed) {
+                    mHandler.post(() -> {
+                        try {
+                            android.content.SharedPreferences prefs = MainActivity.this.getSharedPreferences("DailyPuzzlePrefs", android.content.Context.MODE_PRIVATE);
+                            android.content.SharedPreferences.Editor editor = prefs.edit();
+                            editor.putString("last_played_date", dateStr);
+                            editor.putBoolean("is_daily_completed", completed);
+                            editor.apply();
+                            android.util.Log.d("MainActivity", "Saved daily puzzle status to SharedPreferences: " + dateStr + ", completed: " + completed);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    });
+                }
+
+                @android.webkit.JavascriptInterface
+                public String getDailyPuzzleLastPlayedDate() {
+                    try {
+                        android.content.SharedPreferences prefs = MainActivity.this.getSharedPreferences("DailyPuzzlePrefs", android.content.Context.MODE_PRIVATE);
+                        return prefs.getString("last_played_date", "");
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        return "";
+                    }
+                }
+
+                @android.webkit.JavascriptInterface
+                public boolean getDailyPuzzleIsCompleted() {
+                    try {
+                        android.content.SharedPreferences prefs = MainActivity.this.getSharedPreferences("DailyPuzzlePrefs", android.content.Context.MODE_PRIVATE);
+                        return prefs.getBoolean("is_daily_completed", false);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        return false;
+                    }
+                }
+
+                @android.webkit.JavascriptInterface
                 public void redirectToResultActivity(String winnerId, String winnerName, int winnerScore, String loserId, String loserName, int loserScore, String word, boolean isWinner) {
-                    new Handler(Looper.getMainLooper()).post(() -> {
+                    mHandler.post(() -> {
                         try {
                             android.content.Intent intent = new android.content.Intent(MainActivity.this, ResultActivity.class);
                             intent.putExtra("WINNER_ID", winnerId);
@@ -94,7 +199,7 @@ public class MainActivity extends BridgeActivity {
         mAdViewBottom = findViewById(R.id.alt_banner);
 
         // Defer AdMob initialization to a background handler to ensure the main UI rendering thread is completely untouched and free of latency
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+        mHandler.postDelayed(() -> {
             try {
                 // Initialize Google Mobile Ads SDK asynchronously
                 MobileAds.initialize(MainActivity.this, initializationStatus -> {
@@ -116,7 +221,7 @@ public class MainActivity extends BridgeActivity {
         
         // Dispatches the loading task entirely as an asynchronous post message on the Main Looper
         // This ensures the main UI thread continues rendering current frames at 60/120Hz without hitching
-        new Handler(Looper.getMainLooper()).post(() -> {
+        mHandler.post(() -> {
             try {
                 if (mAdsInitialized) {
                     AdRequest adRequest = new AdRequest.Builder().build();
@@ -141,20 +246,33 @@ public class MainActivity extends BridgeActivity {
         if (mAdViewBottom != null) {
             mAdViewBottom.pause();
         }
+        
+        // Remove all callbacks from our activity's handler to release CPU and Render Thread completely
+        mHandler.removeCallbacksAndMessages(null);
+        
         // Pause WebView JS execution, CSS transitions, and Web Audio context
         if (mWebView != null) {
-            mWebView.onPause();
-            mWebView.pauseTimers();
+            try {
+                mWebView.onPause();
+                mWebView.pauseTimers();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
         super.onPause();
     }
 
     @Override
     public void onStop() {
+        mHandler.removeCallbacksAndMessages(null);
         // Ensure web view is paused when the activity is stopped
         if (mWebView != null) {
-            mWebView.onPause();
-            mWebView.pauseTimers();
+            try {
+                mWebView.onPause();
+                mWebView.pauseTimers();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
         super.onStop();
     }
@@ -177,8 +295,12 @@ public class MainActivity extends BridgeActivity {
         }
         // Resume WebView JS execution, CSS transitions, and Web Audio context
         if (mWebView != null) {
-            mWebView.onResume();
-            mWebView.resumeTimers();
+            try {
+                mWebView.onResume();
+                mWebView.resumeTimers();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
             // Check if we need to reset the game state to welcome/menu screen
             android.content.Intent intent = getIntent();
@@ -201,11 +323,39 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
+        mHandler.removeCallbacksAndMessages(null);
         if (mAdViewTop != null) {
-            mAdViewTop.destroy();
+            try {
+                mAdViewTop.destroy();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            mAdViewTop = null;
         }
         if (mAdViewBottom != null) {
-            mAdViewBottom.destroy();
+            try {
+                mAdViewBottom.destroy();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            mAdViewBottom = null;
+        }
+        
+        // Deep release of WebView & Hardware accelerated layers to free up graphics processor and memory leaks
+        if (mWebView != null) {
+            try {
+                mWebView.setWebChromeClient(null);
+                mWebView.setWebViewClient(null);
+                mWebView.removeJavascriptInterface("AndroidBridge");
+                mWebView.clearHistory();
+                mWebView.clearCache(true);
+                mWebView.loadUrl("about:blank");
+                mWebView.freeMemory();
+                mWebView.destroy();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            mWebView = null;
         }
         super.onDestroy();
     }

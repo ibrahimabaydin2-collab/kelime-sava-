@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import {
   playClickSound,
@@ -417,6 +417,25 @@ export default function App() {
   // Game Play State
   const [wordLength, setWordLength] = useState<number>(5);
   const [isDailyPuzzle, setIsDailyPuzzle] = useState<boolean>(false);
+  const [isDailyPuzzleCompletedToday, setIsDailyPuzzleCompletedToday] = useState<boolean>(() => {
+    const todayDateStr = getDailyWordAndLength().dateStr;
+    const localCompleted = safeLocalStorage.getItem('kelimesavasi_daily_completed_date') === todayDateStr ||
+                           safeLocalStorage.getItem('last_played_date') === todayDateStr;
+    
+    // Check AndroidBridge SharedPreferences if running in hybrid app
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.getDailyPuzzleLastPlayedDate) {
+      try {
+        const nativeDate = (window as any).AndroidBridge.getDailyPuzzleLastPlayedDate();
+        const nativeCompleted = (window as any).AndroidBridge.getDailyPuzzleIsCompleted();
+        if (nativeDate === todayDateStr && nativeCompleted) {
+          return true;
+        }
+      } catch (e) {
+        console.error("Error reading native SharedPreferences for daily puzzle status:", e);
+      }
+    }
+    return localCompleted;
+  });
   const [targetWord, setTargetWord] = useState<string>('');
   const [attempts, setAttempts] = useState<GameAttempt[]>([]);
   const [currentAttempt, setCurrentAttempt] = useState<string>('');
@@ -512,6 +531,36 @@ export default function App() {
     
     safeLocalStorage.setItem('kelimesavasi_last_active_time', new Date().toISOString());
   }, [settings.notificationEnabled]);
+
+  // Load Daily Puzzle completion status from database on app start or when deviceId becomes available
+  useEffect(() => {
+    if (!deviceId) return;
+    const checkDailyStatusOnStart = async () => {
+      try {
+        const response = await fetch(`/api/daily-puzzle?deviceId=${encodeURIComponent(deviceId)}`);
+        if (response.ok) {
+          const data = await response.json();
+          const todayDateStr = getDailyWordAndLength().dateStr;
+          if (data.solved || data.failed) {
+            safeLocalStorage.setItem('kelimesavasi_daily_completed_date', todayDateStr);
+            safeLocalStorage.setItem('last_played_date', todayDateStr);
+            safeLocalStorage.setItem('is_daily_completed', 'true');
+            if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.saveDailyPuzzleStatus) {
+              try {
+                (window as any).AndroidBridge.saveDailyPuzzleStatus(todayDateStr, true);
+              } catch (e) {
+                console.error(e);
+              }
+            }
+            setIsDailyPuzzleCompletedToday(true);
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching initial daily puzzle status:', e);
+      }
+    };
+    checkDailyStatusOnStart();
+  }, [deviceId]);
 
   // Manage app background / foreground state (visibility change, focus/blur)
   useEffect(() => {
@@ -1294,6 +1343,17 @@ export default function App() {
     // 2. Ekrandaki harf kutularının içindeki text'leri temizler ve CSS renk sınıflarını (yeşil/sarı/gri) kaldırır
     // (attempts array'i ve currentAttempt temizlendiğinde React GameBoard component'i otomatik olarak her şeyi varsayılana sıfırlar)
     
+    // Optimize AdMob Banner layouts and pause/resume drawing engines on native Android solo game reset
+    if (!activeMatch && typeof window !== 'undefined' && (window as any).AndroidBridge) {
+      try {
+        if ((window as any).AndroidBridge.onSoloGameReset) {
+          (window as any).AndroidBridge.onSoloGameReset();
+        }
+      } catch (e) {
+        console.error("Error calling onSoloGameReset via AndroidBridge:", e);
+      }
+    }
+    
     // 3. Oyun klavyesindeki harflerin (sarı/yeşil/gri) durumlarını sıfırla
     setLetterStatuses({});
     
@@ -1342,6 +1402,51 @@ export default function App() {
     }
   }, [wordLength, gameMode, hasEnteredGame, activeMatch]);
 
+  const handleLeaveMatchToMenu = useCallback(async () => {
+    console.log('Centralized cleanup: returning to main menu');
+    setHasEnteredGame(false);
+    setIsDailyPuzzle(false);
+    setActiveMatch(null);
+    setGameStatus('idle');
+    setMatchmakingStatus('idle');
+    setAttempts([]);
+    setCurrentAttempt('');
+    setSecondsLeft(20);
+    setShowCongratsModal(false);
+    setShowLobbyModal(false);
+    pendingMatchmakingRef.current = null;
+
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      try {
+        socketRef.current.send(JSON.stringify({ type: 'leave_matchmaking' }));
+        socketRef.current.send(JSON.stringify({ type: 'leave_match' }));
+      } catch (e) {}
+    }
+
+    if (socketRef.current) {
+      try {
+        socketRef.current.onopen = null;
+        socketRef.current.onmessage = null;
+        socketRef.current.onerror = null;
+        socketRef.current.onclose = null;
+        socketRef.current.close();
+      } catch (e) {
+        console.error("Error closing socket in handleLeaveMatchToMenu:", e);
+      }
+      socketRef.current = null;
+    }
+
+    try {
+      if (profile && profile.id) {
+        await clearMatchmakingState(profile.id);
+      }
+    } catch (err) {
+      console.warn('Database cleanup failed in handleLeaveMatchToMenu:', err);
+    }
+
+    setReconnectCounter((prev) => prev + 1);
+  }, [profile.id]);
+
   // Expose yeniKelimeyeBasla globally for Android Native WebView integration
   useEffect(() => {
     (window as any).yeniKelimeyeBasla = () => {
@@ -1350,48 +1455,13 @@ export default function App() {
     };
     (window as any).anaMenuyeDon = async () => {
       console.log('Android Native integration triggered: anaMenuyeDon');
-      setHasEnteredGame(false);
-      setIsDailyPuzzle(false);
-      setActiveMatch(null);
-      setGameStatus('idle');
-      setMatchmakingStatus('idle');
-      setAttempts([]);
-      setCurrentAttempt('');
-      setSecondsLeft(20);
-      setShowCongratsModal(false);
-      pendingMatchmakingRef.current = null;
-
-      // 1. Detach old socket listeners to prevent any interference
-      if (socketRef.current) {
-        try {
-          socketRef.current.onopen = null;
-          socketRef.current.onmessage = null;
-          socketRef.current.onerror = null;
-          socketRef.current.onclose = null;
-          socketRef.current.close();
-        } catch (e) {
-          console.error("Error closing socket in anaMenuyeDon:", e);
-        }
-        socketRef.current = null;
-      }
-
-      // 2. Perform database cleanup asynchronously to clear active states in Firestore
-      try {
-        if (profile && profile.id) {
-          await clearMatchmakingState(profile.id);
-        }
-      } catch (err) {
-        console.warn('Database cleanup failed in anaMenuyeDon:', err);
-      }
-
-      // 3. Trigger a clean WebSocket reconnect for future menu features / lobby
-      setReconnectCounter((prev) => prev + 1);
+      await handleLeaveMatchToMenu();
     };
     return () => {
       delete (window as any).yeniKelimeyeBasla;
       delete (window as any).anaMenuyeDon;
     };
-  }, [wordLength]);
+  }, [wordLength, handleLeaveMatchToMenu]);
 
   // Countdown timer logic
   useEffect(() => {
@@ -1502,6 +1572,16 @@ export default function App() {
   // Handle Game Loss
   const handleGameLoss = async (reason: string = 'Hakkınız Bitti') => {
     setGameStatus('lost');
+    
+    // Stabilize AdMob banner views on Android when game is over to prevent recalculation layout loops
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.preventAdLayoutLoops) {
+      try {
+        (window as any).AndroidBridge.preventAdLayoutLoops();
+      } catch (e) {
+        console.error("Error calling preventAdLayoutLoops on loss:", e);
+      }
+    }
+    
     showToast(`Oyunu Kaybettiniz: ${reason}! Doğru Kelime: ${targetWord}`, 'error');
     playDefeatSound(settings.soundEnabled);
     
@@ -1513,6 +1593,16 @@ export default function App() {
     if (isDailyPuzzle) {
       const { dateStr } = getDailyWordAndLength();
       safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
+      safeLocalStorage.setItem('last_played_date', dateStr);
+      safeLocalStorage.setItem('is_daily_completed', 'true');
+      if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.saveDailyPuzzleStatus) {
+        try {
+          (window as any).AndroidBridge.saveDailyPuzzleStatus(dateStr, true);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      setIsDailyPuzzleCompletedToday(true);
       syncDailyPuzzleProgress(attempts, false, true);
       scheduleDailyNotifications();
     }
@@ -1783,6 +1873,16 @@ export default function App() {
       } else {
         if (hasWon) {
           setGameStatus('won');
+          
+          // Stabilize AdMob banner views on Android when game is over/won to prevent recalculation layout loops
+          if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.preventAdLayoutLoops) {
+            try {
+              (window as any).AndroidBridge.preventAdLayoutLoops();
+            } catch (e) {
+              console.error("Error calling preventAdLayoutLoops on win:", e);
+            }
+          }
+          
           setShowCongratsModal(true);
           if (targetWord) {
             fetchTargetWordDefinition(targetWord);
@@ -1904,6 +2004,18 @@ export default function App() {
       if (isDailyPuzzle) {
         const { dateStr } = getDailyWordAndLength();
         safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
+        safeLocalStorage.setItem('last_played_date', dateStr);
+        safeLocalStorage.setItem('is_daily_completed', 'true');
+        setTimeout(() => {
+          if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.saveDailyPuzzleStatus) {
+            try {
+              (window as any).AndroidBridge.saveDailyPuzzleStatus(dateStr, true);
+            } catch (e) {
+              console.error(e);
+            }
+          }
+          setIsDailyPuzzleCompletedToday(true);
+        }, 0);
         badgesToUnlock.add('daily_puzzle_solver');
         scheduleDailyNotifications();
       }
@@ -2234,39 +2346,7 @@ export default function App() {
     }
   };
 
-  const handleLeaveMatchToMenu = async () => {
-    setActiveMatch(null);
-    setHasEnteredGame(false);
-    setShowLobbyModal(false);
-    setMatchmakingStatus('idle');
-    pendingMatchmakingRef.current = null;
 
-    // Detach old socket listeners to prevent any interference
-    if (socketRef.current) {
-      try {
-        socketRef.current.onopen = null;
-        socketRef.current.onmessage = null;
-        socketRef.current.onerror = null;
-        socketRef.current.onclose = null;
-        socketRef.current.close();
-      } catch (e) {
-        console.error("Error closing socket in handleLeaveMatchToMenu:", e);
-      }
-      socketRef.current = null;
-    }
-
-    // Clean up matchmaking and room states in Firestore
-    try {
-      if (profile && profile.id) {
-        await clearMatchmakingState(profile.id);
-      }
-    } catch (err) {
-      console.warn('Database cleanup failed in handleLeaveMatchToMenu:', err);
-    }
-
-    // Reconnect cleanly to have lobby features active on the menu
-    setReconnectCounter((prev) => prev + 1);
-  };
 
   const handleStartMatchmaking = (matchWordsCount?: number) => {
     if (!isOnline) {
@@ -2309,11 +2389,10 @@ export default function App() {
   };
 
   const todayDateStr = getDailyWordAndLength().dateStr;
-  const isDailyPuzzleCompletedToday = safeLocalStorage.getItem('kelimesavasi_daily_completed_date') === todayDateStr;
 
   const handleStartDailyPuzzle = async () => {
     if (isDailyPuzzleCompletedToday) {
-      showToast('Bugünkü Günlük Bulmacayı zaten çözdünüz! Yarın yeni bir kelime için tekrar gelin.', 'info');
+      showToast('Bugünkü hakkınızı doldurdunuz, yeni kelime yarın gelecek!', 'info');
       return;
     }
 
@@ -2327,8 +2406,18 @@ export default function App() {
       const dailyInfo = getDailyWordAndLength();
 
       if (data.solved || data.failed) {
-        showToast('Bugünkü Günlük Bulmacayı zaten çözdünüz/bitirdiniz! Yarın yeni bir kelime için tekrar gelin.', 'info');
+        showToast('Bugünkü hakkınızı doldurdunuz, yeni kelime yarın gelecek!', 'info');
         safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dailyInfo.dateStr);
+        safeLocalStorage.setItem('last_played_date', dailyInfo.dateStr);
+        safeLocalStorage.setItem('is_daily_completed', 'true');
+        if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.saveDailyPuzzleStatus) {
+          try {
+            (window as any).AndroidBridge.saveDailyPuzzleStatus(dailyInfo.dateStr, true);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        setIsDailyPuzzleCompletedToday(true);
         scheduleDailyNotifications();
         setIsValidating(false);
         return;

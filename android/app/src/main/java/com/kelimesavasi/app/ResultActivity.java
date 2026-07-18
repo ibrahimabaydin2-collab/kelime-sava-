@@ -86,6 +86,7 @@ public class ResultActivity extends AppCompatActivity {
                         updates.put("activeRoomId", null);
                         updates.put("isPlaying", false);
                         updates.put("isInRoom", false);
+                        updates.put("isSearching", false);
                         updates.put("matchmakingStatus", "idle");
                         userRef.update(updates);
                     }
@@ -117,6 +118,7 @@ public class ResultActivity extends AppCompatActivity {
                 updates.put("activeRoomId", null);
                 updates.put("isPlaying", false);
                 updates.put("isInRoom", false);
+                updates.put("isSearching", false);
                 updates.put("matchmakingStatus", "idle");
                 userRef.update(updates);
             }
