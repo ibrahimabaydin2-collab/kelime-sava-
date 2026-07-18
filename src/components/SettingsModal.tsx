@@ -19,9 +19,10 @@ import {
   AlertTriangle, 
   Key, 
   Bell, 
-  Sparkles
+  Sparkles,
+  Wifi
 } from 'lucide-react';
-import { UserProfile, LobbyPlayer } from '../types.js';
+import { UserProfile, LobbyPlayer, NetworkLogEntry } from '../types.js';
 import { validateUsername, validatePassword } from '../utils/usernameValidation.js';
 import PrivacyPolicyModal from './PrivacyPolicyModal.js';
 import { 
@@ -54,9 +55,11 @@ interface SettingsModalProps {
   profile: UserProfile;
   lobbyPlayers?: LobbyPlayer[];
   onUpdateProfile: (name: string, avatarUrl?: string) => void;
+  networkLogs?: NetworkLogEntry[];
+  onReconnect?: () => void;
 }
 
-type TabType = 'account' | 'appearance' | 'preferences';
+type TabType = 'account' | 'appearance' | 'preferences' | 'network';
 
 export default function SettingsModal({
   settings,
@@ -67,7 +70,9 @@ export default function SettingsModal({
   onOpenStats,
   profile,
   lobbyPlayers = [],
-  onUpdateProfile
+  onUpdateProfile,
+  networkLogs = [],
+  onReconnect
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('account');
   const [isPrivacyOpen, setIsPrivacyOpen] = useState<boolean>(false);
@@ -317,7 +322,8 @@ export default function SettingsModal({
             }`}
           >
             <User size={14} />
-            <span>Hesabım</span>
+            <span className="hidden sm:inline">Hesabım</span>
+            <span className="sm:hidden text-[10px]">Hesap</span>
           </button>
           <button
             onClick={() => setActiveTab('appearance')}
@@ -328,7 +334,8 @@ export default function SettingsModal({
             }`}
           >
             <Palette size={14} />
-            <span>Görünüm</span>
+            <span className="hidden sm:inline">Görünüm</span>
+            <span className="sm:hidden text-[10px]">Görünüm</span>
           </button>
           <button
             onClick={() => setActiveTab('preferences')}
@@ -339,7 +346,20 @@ export default function SettingsModal({
             }`}
           >
             <Sliders size={14} />
-            <span>Tercihler</span>
+            <span className="hidden sm:inline">Tercihler</span>
+            <span className="sm:hidden text-[10px]">Tercih</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('network')}
+            className={`flex-1 py-2 px-1 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'network'
+                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            <Wifi size={14} />
+            <span className="hidden sm:inline">Bağlantı</span>
+            <span className="sm:hidden text-[10px]">Log</span>
           </button>
         </div>
 
@@ -1116,6 +1136,77 @@ export default function SettingsModal({
                 </button>
               </div>
 
+            </div>
+          )}
+
+          {activeTab === 'network' && (
+            <div className="space-y-4 text-left">
+              <div className="inner-theme border border-theme rounded-2xl p-4.5 space-y-3.5 text-left shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-theme pb-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                      <Wifi size={14} className="text-amber-400" />
+                      Soket Bağlantı Durumu & Günlükleri
+                    </h4>
+                    <p className="text-[10px] text-slate-300/80 leading-normal mt-1">
+                      Canlı düello bağlantınızı ve WebSocket durumunu izleyin.
+                    </p>
+                  </div>
+                  {onReconnect && (
+                    <button
+                      type="button"
+                      onClick={onReconnect}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow transition duration-200 active:scale-[0.98] flex items-center gap-1.5 cursor-pointer self-start sm:self-center"
+                    >
+                      <Wifi size={13} />
+                      <span>Yeniden Bağlan</span>
+                    </button>
+                  )}
+                </div>
+
+                {networkLogs.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400 text-xs">
+                    Henüz herhangi bir ağ olayı kaydedilmedi.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    {networkLogs.map((log, index) => {
+                      let typeColor = 'text-blue-400';
+                      let typeLabel = 'INFO';
+                      if (log.type === 'error') {
+                        typeColor = 'text-rose-400';
+                        typeLabel = 'HATA';
+                      } else if (log.type === 'success') {
+                        typeColor = 'text-emerald-400';
+                        typeLabel = 'BAŞARILI';
+                      } else if (log.type === 'sent') {
+                        typeColor = 'text-amber-400';
+                        typeLabel = 'GİDEN';
+                      } else if (log.type === 'received') {
+                        typeColor = 'text-purple-400';
+                        typeLabel = 'GELEN';
+                      }
+
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-start gap-2.5 text-xs font-mono p-2.5 rounded-xl bg-black/20 dark:bg-black/45 border border-white/5"
+                        >
+                          <span className="text-slate-500 text-[10px] select-none pt-0.5">
+                            [{log.timestamp}]
+                          </span>
+                          <span className={`font-black tracking-wide text-[10px] ${typeColor} uppercase select-none min-w-[50px] inline-block`}>
+                            {typeLabel}
+                          </span>
+                          <span className="text-gray-300 flex-1 break-all select-text">
+                            {log.message}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

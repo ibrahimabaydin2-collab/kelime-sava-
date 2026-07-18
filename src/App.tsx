@@ -22,7 +22,7 @@ import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import AuthScreen from './components/AuthScreen.js';
 import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
 import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser, fetchUserProfileByDeviceId, deleteUserProfile, signInAsGuest, clearMatchmakingState } from './lib/firebase.js';
-import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge } from './types.js';
+import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge, NetworkLogEntry } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play, Home } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/turkish.js';
@@ -653,6 +653,17 @@ export default function App() {
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
   // Real-time Multiplayer State
+  const [networkLogs, setNetworkLogs] = useState<NetworkLogEntry[]>([]);
+
+  const addNetworkLog = useCallback((type: 'info' | 'error' | 'success' | 'sent' | 'received', message: string) => {
+    const timestamp = new Date().toLocaleTimeString('tr-TR', { hour12: false });
+    const newEntry: NetworkLogEntry = { timestamp, type, message };
+    setNetworkLogs((prev) => {
+      const updated = [newEntry, ...prev];
+      return updated.slice(0, 10);
+    });
+  }, []);
+
   const [isOnline, setIsOnline] = useState<boolean>(false);
   const [reconnectCounter, setReconnectCounter] = useState<number>(0);
   const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
@@ -667,6 +678,7 @@ export default function App() {
   const pendingMatchmakingRef = useRef<number | null>(null);
 
   const handleManualReconnect = () => {
+    addNetworkLog('info', 'Manuel yeniden bağlanma tetiklendi.');
     showToast('Sunucuya yeniden bağlanılıyor...', 'info');
     setReconnectCounter((prev) => prev + 1);
   };
@@ -917,12 +929,28 @@ export default function App() {
       }
 
       console.log('Connecting to WebSocket at:', wsUrl);
+      addNetworkLog('info', `Bağlantı kuruluyor: ${wsUrl.split('?')[0]}`);
       const ws = new WebSocket(wsUrl);
+
+      const originalSend = ws.send.bind(ws);
+      ws.send = (data: any) => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type !== 'ping') {
+            addNetworkLog('sent', `Giden mesaj: ${parsed.type}`);
+          }
+        } catch (e) {
+          addNetworkLog('sent', 'Veri gönderildi');
+        }
+        originalSend(data);
+      };
+
       socketRef.current = ws;
 
       const connTimeout = setTimeout(() => {
         if (ws.readyState === WebSocket.CONNECTING) {
           console.warn('WebSocket connection timed out (stuck in CONNECTING state). Closing & retrying...');
+          addNetworkLog('error', 'Bağlantı zaman aşımına uğradı (CONNECTING durumunda takıldı).');
           try {
             ws.close();
           } catch (e) {
@@ -936,6 +964,7 @@ export default function App() {
         setIsOnline(true);
         wasOnlineRef.current = true;
         lastMessageTime = Date.now();
+        addNetworkLog('success', 'Bağlantı başarıyla kuruldu.');
         // Register client
         ws.send(JSON.stringify({
           type: 'join',
@@ -980,6 +1009,9 @@ export default function App() {
         lastMessageTime = Date.now();
         try {
           const data = JSON.parse(event.data);
+          if (data.type !== 'pong') {
+            addNetworkLog('received', `Gelen mesaj: ${data.type}`);
+          }
           
           switch (data.type) {
             case 'lobby_update':
@@ -1007,6 +1039,75 @@ export default function App() {
             case 'challenge_declined':
               showToast(`${data.challengedName} meydan okumanı reddetti.`, 'error');
               break;
+
+            case 'match_reconnect': {
+              const { matchId, targetWord: sharedWord, wordLength: len, opponentId, opponentName, matchWordsCount, currentRound, roundsWon, attempts: reconAttempts, currentAttempt: reconCurrAttempt, completed, timeRemaining } = data;
+              showToast(`Maça Kaldığın Yerden Devam Ediyorsun! ⚡`, 'info');
+              
+              setWordLength(len);
+              setTargetWord(sharedWord);
+              setAttempts(reconAttempts || []);
+              setCurrentAttempt('');
+              setGameStatus('playing');
+              setSecondsLeft(timeRemaining !== undefined ? timeRemaining : 20);
+              setWordDefinition('');
+              
+              // Recompute letter status from reconnected attempts
+              const letterStatusesMap: { [key: string]: 'green' | 'orange' | 'grey' } = {};
+              if (reconAttempts && reconAttempts.length > 0) {
+                reconAttempts.forEach((attempt: any) => {
+                  attempt.feedback.forEach((feedbackItem: string, index: number) => {
+                    const letter = attempt.word[index];
+                    const currentStatus = letterStatusesMap[letter];
+                    if (feedbackItem === 'green') {
+                      letterStatusesMap[letter] = 'green';
+                    } else if (feedbackItem === 'orange' && currentStatus !== 'green') {
+                      letterStatusesMap[letter] = 'orange';
+                    } else if (feedbackItem === 'grey' && !currentStatus) {
+                      letterStatusesMap[letter] = 'grey';
+                    }
+                  });
+                });
+              }
+              setLetterStatuses(letterStatusesMap);
+              setShowLobbyModal(false);
+              setMatchmakingStatus('idle');
+              setHasEnteredGame(true);
+              setRematchRequested(false);
+              setOpponentRematchRequested(false);
+
+              // Set active match reference
+              setActiveMatch({
+                id: matchId,
+                wordLength: len,
+                targetWord: sharedWord,
+                matchWordsCount: matchWordsCount || 1,
+                currentRound: currentRound || 1,
+                roundsWon: roundsWon || { [profile.id]: 0, [opponentId]: 0 },
+                players: {
+                  [profile.id]: {
+                    name: profile.name,
+                    attempts: reconAttempts || [],
+                    currentAttempt: reconCurrAttempt || 0,
+                    completed: completed || false,
+                    timeRemaining: timeRemaining !== undefined ? timeRemaining : 20,
+                    score: data.score || 0,
+                    won: false
+                  },
+                  [opponentId]: {
+                    name: opponentName,
+                    attempts: data.opponentStatus?.attempts || [],
+                    currentAttempt: data.opponentStatus?.currentAttempt || 0,
+                    completed: data.opponentStatus?.completed || false,
+                    timeRemaining: data.opponentStatus?.timeRemaining !== undefined ? data.opponentStatus.timeRemaining : 20,
+                    score: data.opponentStatus?.score || 0,
+                    won: false
+                  }
+                },
+                status: 'playing'
+              });
+              break;
+            }
 
             case 'match_start': {
               const { matchId, targetWord: sharedWord, wordLength: len, opponentId, opponentName, matchWordsCount, currentRound, roundsWon } = data;
@@ -1224,6 +1325,8 @@ export default function App() {
         clearTimeout(connTimeout);
         if (pingInterval) clearInterval(pingInterval);
         
+        addNetworkLog('error', `Bağlantı kesildi. Kod: ${event.code}${event.reason ? `, Sebep: ${event.reason}` : ''}`);
+        
         if (socketRef.current === ws) {
           setIsOnline(false);
           socketRef.current = null;
@@ -1231,12 +1334,14 @@ export default function App() {
           // Prevent infinite reconnect fights between multiple tabs/windows of the same user ID
           if (event && event.code === 1000 && event.reason === 'Replaced by new connection') {
             console.warn('Connection closed because it was replaced by another active session/tab. Disabling auto-reconnect.');
+            addNetworkLog('info', 'Otomatik yeniden bağlanma iptal edildi (başka aktif oturum algılandı).');
             showToast('Bağlantı başka bir sekme tarafından devralındı.', 'info');
             return;
           }
 
           // Attempt reconnect after 3 seconds
           if (!isDisposed) {
+            addNetworkLog('info', '3 saniye sonra otomatik yeniden bağlanma denenecek.');
             if (reconnectTimeout) clearTimeout(reconnectTimeout);
             reconnectTimeout = setTimeout(connectWS, 3000);
           }
@@ -1246,6 +1351,7 @@ export default function App() {
       ws.onerror = (err) => {
         clearTimeout(connTimeout);
         console.warn(`WebSocket connection warning (handled by auto-reconnect) to URL: ${wsUrl}`, err);
+        addNetworkLog('error', 'Soket bağlantı hatası oluştu.');
         if (socketRef.current === ws) {
           setIsOnline(false);
           try {
@@ -2388,59 +2494,48 @@ export default function App() {
       return;
     }
 
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      if (matchmakingStatus === 'queued') {
-        socketRef.current.send(JSON.stringify({
-          type: 'leave_matchmaking'
-        }));
-        setMatchmakingStatus('idle');
-        try {
-          if (profile && profile.id) {
-            await clearMatchmakingState(profile.id);
-          }
-        } catch (err) {
-          console.warn('Database cleanup failed in handleStartMatchmaking leave:', err);
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      showToast('Sunucu bağlantısı kuruluyor, lütfen birkaç saniye sonra tekrar deneyin.', 'info');
+      setReconnectCounter(prev => prev + 1);
+      return;
+    }
+
+    if (matchmakingStatus === 'queued') {
+      socketRef.current.send(JSON.stringify({
+        type: 'leave_matchmaking'
+      }));
+      setMatchmakingStatus('idle');
+      try {
+        if (profile && profile.id) {
+          await clearMatchmakingState(profile.id);
         }
-      } else {
-        // RADICAL CLEANUP BEFORE STARTING MATCHMAKING
-        console.log("Radical matchmaking starting: performing complete database and socket cleanup first...");
-        setMatchmakingStatus('idle');
-        setActiveMatch(null);
-        setGameStatus('idle');
-        setAttempts([]);
-        setCurrentAttempt('');
-        
-        try {
-          if (profile && profile.id) {
-            await clearMatchmakingState(profile.id);
-          }
-        } catch (err) {
-          console.warn('Database cleanup failed in handleStartMatchmaking join:', err);
-        }
-
-        // Send a clean leave_matchmaking/leave_match to ensure the server is 100% synchronized
-        try {
-          socketRef.current.send(JSON.stringify({ type: 'leave_matchmaking' }));
-          socketRef.current.send(JSON.stringify({ type: 'leave_match' }));
-        } catch (e) {}
-
-        // Small timeout to allow database and socket messages to propagate cleanly before queuing
-        setTimeout(() => {
-          if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-            // Re-verify cleanup states right before sending join message
-            setActiveMatch(null);
-            setAttempts([]);
-            setCurrentAttempt('');
-
-            socketRef.current.send(JSON.stringify({
-              type: 'join_matchmaking',
-              wordLength,
-              matchWordsCount: matchWordsCount || 1
-            }));
-            setMatchmakingStatus('queued');
-          }
-        }, 100);
+      } catch (err) {
+        console.warn('Database cleanup failed in handleStartMatchmaking leave:', err);
       }
+    } else {
+      // RADICAL CLEANUP BEFORE STARTING MATCHMAKING
+      console.log("Radical matchmaking starting: performing complete database and socket cleanup first...");
+      setMatchmakingStatus('idle');
+      setActiveMatch(null);
+      setGameStatus('idle');
+      setAttempts([]);
+      setCurrentAttempt('');
+      
+      try {
+        if (profile && profile.id) {
+          await clearMatchmakingState(profile.id);
+        }
+      } catch (err) {
+        console.warn('Database cleanup failed in handleStartMatchmaking join:', err);
+      }
+
+      // No redundant leave messages or timeout! Connect immediately to prevent race conditions.
+      socketRef.current.send(JSON.stringify({
+        type: 'join_matchmaking',
+        wordLength,
+        matchWordsCount: matchWordsCount || 1
+      }));
+      setMatchmakingStatus('queued');
     }
   };
 
@@ -2693,7 +2788,7 @@ export default function App() {
       </div>
 
       {/* Main Container */}
-      <main className="flex-1 flex flex-col items-center justify-center py-1 sm:py-3 px-1.5 sm:px-4 max-w-full md:max-w-[95vw] lg:max-w-[90vw] w-full mx-auto relative overflow-hidden">
+      <main className="flex-1 flex flex-col items-stretch justify-stretch w-full max-w-full relative overflow-hidden">
         {/* Toast Notification */}
         {toast && (
           <div className={`fixed top-20 z-50 left-1/2 transform -translate-x-1/2 px-4 py-2.5 rounded-xl border flex items-center gap-2.5 text-xs sm:text-sm font-semibold shadow-lg transition duration-200 animate-slide-in ${
@@ -2954,7 +3049,7 @@ export default function App() {
         )}
 
         {/* Game Layout Wrapper */}
-        <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-0.5 sm:gap-1 relative z-10">
+        <div className="w-full flex-1 min-h-0 flex flex-col items-stretch justify-stretch gap-0.5 sm:gap-1 relative z-10">
           {/* Game Area Card */}
           <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[1.5rem] border border-[#3E485A]/30 p-2 sm:p-3 shadow-2xl flex flex-col items-center justify-between flex-1 min-h-0 overflow-hidden gap-y-0.5 transition-all duration-200 relative text-white" id="game-area-card">
           {/* Subtle atmospheric ambient glow inside the card */}
@@ -3731,6 +3826,8 @@ export default function App() {
           profile={profile}
           lobbyPlayers={lobbyPlayers}
           onUpdateProfile={handleUpdateProfile}
+          networkLogs={networkLogs}
+          onReconnect={handleManualReconnect}
         />
       )}
 

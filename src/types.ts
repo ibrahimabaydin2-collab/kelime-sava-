@@ -81,3 +81,10 @@ export interface RealtimeMatch {
   status: 'playing' | 'ended';
   winnerId?: string | 'draw';
 }
+
+export interface NetworkLogEntry {
+  timestamp: string;
+  type: 'info' | 'error' | 'success' | 'sent' | 'received';
+  message: string;
+}
+

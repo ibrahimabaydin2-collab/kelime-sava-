@@ -333,10 +333,40 @@ html.dark {
   bottom: 0 !important;
 }
 
-/* Ensure main content doesn't get covered by the fixed banners */
+/* Ensure main content doesn't get covered by the fixed banners and fills 100% width/height */
 main {
   padding-top: 50px !important;
   padding-bottom: 50px !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+}
+
+/* Make all game screens and auth panels expand completely between the ads to eliminate any black areas */
+#welcome-screen-root,
+#welcome-setup-page,
+#game-area-card,
+#multiplayer-results-container,
+#opponent-waiting-container,
+#auth-screen-card,
+#auth-linking-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 100% !important;
+  border-radius: 0px !important;
+  border: none !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  flex: 1 !important;
 }
 
 /* Disable placeholders and paddings inside the Android hybrid app webview */
