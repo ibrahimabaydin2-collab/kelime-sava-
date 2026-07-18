@@ -306,6 +306,7 @@ public class MainActivity extends BridgeActivity {
             android.content.Intent intent = getIntent();
             if (intent != null && intent.getBooleanExtra("RESET_TO_MENU", false)) {
                 intent.removeExtra("RESET_TO_MENU");
+                setIntent(intent); // Persist the removal of RESET_TO_MENU extra so it does not trigger on future resumes
                 mWebView.post(() -> {
                     mWebView.evaluateJavascript("javascript:if(window.anaMenuyeDon){window.anaMenuyeDon();}", null);
                 });

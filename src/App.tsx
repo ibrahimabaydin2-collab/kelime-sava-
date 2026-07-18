@@ -1336,6 +1336,18 @@ export default function App() {
   // Yumuşak Sıfırlama (Soft Reset) Fonksiyonu
   // WebView'da sıfırdan reload yapmadan, reklamları etkilemeden ve performansı bozmadan oyunu temizler.
   const softResetGame = (length: number = wordLength, isDaily: boolean = isDailyPuzzle) => {
+    // Optimize AdMob Banner layouts and pause/resume drawing engines on native Android solo game reset
+    // This MUST be called at the absolute beginning before any state or DOM updates to lock the native layouts
+    if (!activeMatch && typeof window !== 'undefined' && (window as any).AndroidBridge) {
+      try {
+        if ((window as any).AndroidBridge.onSoloGameReset) {
+          (window as any).AndroidBridge.onSoloGameReset();
+        }
+      } catch (e) {
+        console.error("Error calling onSoloGameReset via AndroidBridge:", e);
+      }
+    }
+
     // Stop all timer intervals synchronously first
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -1348,17 +1360,6 @@ export default function App() {
     
     // 2. Ekrandaki harf kutularının içindeki text'leri temizler ve CSS renk sınıflarını (yeşil/sarı/gri) kaldırır
     // (attempts array'i ve currentAttempt temizlendiğinde React GameBoard component'i otomatik olarak her şeyi varsayılana sıfırlar)
-    
-    // Optimize AdMob Banner layouts and pause/resume drawing engines on native Android solo game reset
-    if (!activeMatch && typeof window !== 'undefined' && (window as any).AndroidBridge) {
-      try {
-        if ((window as any).AndroidBridge.onSoloGameReset) {
-          (window as any).AndroidBridge.onSoloGameReset();
-        }
-      } catch (e) {
-        console.error("Error calling onSoloGameReset via AndroidBridge:", e);
-      }
-    }
     
     // 3. Oyun klavyesindeki harflerin (sarı/yeşil/gri) durumlarını sıfırla
     setLetterStatuses({});
@@ -1422,14 +1423,16 @@ export default function App() {
     setShowLobbyModal(false);
     pendingMatchmakingRef.current = null;
 
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      try {
-        socketRef.current.send(JSON.stringify({ type: 'leave_matchmaking' }));
-        socketRef.current.send(JSON.stringify({ type: 'leave_match' }));
-      } catch (e) {}
-    }
-
+    // WebSocket cleanup and reconnection block
     if (socketRef.current) {
+      try {
+        if (socketRef.current.readyState === WebSocket.OPEN) {
+          socketRef.current.send(JSON.stringify({ type: 'leave_matchmaking' }));
+          socketRef.current.send(JSON.stringify({ type: 'leave_match' }));
+        }
+      } catch (e) {
+        console.error("Error sending leave messages over WebSocket:", e);
+      }
       try {
         socketRef.current.onopen = null;
         socketRef.current.onmessage = null;
@@ -1442,6 +1445,9 @@ export default function App() {
       socketRef.current = null;
     }
 
+    // Force trigger a fresh, clean WebSocket connection on return to menu
+    setReconnectCounter((prev) => prev + 1);
+
     try {
       if (profile && profile.id) {
         await clearMatchmakingState(profile.id);
@@ -1449,8 +1455,6 @@ export default function App() {
     } catch (err) {
       console.warn('Database cleanup failed in handleLeaveMatchToMenu:', err);
     }
-
-    setReconnectCounter((prev) => prev + 1);
   }, [profile.id]);
 
   // Expose yeniKelimeyeBasla globally for Android Native WebView integration
@@ -1588,21 +1592,22 @@ export default function App() {
 
   // Handle Game Loss
   const handleGameLoss = async (reason: string = 'Hakkınız Bitti') => {
-    setGameStatus('lost');
-    
-    // Stop all timer intervals synchronously first
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    
     // Stabilize AdMob banner views on Android when game is over to prevent recalculation layout loops
+    // This MUST be called at the absolute beginning before any state or DOM updates to freeze/prevent layout loop flickering
     if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.preventAdLayoutLoops) {
       try {
         (window as any).AndroidBridge.preventAdLayoutLoops();
       } catch (e) {
         console.error("Error calling preventAdLayoutLoops on loss:", e);
       }
+    }
+
+    setGameStatus('lost');
+    
+    // Stop all timer intervals synchronously first
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
     
     showToast(`Oyunu Kaybettiniz: ${reason}! Doğru Kelime: ${targetWord}`, 'error');
@@ -2422,6 +2427,11 @@ export default function App() {
         // Small timeout to allow database and socket messages to propagate cleanly before queuing
         setTimeout(() => {
           if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            // Re-verify cleanup states right before sending join message
+            setActiveMatch(null);
+            setAttempts([]);
+            setCurrentAttempt('');
+
             socketRef.current.send(JSON.stringify({
               type: 'join_matchmaking',
               wordLength,
@@ -2600,16 +2610,6 @@ export default function App() {
       
       // Force set isMatchEndedRef.current to true so keyboard listener ignores any events
       isMatchEndedRef.current = true;
-      
-      // Close the websocket to stop receiving or sending any more messages
-      if (socketRef.current) {
-        try {
-          socketRef.current.close();
-        } catch (e) {
-          console.error("Error closing socket in useEffect:", e);
-        }
-        socketRef.current = null;
-      }
 
       // Identify Winner & Loser
       const playersList = Object.entries(activeMatch.players);
