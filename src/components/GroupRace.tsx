@@ -101,6 +101,7 @@ export default function GroupRace({
   const [currentRound, setCurrentRound] = useState<number>(1); // 1, 2, 3, 4
   const [wordLength, setWordLength] = useState<number>(5); // 5 -> 6 -> 7 -> 8
   const [targetWord, setTargetWord] = useState<string>('');
+  const [winnerId, setWinnerId] = useState<string>('');
   const [wordDefinition, setWordDefinition] = useState<string>('');
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [roundTimer, setRoundTimer] = useState<number>(45);
@@ -500,6 +501,7 @@ export default function GroupRace({
       // Real-time winner verification:
       // If a player successfully solves the word first, stop the game instantly.
       if (data.winnerId && data.winnerId !== '') {
+        setWinnerId(data.winnerId);
         if (timerRef.current) {
           clearInterval(timerRef.current);
         }
@@ -2264,8 +2266,22 @@ export default function GroupRace({
             </div>
 
             {(() => {
-              const champion = competitors.find(c => !c.eliminated);
-              const isUserChampion = champion?.isUser;
+              let isUserChampion = false;
+              let championName = 'Bilinmiyor';
+
+              if (winnerId) {
+                if (winnerId === profile.id) {
+                  isUserChampion = true;
+                  championName = profile.name;
+                } else {
+                  const cmp = competitors.find(c => c.id === winnerId);
+                  championName = cmp ? cmp.name : 'Rakip';
+                }
+              } else {
+                const champion = competitors.find(c => !c.eliminated);
+                isUserChampion = champion?.isUser || false;
+                championName = champion?.name || 'Bilinmiyor';
+              }
 
               if (isUserChampion) {
                 return (
@@ -2288,7 +2304,7 @@ export default function GroupRace({
                       TURNUVA SONA ERDİ
                     </span>
                     <h1 className="text-2xl sm:text-3xl font-extrabold text-[#FAF6E9] tracking-tight">
-                      Şampiyon: {champion?.name || 'Bilinmiyor'}
+                      Şampiyon: {championName}
                     </h1>
                     <p className="text-xs text-gray-400 font-medium">
                       Turnuva finalinde rakibiniz zafere ulaştı. Antrenman yapıp bir dahaki sefere kupayı siz kazanın!

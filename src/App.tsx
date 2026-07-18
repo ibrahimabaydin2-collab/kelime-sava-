@@ -1060,7 +1060,7 @@ export default function App() {
 
             case 'match_next_word': {
               const { targetWord: newWord, roundsWon: rw, currentRound: round } = data;
-              showToast(`Sıradaki kelimeye geçtin! Başarılar!`, 'success');
+              showToast(`Yeni kelime başladı! Başarılar! 🚀`, 'success');
               
               setTargetWord(newWord);
               setAttempts([]);
@@ -1072,20 +1072,20 @@ export default function App() {
 
               setActiveMatch((prev) => {
                 if (!prev) return null;
-                // Reset self attempts on the UI
                 const updatedPlayers = { ...prev.players };
-                if (updatedPlayers[profile.id]) {
-                  updatedPlayers[profile.id] = {
-                    ...updatedPlayers[profile.id],
+                Object.keys(updatedPlayers).forEach((pId) => {
+                  updatedPlayers[pId] = {
+                    ...updatedPlayers[pId],
                     attempts: [],
                     currentAttempt: 0,
                     completed: false,
                     won: false,
                     timeRemaining: 20
                   };
-                }
+                });
                 return {
                   ...prev,
+                  targetWord: newWord,
                   currentRound: round,
                   roundsWon: rw || prev.roundsWon,
                   players: updatedPlayers
@@ -1662,18 +1662,11 @@ export default function App() {
           playEnterSound(settings.soundEnabled);
           syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded);
         } else if (updatedAttempts.length >= 6) {
-          showToast(`6 tahmin hakkınız tükendi! Sizin için yeni kelime yükleniyor. Doğru kelime: ${targetWord}`, 'info');
+          showToast(`6 tahmin hakkınız tükendi! Rakibin de tamamlaması bekleniyor... Doğru kelime: ${targetWord}`, 'info');
           playDefeatSound(settings.soundEnabled);
           
-          // Generate new word and soft-reset attempts locally
-          const newWord = getRandomWord(wordLength);
-          setTargetWord(newWord);
-          setAttempts([]);
-          setCurrentAttempt('');
-          setLetterStatuses({});
-          
-          // Notify the server/opponent of the reset
-          syncMatchState([], 0, false, false, 0);
+          // Send completed=true, won=false state to the server and wait
+          syncMatchState(updatedAttempts, updatedAttempts.length, true, false, 0);
         } else {
           playEnterSound(settings.soundEnabled);
           syncMatchState(updatedAttempts, updatedAttempts.length, false, false, 0);
@@ -2277,6 +2270,7 @@ export default function App() {
   };
 
   const opponent = activeMatch ? Object.values(activeMatch.players).find(p => (p as any).name !== profile.name) as any : null;
+  const isMatchEnded = !!(activeMatch && activeMatch.status === 'ended');
 
   return (
     <div className={`h-screen max-h-screen overflow-hidden flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
@@ -2554,71 +2548,75 @@ export default function App() {
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
 
           {/* Top Timer & Attempts Tracker */}
-          <div className="w-full flex justify-between items-center mb-2 px-1 border-b border-[#3E485A]/40 pb-2 relative z-10">
-            {gameStatus === 'playing' ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <Trophy size={16} className="text-amber-500" />
-                  <span className="text-xs font-bold text-gray-300 font-mono">
-                    Deneme: {attempts.length}/6
+          {!isMatchEnded && (
+            <div className="w-full flex justify-between items-center mb-2 px-1 border-b border-[#3E485A]/40 pb-2 relative z-10">
+              {gameStatus === 'playing' ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Trophy size={16} className="text-amber-500" />
+                    <span className="text-xs font-bold text-gray-300 font-mono">
+                      Deneme: {attempts.length}/6
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {gameMode === 'timed' && !activeMatch && !isDailyPuzzle ? (
+                      <>
+                        <Hourglass size={16} className={`animate-spin ${secondsLeft <= 5 ? 'text-rose-500' : 'text-emerald-500'}`} />
+                        <div className={`text-sm font-bold font-mono px-2 py-0.5 rounded-lg border ${
+                          secondsLeft <= 5
+                            ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 animate-pulse'
+                            : 'bg-black/25 border-[#3E485A] text-emerald-400'
+                        }`}>
+                          {secondsLeft} sn
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Hourglass size={16} className="text-emerald-500 animate-pulse" />
+                        <div className="text-xs font-extrabold font-mono px-2 py-0.5 rounded-lg border bg-black/25 border-[#3E485A] text-emerald-400">
+                          Süresiz ♾️
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="w-full flex justify-center py-0.5 animate-scale-up">
+                  <span className={`text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-full border ${
+                    gameStatus === 'won'
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                      : gameStatus === 'lost'
+                      ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
+                      : 'bg-[#3D4756] border-[#3E485A] text-gray-300'
+                  }`}>
+                    {gameStatus === 'won' ? '🎉 TEBRİKLER! KAZANDINIZ' : gameStatus === 'lost' ? '💥 SÜRE BİTTİ / ELENDİNİZ' : 'HAZIR'}
                   </span>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  {gameMode === 'timed' && !activeMatch && !isDailyPuzzle ? (
-                    <>
-                      <Hourglass size={16} className={`animate-spin ${secondsLeft <= 5 ? 'text-rose-500' : 'text-emerald-500'}`} />
-                      <div className={`text-sm font-bold font-mono px-2 py-0.5 rounded-lg border ${
-                        secondsLeft <= 5
-                          ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 animate-pulse'
-                          : 'bg-black/25 border-[#3E485A] text-emerald-400'
-                      }`}>
-                        {secondsLeft} sn
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <Hourglass size={16} className="text-emerald-500 animate-pulse" />
-                      <div className="text-xs font-extrabold font-mono px-2 py-0.5 rounded-lg border bg-black/25 border-[#3E485A] text-emerald-400">
-                        Süresiz ♾️
-                      </div>
-                    </>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="w-full flex justify-center py-0.5 animate-scale-up">
-                <span className={`text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-full border ${
-                  gameStatus === 'won'
-                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                    : gameStatus === 'lost'
-                    ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
-                    : 'bg-[#3D4756] border-[#3E485A] text-gray-300'
-                }`}>
-                  {gameStatus === 'won' ? '🎉 TEBRİKLER! KAZANDINIZ' : gameStatus === 'lost' ? '💥 SÜRE BİTTİ / ELENDİNİZ' : 'HAZIR'}
-                </span>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Spacer A */}
-          {gameStatus === 'playing' && (
+          {gameStatus === 'playing' && !isMatchEnded && (
             <div className="flex-1 min-h-[0.25rem] sm:min-h-[0.5rem]" />
           )}
 
           {/* Letter Grid */}
-          <GameBoard
-            attempts={attempts}
-            currentAttempt={currentAttempt}
-            wordLength={wordLength}
-            boardTheme={settings.boardTheme}
-            isGameOver={gameStatus !== 'playing'}
-          />
+          {!isMatchEnded && (
+            <GameBoard
+              attempts={attempts}
+              currentAttempt={currentAttempt}
+              wordLength={wordLength}
+              boardTheme={settings.boardTheme}
+              isGameOver={gameStatus !== 'playing'}
+            />
+          )}
 
           {/* Victory Celebration is now handled via the lightweight showCongratsModal popup to prevent layout shifts, lag and WebView/AdMob crashes */}
 
           {/* Standard Game Over (Loss) Screen */}
-          {gameStatus === 'lost' && (
+          {gameStatus === 'lost' && !activeMatch && (
             <div className="w-full text-center py-2 space-y-2.5 max-w-sm animate-scale-up" id="game-over-loss-container">
               <div className="p-2.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900 rounded-xl space-y-1">
                 <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest font-mono">DENEME HAKKI VEYA SÜRE BİTTİ</p>
@@ -2679,7 +2677,7 @@ export default function App() {
           )}
 
           {/* Action Buttons Above Keyboard */}
-          {gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
+          {!isMatchEnded && gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
             <BottomBar
               currentGuess={currentAttempt}
               wordLength={wordLength}
@@ -2695,12 +2693,12 @@ export default function App() {
           )}
 
           {/* Spacer C */}
-          {gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
+          {!isMatchEnded && gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
             <div className="flex-1 min-h-[0.25rem] sm:min-h-[0.5rem]" />
           )}
 
           {/* Virtual Keyboard */}
-          {gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
+          {!isMatchEnded && gameStatus === 'playing' && !(activeMatch && activeMatch.players[profile.id]?.completed) && (
             <Keyboard
               onChar={onChar}
               onDelete={onDelete}
@@ -2712,7 +2710,7 @@ export default function App() {
           )}
 
           {/* Waiting for Opponent Card */}
-          {activeMatch && activeMatch.players[profile.id]?.completed && activeMatch.status !== 'ended' && (
+          {!isMatchEnded && activeMatch && activeMatch.players[profile.id]?.completed && activeMatch.status !== 'ended' && (
             <div className="w-full max-w-sm mx-auto bg-slate-900/95 border border-amber-500/25 rounded-3xl p-5 text-center space-y-4 shadow-xl animate-scale-up" id="opponent-waiting-container">
               <div className="flex flex-col items-center">
                 <div className="relative">

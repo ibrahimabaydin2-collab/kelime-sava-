@@ -1068,6 +1068,42 @@ const setupWebSocket = (server: any) => {
                   }
 
                   broadcastLobby();
+                } else {
+                  // Her iki oyuncu da 6 tahmin hakkını tamamlamış ve kimse kazanamamışsa yeni bir kelime ile oyunu devam ettir.
+                  const allCompleted = Object.values(match.players).every(p => p.completed);
+                  const anyWon = Object.values(match.players).some(p => p.won);
+
+                  if (allCompleted && !anyWon) {
+                    const finalWordLength = match.wordLength || 5;
+                    const newTargetWord = getRandomWord(finalWordLength);
+                    
+                    match.currentRound = (match.currentRound || 1) + 1;
+                    match.targetWord = newTargetWord;
+
+                    // Oyuncuların elindeki tahmin ve tamamlanma durumlarını sıfırla
+                    for (const pId of Object.keys(match.players)) {
+                      match.players[pId].attempts = [];
+                      match.players[pId].currentAttempt = 0;
+                      match.players[pId].completed = false;
+                      match.players[pId].won = false;
+                      match.players[pId].timeRemaining = 20;
+                    }
+
+                    const nextWordPayload = JSON.stringify({
+                      type: 'match_next_word',
+                      targetWord: newTargetWord,
+                      roundsWon: match.roundsWon || {},
+                      currentRound: match.currentRound
+                    });
+
+                    // Her iki oyuncuya da yeni kelimeyi bildir
+                    for (const pId of Object.keys(match.players)) {
+                      const client = clients.get(pId);
+                      if (client && client.ws.readyState === WebSocket.OPEN) {
+                        client.ws.send(nextWordPayload);
+                      }
+                    }
+                  }
                 }
               }
             }
