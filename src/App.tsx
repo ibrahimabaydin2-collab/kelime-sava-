@@ -1336,6 +1336,12 @@ export default function App() {
   // Yumuşak Sıfırlama (Soft Reset) Fonksiyonu
   // WebView'da sıfırdan reload yapmadan, reklamları etkilemeden ve performansı bozmadan oyunu temizler.
   const softResetGame = (length: number = wordLength, isDaily: boolean = isDailyPuzzle) => {
+    // Stop all timer intervals synchronously first
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
     // 1. Deneme sayısı sıfırlansın (attempts array'ini boşaltmak deneme sayısını 0 yapar)
     setAttempts([]);
     setCurrentAttempt('');
@@ -1472,10 +1478,21 @@ export default function App() {
     }
 
     timerRef.current = setInterval(() => {
+      // If the game status changes to anything other than playing, immediately abort and clear
+      if (gameStatusRef.current !== 'playing') {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        return;
+      }
       setSecondsLeft((prev) => {
         if (prev <= 1) {
           // Time expired - lose game or complete word in active match
-          clearInterval(timerRef.current!);
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
           if (activeMatch) {
             showToast(`Süre bitti! Rakibin tamamlaması bekleniyor...`, 'error');
             syncMatchState(attempts, attempts.length, true, false, 0);
@@ -1572,6 +1589,12 @@ export default function App() {
   // Handle Game Loss
   const handleGameLoss = async (reason: string = 'Hakkınız Bitti') => {
     setGameStatus('lost');
+    
+    // Stop all timer intervals synchronously first
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     
     // Stabilize AdMob banner views on Android when game is over to prevent recalculation layout loops
     if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.preventAdLayoutLoops) {
@@ -1873,6 +1896,12 @@ export default function App() {
       } else {
         if (hasWon) {
           setGameStatus('won');
+          
+          // Stop all timer intervals synchronously first to avoid background ticks or flickering
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
           
           // Stabilize AdMob banner views on Android when game is over/won to prevent recalculation layout loops
           if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.preventAdLayoutLoops) {
@@ -2348,7 +2377,7 @@ export default function App() {
 
 
 
-  const handleStartMatchmaking = (matchWordsCount?: number) => {
+  const handleStartMatchmaking = async (matchWordsCount?: number) => {
     if (!isOnline) {
       showToast('Kuyruğa girmek için sunucuya bağlı olmalısınız. Lütfen bekleyin veya çevrimdışı modu oynayın.', 'error');
       return;
@@ -2360,13 +2389,47 @@ export default function App() {
           type: 'leave_matchmaking'
         }));
         setMatchmakingStatus('idle');
+        try {
+          if (profile && profile.id) {
+            await clearMatchmakingState(profile.id);
+          }
+        } catch (err) {
+          console.warn('Database cleanup failed in handleStartMatchmaking leave:', err);
+        }
       } else {
-        socketRef.current.send(JSON.stringify({
-          type: 'join_matchmaking',
-          wordLength,
-          matchWordsCount: matchWordsCount || 1
-        }));
-        setMatchmakingStatus('queued');
+        // RADICAL CLEANUP BEFORE STARTING MATCHMAKING
+        console.log("Radical matchmaking starting: performing complete database and socket cleanup first...");
+        setMatchmakingStatus('idle');
+        setActiveMatch(null);
+        setGameStatus('idle');
+        setAttempts([]);
+        setCurrentAttempt('');
+        
+        try {
+          if (profile && profile.id) {
+            await clearMatchmakingState(profile.id);
+          }
+        } catch (err) {
+          console.warn('Database cleanup failed in handleStartMatchmaking join:', err);
+        }
+
+        // Send a clean leave_matchmaking/leave_match to ensure the server is 100% synchronized
+        try {
+          socketRef.current.send(JSON.stringify({ type: 'leave_matchmaking' }));
+          socketRef.current.send(JSON.stringify({ type: 'leave_match' }));
+        } catch (e) {}
+
+        // Small timeout to allow database and socket messages to propagate cleanly before queuing
+        setTimeout(() => {
+          if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({
+              type: 'join_matchmaking',
+              wordLength,
+              matchWordsCount: matchWordsCount || 1
+            }));
+            setMatchmakingStatus('queued');
+          }
+        }, 100);
       }
     }
   };
@@ -2621,8 +2684,10 @@ export default function App() {
     }
   }, [isMatchEnded, activeMatch]);
 
+  const isAndroidApp = typeof window !== 'undefined' && !!(window as any).AndroidBridge;
+
   return (
-    <div className={`h-screen max-h-screen overflow-hidden flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()}`}>
+    <div className={`h-screen max-h-screen overflow-hidden flex flex-col transition-all duration-300 ${getBgThemeClass()} ${getFontFamilyClass()} ${isAndroidApp ? 'android-hybrid' : ''}`}>
       {/* Safe Space for Future Top Banner Ad */}
       <div className="h-[50px] w-full shrink-0 flex items-center justify-center border-b border-[#3E485A]/15 bg-black/35 text-[#FAF6E9]/40 font-mono text-[9px] tracking-widest select-none uppercase" id="top-ad-placeholder">
       </div>

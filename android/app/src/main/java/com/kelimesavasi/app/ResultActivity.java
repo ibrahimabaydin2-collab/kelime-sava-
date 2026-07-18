@@ -96,7 +96,7 @@ public class ResultActivity extends AppCompatActivity {
 
                 // Return to MainActivity cleanly and reset game state in WebView
                 Intent intent = new Intent(ResultActivity.this, MainActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
                 intent.putExtra("RESET_TO_MENU", true);
                 startActivity(intent);
                 finish();
@@ -128,7 +128,7 @@ public class ResultActivity extends AppCompatActivity {
 
         // Go back to main activity on system back press and reset game state in WebView
         Intent intent = new Intent(ResultActivity.this, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         intent.putExtra("RESET_TO_MENU", true);
         startActivity(intent);
         finish();

@@ -338,3 +338,14 @@ main {
   padding-top: 50px !important;
   padding-bottom: 50px !important;
 }
+
+/* Disable placeholders and paddings inside the Android hybrid app webview */
+.android-hybrid #top-ad-placeholder,
+.android-hybrid #bottom-ad-placeholder {
+  display: none !important;
+}
+
+.android-hybrid main {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}

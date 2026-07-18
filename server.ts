@@ -1251,32 +1251,40 @@ const setupWebSocket = (server: any) => {
             const { matchId } = data;
             const match = matches.get(matchId);
 
-            if (match && match.status === 'playing') {
-              match.status = 'ended';
-              const opponentId = Object.keys(match.players).find(id => id !== playerId);
-              if (opponentId) {
-                const opponent = clients.get(opponentId);
-                if (opponent && opponent.ws.readyState === WebSocket.OPEN) {
-                  opponent.ws.send(JSON.stringify({
-                    type: 'opponent_left',
-                    matchId
-                  }));
+            if (match) {
+              if (match.status === 'playing') {
+                match.status = 'ended';
+                const opponentId = Object.keys(match.players).find(id => id !== playerId);
+                if (opponentId) {
+                  const opponent = clients.get(opponentId);
+                  if (opponent && opponent.ws.readyState === WebSocket.OPEN) {
+                    opponent.ws.send(JSON.stringify({
+                      type: 'opponent_left',
+                      matchId
+                    }));
+                  }
+                  const oppClient = clients.get(opponentId);
+                  if (oppClient) oppClient.status = 'idle';
                 }
-                const oppClient = clients.get(opponentId);
-                if (oppClient) oppClient.status = 'idle';
               }
-              const selfClient = clients.get(playerId);
-              if (selfClient) selfClient.status = 'idle';
-
-              broadcastLobby();
             }
+            const selfClient = clients.get(playerId);
+            if (selfClient) {
+              selfClient.status = 'idle';
+            }
+
+            broadcastLobby();
             break;
           }
 
           case 'join_matchmaking': {
             const { wordLength, matchWordsCount } = data;
             const selfClient = clients.get(playerId);
-            if (!selfClient || selfClient.status === 'playing') break;
+            if (!selfClient) break;
+
+            // Radically and unconditionally reset player state and remove them from any old queue/match before joining matchmaking queue
+            selfClient.status = 'idle';
+            matchmakingQueue.delete(playerId);
 
             const requestedWordsCount = matchWordsCount || 1;
             console.log(`Player joined matchmaking queue: ${selfClient.name} (${playerId}) for ${wordLength} letters, ${requestedWordsCount} words`);
