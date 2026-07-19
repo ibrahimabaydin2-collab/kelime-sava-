@@ -152,6 +152,9 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
       }
 
       if (user) {
+        try {
+          localStorage.setItem('kelimesavasi_is_registered', 'true');
+        } catch (e) {}
         const profile = await fetchUserProfile(user.uid);
         if (profile) {
           onAuthComplete(profile, user);
@@ -245,10 +248,27 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         return;
       }
 
+      if (username.trim()) {
+        try {
+          localStorage.setItem('saved_username', username.trim());
+          const tempProfile = {
+            name: username.trim(),
+            avatarUrl: selectedAvatar || '🧠',
+            nameSet: true
+          };
+          localStorage.setItem('kelimesavasi_profile', JSON.stringify(tempProfile));
+        } catch (e) {
+          console.warn(e);
+        }
+      }
+
       const result = await confirmationResult.confirm(otpCode.trim());
       const user = result.user;
 
       if (user) {
+        try {
+          localStorage.setItem('kelimesavasi_is_registered', 'true');
+        } catch (e) {}
         const profile = await fetchUserProfile(user.uid);
         if (profile) {
           onAuthComplete(profile, user);
@@ -313,6 +333,20 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
 
     try {
       if (mode === 'guest') {
+        // Save the manual username and preset profile to local storage first so that the onAuthStateChanged listener picks it up immediately
+        try {
+          localStorage.setItem('kelimesavasi_is_registered', 'false');
+          localStorage.setItem('saved_username', username.trim());
+          const tempProfile = {
+            name: username.trim(),
+            avatarUrl: selectedAvatar,
+            nameSet: true
+          };
+          localStorage.setItem('kelimesavasi_profile', JSON.stringify(tempProfile));
+        } catch (e) {
+          console.warn(e);
+        }
+
         // 1. Play as Guest (Anonymous Auth)
         const firebaseUser = await signInAsGuest();
         
@@ -340,6 +374,20 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         onAuthComplete(initialProfile, firebaseUser);
 
       } else if (mode === 'register') {
+        // Save the manual username and preset profile to local storage first so that the onAuthStateChanged listener picks it up immediately
+        try {
+          localStorage.setItem('kelimesavasi_is_registered', 'true');
+          localStorage.setItem('saved_username', username.trim());
+          const tempProfile = {
+            name: username.trim(),
+            avatarUrl: selectedAvatar,
+            nameSet: true
+          };
+          localStorage.setItem('kelimesavasi_profile', JSON.stringify(tempProfile));
+        } catch (e) {
+          console.warn(e);
+        }
+
         // 2. Register with Email/Password
         const firebaseUser = await registerWithEmailAndPassword(email, password);
         
@@ -366,6 +414,9 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         onAuthComplete(initialProfile, firebaseUser);
 
       } else if (mode === 'login') {
+        try {
+          localStorage.setItem('kelimesavasi_is_registered', 'true');
+        } catch (e) {}
         // 3. Login with Email/Password
         const firebaseUser = await loginWithEmailAndPassword(email, password);
         

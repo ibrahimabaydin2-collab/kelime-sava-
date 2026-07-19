@@ -343,6 +343,65 @@ export default function WelcomeScreen({
     ? Math.round((profile.stats.gamesWon / profile.stats.gamesPlayed) * 100) 
     : 0;
 
+  if (matchmakingStatus === 'queued') {
+    return (
+      <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between items-center text-center gap-6 min-h-[50vh] transition-all duration-200 text-white animate-scale-up" id="matchmaking-searching-view">
+        {/* Decorative ambient glowing background rings */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-72 bg-amber-500/15 rounded-full blur-3xl pointer-events-none animate-pulse" />
+        
+        {/* Animated sword fight icon */}
+        <div className="relative mt-8">
+          <div className="w-24 h-24 bg-gradient-to-br from-amber-500 to-rose-500 rounded-full flex items-center justify-center border-4 border-amber-400 shadow-lg relative animate-pulse">
+            <Swords size={48} className="text-white stroke-[2.5] animate-bounce" />
+          </div>
+          {/* Pulsing ring animation */}
+          <div className="absolute inset-0 w-24 h-24 border-4 border-amber-400/50 rounded-full animate-ping pointer-events-none" />
+        </div>
+
+        <div className="space-y-2 max-w-xs relative z-10">
+          <h2 className="text-xl font-black tracking-wider text-amber-300 uppercase font-sans animate-pulse">Rakipler Aranıyor...</h2>
+          <p className="text-xs text-gray-300 font-medium leading-relaxed">
+            Savaş meydanında seninle kapışacak bir rakip aranıyor. Lütfen ayrılma!
+          </p>
+        </div>
+
+        {/* Live Search Stats / Visualizer */}
+        <div className="w-full max-w-xs bg-black/40 border border-white/5 rounded-2xl p-4 space-y-2.5 relative z-10 font-mono text-[10px] text-gray-400">
+          <div className="flex justify-between items-center">
+            <span>Seçilen Harf Sayısı:</span>
+            <span className="text-amber-400 font-bold">{wordLength} Harf</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span>Sözlük Modu:</span>
+            <span className="text-emerald-400 font-bold">
+              {dictionaryMode === 'tdk_online' ? 'TDK Onaylı' : 'Serbest'}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span>Oyun Modu:</span>
+            <span className="text-rose-400 font-bold">Canlı Düello</span>
+          </div>
+          {/* Animated dot logs */}
+          <div className="border-t border-white/5 pt-2 flex items-center gap-2 text-amber-500/70">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <span className="animate-pulse">Sıraya girildi, eşleşme bekleniyor...</span>
+          </div>
+        </div>
+
+        {/* Cancel Button */}
+        <button
+          onClick={() => onStartMatchmaking(selectedMatchWords)}
+          className="w-full max-w-xs bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-xs py-3 px-4 rounded-xl shadow-lg transition-all uppercase tracking-widest cursor-pointer border border-rose-500 mb-4 z-10"
+        >
+          Aramayı İptal Et
+        </button>
+      </div>
+    );
+  }
+
   if (showGameSetup) {
     return (
       <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2rem] border border-[#3E485A]/30 p-4 sm:p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between gap-y-2.5 h-full max-h-full transition-all duration-200 text-white animate-scale-up" id="welcome-setup-page">
@@ -540,20 +599,22 @@ export default function WelcomeScreen({
               <button
                 onClick={() => {
                   onStartMatchmaking(selectedMatchWords);
-                  setShowGameSetup(false);
+                  if (isOnline) {
+                    setShowGameSetup(false);
+                  }
                 }}
-                disabled={matchmakingStatus === 'queued' || !isOnline}
+                disabled={(matchmakingStatus as string) === 'queued' || !isOnline}
                 className={`w-full font-black text-xs sm:text-sm py-2.5 px-4 rounded-xl active:scale-[0.98] transition-all flex items-center justify-center uppercase tracking-widest cursor-pointer border-2 mb-0 ${
                   !isOnline
                     ? 'bg-black/20 text-gray-500 border-white/5 cursor-not-allowed opacity-60'
-                    : matchmakingStatus === 'queued'
+                    : (matchmakingStatus as string) === 'queued'
                     ? 'bg-amber-500 text-slate-950 border-amber-400 animate-pulse'
                     : 'bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border-[#EBE6D5] shadow-[0_3px_0_#D9D4C3,0_5px_10px_rgba(0,0,0,0.15)]'
                 }`}
                 id="start-pvp-btn"
               >
-                <Swords size={14} className={`mr-2 stroke-[2.5] ${matchmakingStatus === 'queued' ? 'animate-bounce' : 'text-[#2E3748]'}`} />
-                <span>{matchmakingStatus === 'queued' ? 'Aranıyor...' : 'Canlı Düelloyu Başlat'}</span>
+                <Swords size={14} className={`mr-2 stroke-[2.5] ${(matchmakingStatus as string) === 'queued' ? 'animate-bounce' : 'text-[#2E3748]'}`} />
+                <span>{(matchmakingStatus as string) === 'queued' ? 'Aranıyor...' : 'Canlı Düelloyu Başlat'}</span>
               </button>
             )}
 
@@ -844,7 +905,7 @@ export default function WelcomeScreen({
         </button>
 
         {/* Matchmaking Queue Status */}
-        {matchmakingStatus === 'queued' && (
+        {((matchmakingStatus as string) === 'queued') && (
           <div className="bg-amber-500/10 border border-amber-500/30 p-2 rounded-lg flex items-center justify-between animate-fade-in mt-1">
             <div className="text-left">
               <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1.5 font-mono uppercase tracking-wide">
@@ -895,14 +956,6 @@ export default function WelcomeScreen({
                 </p>
               </div>
             </div>
-            
-            {/* BİLGİ Action Button */}
-            <button 
-              onClick={() => setShowRulesModal(true)}
-              className="bg-white hover:bg-gray-50 active:scale-95 text-[#2E3748] border border-[#EBE6D5] rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-wider shadow-sm transition shrink-0 z-10"
-            >
-              BİLGİ
-            </button>
           </div>
         ) : (
           <button

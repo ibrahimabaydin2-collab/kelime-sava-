@@ -718,6 +718,9 @@ export default function App() {
 
         if (user) {
           setFirebaseUser(user);
+          try {
+            window.localStorage.setItem('kelimesavasi_is_registered', (!user.isAnonymous).toString());
+          } catch (e) {}
           // Check if we have a pending restoration profile
           const pendingRestorationJson = safeLocalStorage.getItem('pending_restoration_profile');
           if (pendingRestorationJson) {
@@ -830,8 +833,9 @@ export default function App() {
             setFirebaseUser(null);
             const savedUsername = safeLocalStorage.getItem('saved_username');
             const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
-            if (savedUsername || savedProfileStr) {
-              console.log('Returning anonymous or registered user session detected. Auto-signing in as guest to prevent AuthScreen flash...');
+            const isRegisteredUser = safeLocalStorage.getItem('kelimesavasi_is_registered') === 'true';
+            if (!isRegisteredUser && (savedUsername || savedProfileStr)) {
+              console.log('Returning anonymous user session detected. Auto-signing in as guest to prevent AuthScreen flash...');
               try {
                 await signInAsGuest();
                 console.log('Auto-sign in as guest succeeded inside Auth listener.');
@@ -1583,24 +1587,26 @@ export default function App() {
   useEffect(() => {
     // Pause timer if app is not active (backgrounded)
     if (!isAppActive || gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch) || activeMatch) {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       return;
     }
 
-    timerRef.current = setInterval(() => {
+    const intervalId = setInterval(() => {
       // If the game status changes to anything other than playing, immediately abort and clear
       if (gameStatusRef.current !== 'playing') {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
+        clearInterval(intervalId);
+        if (timerRef.current === intervalId) {
           timerRef.current = null;
         }
         return;
       }
       setSecondsLeft((prev) => {
         if (prev <= 1) {
-          // Time expired - lose game or complete word in active match
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
+          clearInterval(intervalId);
+          if (timerRef.current === intervalId) {
             timerRef.current = null;
           }
           if (activeMatch) {
@@ -1619,8 +1625,13 @@ export default function App() {
       });
     }, 1000);
 
+    timerRef.current = intervalId;
+
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      clearInterval(intervalId);
+      if (timerRef.current === intervalId) {
+        timerRef.current = null;
+      }
     };
   }, [isAppActive, gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch, isDailyPuzzle, targetWord]); // Resets interval on attempt submission or validation change or exit or gameMode change
 
@@ -1708,13 +1719,13 @@ export default function App() {
       }
     }
 
-    setGameStatus('lost');
-    
     // Stop all timer intervals synchronously first
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+
+    setGameStatus('lost');
     
     showToast(`Oyunu Kaybettiniz: ${reason}! Doğru Kelime: ${targetWord}`, 'error');
     playDefeatSound(settings.soundEnabled);
@@ -2060,6 +2071,12 @@ export default function App() {
 
   // Handle Game Win
   const handleGameWin = (attemptCount: number, scoreAwarded: number) => {
+    // Stop all timer intervals synchronously first
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
     setProfile((prev) => {
       const newPlayed = prev.stats.gamesPlayed + 1;
       const newWon = prev.stats.gamesWon + 1;
