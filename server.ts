@@ -1090,35 +1090,39 @@ const setupWebSocket = (server: any) => {
                   const anyWon = Object.values(match.players).some(p => p.won);
 
                   if (allCompleted && !anyWon) {
-                    const finalWordLength = match.wordLength || 5;
-                    const newTargetWord = getRandomWord(finalWordLength);
-                    
-                    match.currentRound = (match.currentRound || 1) + 1;
-                    match.targetWord = newTargetWord;
-
-                    // Oyuncuların elindeki tahmin ve tamamlanma durumlarını sıfırla
-                    for (const pId of Object.keys(match.players)) {
-                      match.players[pId].attempts = [];
-                      match.players[pId].currentAttempt = 0;
-                      match.players[pId].completed = false;
-                      match.players[pId].won = false;
-                      match.players[pId].timeRemaining = 20;
+                    if (!match.roundsWon) {
+                      match.roundsWon = {};
                     }
-
-                    const nextWordPayload = JSON.stringify({
-                      type: 'match_next_word',
-                      targetWord: newTargetWord,
-                      roundsWon: match.roundsWon || {},
-                      currentRound: match.currentRound
-                    });
-
-                    // Her iki oyuncuya da yeni kelimeyi bildir
                     for (const pId of Object.keys(match.players)) {
-                      const client = clients.get(pId);
-                      if (client && client.ws.readyState === WebSocket.OPEN) {
-                        client.ws.send(nextWordPayload);
+                      if (match.roundsWon[pId] === undefined) {
+                        match.roundsWon[pId] = 0;
                       }
                     }
+
+                    match.status = 'ended';
+                    match.winnerId = 'draw';
+
+                    const endPayload = JSON.stringify({
+                      type: 'match_end',
+                      matchId,
+                      winnerId: 'draw',
+                      roundsWon: match.roundsWon,
+                      players: match.players,
+                      kelime_bulundu_zamani: null
+                    });
+
+                    // Her iki oyuncuya da bildir ve durumlarını boşta yap
+                    for (const pId of Object.keys(match.players)) {
+                      const client = clients.get(pId);
+                      if (client) {
+                        client.status = 'idle';
+                        if (client.ws.readyState === WebSocket.OPEN) {
+                          client.ws.send(endPayload);
+                        }
+                      }
+                    }
+
+                    broadcastLobby();
                   }
                 }
               }

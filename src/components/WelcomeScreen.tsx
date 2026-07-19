@@ -45,6 +45,11 @@ interface WelcomeScreenProps {
   onStartDailyPuzzle?: () => void;
   isDailyPuzzleCompletedToday?: boolean;
   onUpdateFriends?: (friends: string[]) => void;
+  isMatchmakingLocked?: boolean;
+  onAddGold?: (amount: number) => Promise<void>;
+  onDeductGold?: (amount: number) => Promise<boolean>;
+  onClaimDailyReward?: () => Promise<void>;
+  onWatchRewardedAdReward?: () => Promise<void>;
 }
 
 export default function WelcomeScreen({
@@ -74,7 +79,12 @@ export default function WelcomeScreen({
   onDeclineChallenge,
   onStartDailyPuzzle,
   isDailyPuzzleCompletedToday = false,
-  onUpdateFriends
+  onUpdateFriends,
+  isMatchmakingLocked = false,
+  onAddGold,
+  onDeductGold,
+  onClaimDailyReward,
+  onWatchRewardedAdReward
 }: WelcomeScreenProps) {
   const [showHowToPlay, setShowHowToPlay] = useState<boolean>(false);
   const [showMissions, setShowMissions] = useState<boolean>(false);
@@ -99,6 +109,11 @@ export default function WelcomeScreen({
 
   const [friendsTab, setFriendsTab] = useState<'friends' | 'find'>('friends');
   const [friendsSearchTerm, setFriendsSearchTerm] = useState<string>('');
+  
+  // Rewarded Ad and Daily Claim States
+  const [isWatchingAd, setIsWatchingAd] = useState<boolean>(false);
+  const [adCountdown, setAdCountdown] = useState<number>(5);
+  const [showAdSuccess, setShowAdSuccess] = useState<boolean>(false);
   
   // Daily Puzzle reset countdown timer state
   const [timeLeftToReset, setTimeLeftToReset] = useState<string>('');
@@ -225,6 +240,34 @@ export default function WelcomeScreen({
     } finally {
       setSearching(false);
     }
+  };
+
+  const startRewardedAdWatch = () => {
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+      try {
+        if ((window as any).AndroidBridge.loadAdBackground) {
+          (window as any).AndroidBridge.loadAdBackground();
+        }
+      } catch (e) {
+        console.error("Error triggering native ad:", e);
+      }
+    }
+
+    setIsWatchingAd(true);
+    setAdCountdown(5);
+
+    const interval = setInterval(() => {
+      setAdCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setIsWatchingAd(false);
+          onWatchRewardedAdReward?.();
+          setShowAdSuccess(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   useEffect(() => {
@@ -599,14 +642,16 @@ export default function WelcomeScreen({
               <button
                 onClick={() => {
                   onStartMatchmaking(selectedMatchWords);
-                  if (isOnline) {
+                  if (isOnline && !isMatchmakingLocked) {
                     setShowGameSetup(false);
                   }
                 }}
-                disabled={(matchmakingStatus as string) === 'queued' || !isOnline}
+                disabled={(matchmakingStatus as string) === 'queued' || !isOnline || isMatchmakingLocked}
                 className={`w-full font-black text-xs sm:text-sm py-2.5 px-4 rounded-xl active:scale-[0.98] transition-all flex items-center justify-center uppercase tracking-widest cursor-pointer border-2 mb-0 ${
                   !isOnline
                     ? 'bg-black/20 text-gray-500 border-white/5 cursor-not-allowed opacity-60'
+                    : isMatchmakingLocked
+                    ? 'bg-slate-700/50 text-slate-400 border-slate-600/30 cursor-not-allowed opacity-70'
                     : (matchmakingStatus as string) === 'queued'
                     ? 'bg-amber-500 text-slate-950 border-amber-400 animate-pulse'
                     : 'bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border-[#EBE6D5] shadow-[0_3px_0_#D9D4C3,0_5px_10px_rgba(0,0,0,0.15)]'
@@ -614,7 +659,13 @@ export default function WelcomeScreen({
                 id="start-pvp-btn"
               >
                 <Swords size={14} className={`mr-2 stroke-[2.5] ${(matchmakingStatus as string) === 'queued' ? 'animate-bounce' : 'text-[#2E3748]'}`} />
-                <span>{(matchmakingStatus as string) === 'queued' ? 'Aranıyor...' : 'Canlı Düelloyu Başlat'}</span>
+                <span>
+                  {isMatchmakingLocked
+                    ? 'Eşleşme Kilitli (Bekleyin...)'
+                    : (matchmakingStatus as string) === 'queued'
+                    ? 'Aranıyor...'
+                    : 'Canlı Düelloyu Başlat'}
+                </span>
               </button>
             )}
 
@@ -856,6 +907,75 @@ export default function WelcomeScreen({
           </div>
         );
       })()}
+
+      {/* ALTIN & ÖDÜL MERKEZİ CARD */}
+      <div className="w-full bg-[#FAF6E9] border-2 border-[#EBE6D5] rounded-3xl p-4 sm:p-5 shadow-[0_5px_0_#D9D4C3,0_8px_16px_rgba(0,0,0,0.15)] flex flex-col gap-3.5 text-left relative z-10 overflow-hidden animate-fade-in" id="gold-rewards-card">
+        {/* Elegant Vintage Double Border & Corner Ornaments */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-[#E2DCBF]/85 fill-none p-1" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <rect x="2" y="2" width="96" height="96" rx="8" strokeWidth="0.75" />
+          <rect x="3.5" y="3.5" width="93" height="93" rx="6" strokeWidth="0.5" strokeDasharray="1 1.5" />
+          <path d="M 3.5 8 Q 8 8 8 3.5" strokeWidth="0.75" />
+          <path d="M 96.5 8 Q 92 8 92 3.5" strokeWidth="0.75" />
+          <path d="M 3.5 92 Q 8 92 8 96.5" strokeWidth="0.75" />
+          <path d="M 96.5 92 Q 92 92 92 96.5" strokeWidth="0.75" />
+        </svg>
+
+        <div className="flex items-center justify-between gap-3 relative z-10 border-b border-[#E2DCBF] pb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🪙</span>
+            <span className="font-serif tracking-wide text-[#2E3748] font-bold text-base sm:text-lg">Cüzdanım & Ödüller</span>
+          </div>
+          <div className="bg-[#FEF9E6] px-2.5 py-1 rounded-xl border border-amber-500/30 flex items-center gap-1.5 shadow-sm">
+            <span className="text-xs sm:text-sm font-black text-[#C59B27] font-mono leading-none">{profile.gold !== undefined ? profile.gold : 20}</span>
+            <span className="text-[10px] sm:text-xs font-black text-[#C59B27] font-mono leading-none">ALTIN</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 relative z-10">
+          {/* Daily Login Button */}
+          {(() => {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const isDailyClaimed = profile.lastDailyLoginClaim === todayStr;
+            return (
+              <button
+                disabled={isDailyClaimed}
+                onClick={onClaimDailyReward}
+                className={`w-full py-3 px-4 rounded-xl font-extrabold text-xs flex items-center justify-between transition-all duration-150 active:scale-95 border uppercase tracking-wider ${
+                  isDailyClaimed
+                    ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border-emerald-200 text-emerald-800 shadow-sm cursor-pointer'
+                }`}
+                title={isDailyClaimed ? 'Günlük giriş ödülü zaten alındı' : 'Günlük 10 altın kazan'}
+              >
+                <div className="flex items-center gap-2">
+                  <span>🎁</span>
+                  <div className="text-left">
+                    <span className="block font-black text-[10px] leading-tight text-emerald-900/80">GÜNLÜK GİRİŞ</span>
+                    <span className="block text-[8px] font-mono text-gray-500 leading-none mt-0.5">RESET 00:00</span>
+                  </div>
+                </div>
+                <span className="font-mono text-xs font-black text-emerald-600">{isDailyClaimed ? '✓ ALINDI' : '+10🪙'}</span>
+              </button>
+            );
+          })()}
+
+          {/* Rewarded Ad Button */}
+          <button
+            onClick={startRewardedAdWatch}
+            className="w-full py-3 px-4 rounded-xl font-extrabold text-xs flex items-center justify-between transition-all duration-150 active:scale-95 bg-gradient-to-r from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 border-amber-200 text-amber-850 shadow-sm cursor-pointer uppercase tracking-wider"
+            title="Reklam izleyerek 10 altın kazan"
+          >
+            <div className="flex items-center gap-2">
+              <span>📺</span>
+              <div className="text-left">
+                <span className="block font-black text-[10px] leading-tight text-amber-900/80">REKLAM İZLE</span>
+                <span className="block text-[8px] font-mono text-gray-500 leading-none mt-0.5">SINIRSIZ HAK</span>
+              </div>
+            </div>
+            <span className="font-mono text-xs font-black text-amber-600">+10🪙</span>
+          </button>
+        </div>
+      </div>
 
       {/* Direct Challenge Notification */}
       {activeChallenges.length > 0 && (
@@ -1522,6 +1642,60 @@ export default function WelcomeScreen({
                 Kapat
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📺 AD-WATCHING OVERLAY */}
+      {isWatchingAd && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in pointer-events-auto">
+          <div className="w-full max-w-sm bg-slate-900 border border-amber-500/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative">
+            <div className="absolute inset-0 rounded-3xl border border-dashed border-amber-500/20 animate-spin [animation-duration:40s]" />
+            <span className="text-4xl block mb-4 animate-bounce">📺</span>
+            <h3 className="text-[#FAF6E9] font-serif text-lg sm:text-xl font-bold uppercase tracking-wide leading-tight mb-2">
+              Ödüllü Reklam Oynatılıyor
+            </h3>
+            <p className="text-gray-400 text-xs leading-relaxed mb-6">
+              Lütfen bekleyin, altın ödülünüz yükleniyor. Bu ekranı kapatmayınız...
+            </p>
+
+            <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5 border border-white/5 mb-4">
+              <div 
+                style={{ width: `${(adCountdown / 5) * 100}%` }}
+                className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full transition-all duration-1000 ease-linear shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+              />
+            </div>
+
+            <div className="text-xs font-black text-amber-400 font-mono tracking-widest leading-none">
+              REKLAM SÜRESİ: {adCountdown} saniye
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🎉 AD SUCCESS CELEBRATION POPUP */}
+      {showAdSuccess && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 text-center animate-fade-in">
+          <div className="w-full max-w-sm bg-[#FAF6E9] border-2 border-amber-500 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden animate-scale-up">
+            <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-[#E2DCBF] fill-none p-1" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <rect x="2" y="2" width="96" height="96" rx="8" strokeWidth="0.75" />
+              <rect x="3.5" y="3.5" width="93" height="93" rx="6" strokeWidth="0.5" strokeDasharray="1 1.5" />
+            </svg>
+
+            <div className="text-5xl block mb-4 animate-bounce">🪙✨</div>
+            <h3 className="text-[#2E3748] font-serif text-lg sm:text-xl font-black uppercase tracking-wide leading-tight mb-2">
+              Tebrikler!
+            </h3>
+            <p className="text-gray-600 text-xs sm:text-sm leading-relaxed mb-6">
+              Ödüllü reklam başarıyla tamamlandı! Hesabınıza <span className="font-bold text-amber-600">10 Altın</span> eklendi.
+            </p>
+
+            <button
+              onClick={() => setShowAdSuccess(false)}
+              className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 py-3 rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition cursor-pointer"
+            >
+              Altınları Al!
+            </button>
           </div>
         </div>
       )}

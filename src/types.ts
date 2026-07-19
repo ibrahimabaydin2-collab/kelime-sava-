@@ -36,6 +36,9 @@ export interface UserProfile {
   nameSet?: boolean;
   deviceId?: string;
   friends?: string[];
+  wordLengthStats?: { [key: string]: number };
+  gold?: number;
+  lastDailyLoginClaim?: string;
 }
 
 export interface GameAttempt {

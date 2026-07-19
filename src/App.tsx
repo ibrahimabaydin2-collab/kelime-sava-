@@ -24,7 +24,7 @@ import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
 import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser, fetchUserProfileByDeviceId, deleteUserProfile, signInAsGuest, clearMatchmakingState } from './lib/firebase.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge, NetworkLogEntry } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play, Home } from 'lucide-react';
-import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './data/wordlist.js';
+import { getRandomWord, isWordInCuratedList, getDailyWordAndLength, COMMON_TURKISH_WORDS } from './data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/turkish.js';
 import { getApiUrl, getWsUrl, validateWordClientSide } from './utils/api.js';
 import { calculateDynamicScore, verifyScoringAccuracy, getLevelForScore } from './utils/scoring.js';
@@ -39,25 +39,50 @@ const INITIAL_STATS = {
   winDistribution: [0, 0, 0, 0, 0, 0]
 };
 
+export const ensureProfileFields = (p: UserProfile): UserProfile => {
+  return {
+    ...p,
+    gold: p.gold !== undefined ? p.gold : 20,
+    lastDailyLoginClaim: p.lastDailyLoginClaim !== undefined ? p.lastDailyLoginClaim : '',
+    wordLengthStats: p.wordLengthStats || {
+      "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "8": 0
+    },
+    missions: p.missions || DEFAULT_MISSIONS,
+    badges: p.badges || DEFAULT_BADGES,
+    stats: p.stats || INITIAL_STATS
+  };
+};
+
 const DEFAULT_BADGES: Badge[] = [
-  { id: 'first_step', title: 'İlk Adım', description: 'İlk kelime oyununu oyna', iconName: 'Award' },
-  { id: 'champion', title: 'Şampiyon', description: 'İlk galibiyetini kazan', iconName: 'Trophy' },
-  { id: 'lightning', title: 'Yıldırım Çözücü', description: '10 saniyeden fazla süre varken kelimeyi çöz', iconName: 'Zap' },
-  { id: 'flawless', title: 'Kusursuz', description: 'Kelimeyi ilk veya ikinci denemede doğru bil', iconName: 'Star' },
-  { id: 'genius', title: 'Zeka Küpü', description: '8 harfli bir kelimeyi başarıyla tamamla', iconName: 'Brain' },
-  { id: 'gladiator', title: 'Gladyatör', description: 'Gerçek zamanlı bir arkadaş meydan okumasını kazan', iconName: 'Shield' },
-  { id: 'daily_puzzle_solver', title: 'Günlük Bilge', description: 'Günün bulmacasını başarıyla çöz', iconName: 'Calendar' },
-  { id: 'word_detective', title: 'Kelime Dedektifi', description: 'Toplam 10 kelimeyi başarıyla çöz', iconName: 'Search' },
-  { id: 'word_guru', title: 'Kelime Gurusu', description: 'Toplam 50 kelimeyi başarıyla çöz', iconName: 'Crown' },
-  { id: 'word_master', title: 'Kelime Ustası', description: 'Toplam 100 kelimeyi başarıyla çöz', iconName: 'Crown' },
-  { id: 'persistent_player', title: 'Azimli Oyuncu', description: 'Toplam 25 oyun oyna', iconName: 'Award' },
-  { id: 'quick_draw', title: 'Hızlı Silah', description: 'Bir kelimeyi 5 saniyeden kısa sürede çöz', iconName: 'Zap' },
-  { id: 'streak_master', title: 'Seri Katil', description: 'Üst üste 5 galibiyet serisi yakala', iconName: 'Flame' },
-  { id: 'legend', title: 'Efsane', description: 'Üst üste 10 galibiyet serisi yakala', iconName: 'Crown' },
-  { id: 'perfect_brain', title: 'Kusursuz Deha', description: 'Bir kelimeyi ilk denemede doğru bil', iconName: 'Sparkles' },
-  { id: 'mission_seeker', title: 'Görev Avcısı', description: '5 günlük görevi tamamla', iconName: 'Target' },
-  { id: 'mission_lord', title: 'Görev Efendisi', description: '20 günlük görevi tamamla', iconName: 'Trophy' },
-  { id: 'polymath', title: 'Kelime Bilgini', description: 'Tüm kelime uzunluklarından (3-8 harf) en az birer kelime çöz', iconName: 'Compass' }
+  // 3 Harfli Modu
+  { id: 'solve_3_10', title: '3 Harfli Çömez', description: '3 harfli modda toplam 10 kelimeyi doğru bil', iconName: 'Award' },
+  { id: 'solve_3_50', title: '3 Harfli Usta', description: '3 harfli modda toplam 50 kelimeyi doğru bil', iconName: 'Trophy' },
+  { id: 'solve_3_150', title: '3 Harfli Efsane', description: '3 harfli modda toplam 150 kelimeyi doğru bil', iconName: 'Crown' },
+
+  // 4 Harfli Modu
+  { id: 'solve_4_10', title: '4 Harfli Çömez', description: '4 harfli modda toplam 10 kelimeyi doğru bil', iconName: 'Award' },
+  { id: 'solve_4_50', title: '4 Harfli Usta', description: '4 harfli modda toplam 50 kelimeyi doğru bil', iconName: 'Trophy' },
+  { id: 'solve_4_150', title: '4 Harfli Efsane', description: '4 harfli modda toplam 150 kelimeyi doğru bil', iconName: 'Crown' },
+
+  // 5 Harfli Modu
+  { id: 'solve_5_10', title: '5 Harfli Çömez', description: '5 harfli modda toplam 10 kelimeyi doğru bil', iconName: 'Award' },
+  { id: 'solve_5_50', title: '5 Harfli Usta', description: '5 harfli modda toplam 50 kelimeyi doğru bil', iconName: 'Trophy' },
+  { id: 'solve_5_150', title: '5 Harfli Efsane', description: '5 harfli modda toplam 150 kelimeyi doğru bil', iconName: 'Crown' },
+
+  // 6 Harfli Modu
+  { id: 'solve_6_10', title: '6 Harfli Çömez', description: '6 harfli modda toplam 10 kelimeyi doğru bil', iconName: 'Award' },
+  { id: 'solve_6_50', title: '6 Harfli Usta', description: '6 harfli modda toplam 50 kelimeyi doğru bil', iconName: 'Trophy' },
+  { id: 'solve_6_150', title: '6 Harfli Efsane', description: '6 harfli modda toplam 150 kelimeyi doğru bil', iconName: 'Crown' },
+
+  // 7 Harfli Modu
+  { id: 'solve_7_10', title: '7 Harfli Çömez', description: '7 harfli modda toplam 10 kelimeyi doğru bil', iconName: 'Award' },
+  { id: 'solve_7_50', title: '7 Harfli Usta', description: '7 harfli modda toplam 50 kelimeyi doğru bil', iconName: 'Trophy' },
+  { id: 'solve_7_150', title: '7 Harfli Efsane', description: '7 harfli modda toplam 150 kelimeyi doğru bil', iconName: 'Crown' },
+
+  // 8 Harfli Modu
+  { id: 'solve_8_10', title: '8 Harfli Çömez', description: '8 harfli modda toplam 10 kelimeyi doğru bil', iconName: 'Award' },
+  { id: 'solve_8_50', title: '8 Harfli Usta', description: '8 harfli modda toplam 50 kelimeyi doğru bil', iconName: 'Trophy' },
+  { id: 'solve_8_150', title: '8 Harfli Efsane', description: '8 harfli modda toplam 150 kelimeyi doğru bil', iconName: 'Crown' }
 ];
 
 const DEFAULT_MISSIONS: DailyMission[] = [
@@ -388,22 +413,18 @@ export default function App() {
             }
           });
         }
-        if (!parsed.badges) {
-          parsed.badges = DEFAULT_BADGES;
-        } else {
-          // Merge default badges to ensure any newly added badges are present
-          const existingIds = parsed.badges.map((b: any) => b.id);
-          DEFAULT_BADGES.forEach(badge => {
-            if (!existingIds.includes(badge.id)) {
-              parsed.badges.push(badge);
-            }
-          });
-        }
+        // Keep only badges that exist in DEFAULT_BADGES. If they were already unlocked, keep the unlocked state.
+        const oldBadges = parsed.badges || [];
+        parsed.badges = DEFAULT_BADGES.map(defBadge => {
+          const matched = oldBadges.find((b: any) => b.id === defBadge.id);
+          return matched ? { ...defBadge, unlockedAt: matched.unlockedAt } : defBadge;
+        });
+
         // Backward-compatibility: if user has already entered the game before, assume name is set
         if (parsed.nameSet === undefined) {
           parsed.nameSet = true;
         }
-        return parsed;
+        return ensureProfileFields(parsed);
       } catch (e) {
         console.error('Failed parsing profile', e);
       }
@@ -412,16 +433,26 @@ export default function App() {
     // Default profile
     const randomId = `user_${Math.random().toString(36).substring(2, 11)}`;
     const randomNum = Math.floor(100 + Math.random() * 900);
-    return {
+    return ensureProfileFields({
       id: randomId,
       name: `Oyuncu_${randomNum}`,
       stats: INITIAL_STATS,
       badges: DEFAULT_BADGES,
       missions: DEFAULT_MISSIONS,
       dailyScore: 0,
+      wordLengthStats: {
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0
+      },
+      gold: 20,
+      lastDailyLoginClaim: '',
       lastUpdated: new Date().toISOString(),
       nameSet: false // Brand new users must select their nickname and avatar
-    };
+    });
   });
 
   // Firebase Auth states with fast-path and optimistic rendering optimizations
@@ -492,9 +523,260 @@ export default function App() {
   const [isValidating, setIsValidating] = useState<boolean>(false);
   const [wordDefinition, setWordDefinition] = useState<string>('');
   const [letterStatuses, setLetterStatuses] = useState<{ [key: string]: 'green' | 'orange' | 'grey' }>({});
+  const [revealedHints, setRevealedHints] = useState<{ [index: number]: string }>({});
+  const [activeWordSuggestion, setActiveWordSuggestion] = useState<string | null>(null);
 
   // Welcome Screen & Dictionary Mode State
   const [hasEnteredGame, setHasEnteredGame] = useState<boolean>(false);
+
+  // Gold economy helper functions
+  const addGold = async (amount: number) => {
+    const currentGold = profile.gold !== undefined ? profile.gold : 20;
+    const updated = {
+      ...profile,
+      gold: currentGold + amount,
+      lastUpdated: new Date().toISOString()
+    };
+    setProfile(updated);
+    safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updated));
+    saveUserProfileToFirestore(updated).catch((err) => {
+      console.warn("Firestore gold update failed:", err);
+    });
+  };
+
+  const deductGold = async (amount: number): Promise<boolean> => {
+    const currentGold = profile.gold !== undefined ? profile.gold : 20;
+    if (currentGold < amount) {
+      showToast("Yetersiz Altın! Reklam izleyerek altın kazanabilirsin.", "error");
+      return false;
+    }
+    const updated = {
+      ...profile,
+      gold: currentGold - amount,
+      lastUpdated: new Date().toISOString()
+    };
+    setProfile(updated);
+    safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updated));
+    saveUserProfileToFirestore(updated).catch((err) => {
+      console.warn("Firestore gold update failed:", err);
+    });
+    return true;
+  };
+
+  // 💡 WORD SUGGESTION GENERATION (Wordle helper matching current green/orange constraints)
+  const generateWordSuggestion = (): string | null => {
+    const wordList = COMMON_TURKISH_WORDS[wordLength];
+    if (!wordList || wordList.length === 0) return null;
+
+    // 1. Gather constraints
+    const greenLetters: { [idx: number]: string } = {};
+    const orangeLetters = new Set<string>();
+    const orangeExclusions: { [idx: number]: Set<string> } = {};
+    const greyLetters = new Set<string>();
+    const confirmedLetters = new Set<string>();
+
+    attempts.forEach(attempt => {
+      attempt.feedback.forEach((f, idx) => {
+        const char = attempt.word[idx]?.toLowerCase();
+        if (!char) return;
+        if (f === 'green') {
+          greenLetters[idx] = char;
+          confirmedLetters.add(char);
+        } else if (f === 'orange') {
+          orangeLetters.add(char);
+          confirmedLetters.add(char);
+          if (!orangeExclusions[idx]) orangeExclusions[idx] = new Set();
+          orangeExclusions[idx].add(char);
+        } else if (f === 'grey') {
+          greyLetters.add(char);
+        }
+      });
+    });
+
+    // Clean up grey letters that are actually confirmed (e.g. green in another position)
+    confirmedLetters.forEach(char => {
+      greyLetters.delete(char);
+    });
+
+    const targetLower = targetWord.toLowerCase();
+
+    // 2. Filter words
+    const matchingWords = wordList.filter(w => {
+      const word = w.toLowerCase();
+      if (word.length !== wordLength) return false;
+      if (word === targetLower) return false; // don't reveal the exact answer directly!
+
+      // Check greens
+      for (let i = 0; i < wordLength; i++) {
+        if (greenLetters[i] !== undefined && word[i] !== greenLetters[i]) {
+          return false;
+        }
+      }
+
+      // Check oranges presence
+      for (const char of orangeLetters) {
+        if (!word.includes(char)) {
+          return false;
+        }
+      }
+
+      // Check orange positions exclusion
+      for (let i = 0; i < wordLength; i++) {
+        if (orangeExclusions[i] && orangeExclusions[i].has(word[i])) {
+          return false;
+        }
+      }
+
+      // Check greys exclusion
+      for (const char of greyLetters) {
+        if (word.includes(char)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    if (matchingWords.length > 0) {
+      const idx = Math.floor(Math.random() * matchingWords.length);
+      return matchingWords[idx];
+    }
+
+    // Fallback: if no perfect match, find words that match just the green letters
+    const simpleMatching = wordList.filter(w => {
+      const word = w.toLowerCase();
+      if (word.length !== wordLength) return false;
+      if (word === targetLower) return false;
+      for (let i = 0; i < wordLength; i++) {
+        if (greenLetters[i] !== undefined && word[i] !== greenLetters[i]) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (simpleMatching.length > 0) {
+      const idx = Math.floor(Math.random() * simpleMatching.length);
+      return simpleMatching[idx];
+    }
+
+    // Secondary fallback: just pick a random word of same length that isn't the target word
+    const allowed = wordList.filter(w => w.toLowerCase() !== targetLower);
+    if (allowed.length > 0) {
+      return allowed[Math.floor(Math.random() * allowed.length)];
+    }
+
+    return null;
+  };
+
+  const handleGetWordSuggestion = async () => {
+    if (gameStatus !== 'playing') return;
+    if (profile.gold < 1) {
+      showToast("Yetersiz Altın! Reklam izleyerek altın kazanabilirsiniz.", "error");
+      return;
+    }
+    const suggestion = generateWordSuggestion();
+    if (suggestion) {
+      const success = await deductGold(1);
+      if (success) {
+        setActiveWordSuggestion(suggestion.toUpperCase());
+        showToast(`Kelime Tavsiyesi Alındı: ${suggestion.toUpperCase()} 💡`, "success");
+        playClickSound(settings.soundEnabled);
+      }
+    } else {
+      showToast("Uygun bir kelime önerisi bulunamadı.", "info");
+    }
+  };
+
+  const handleGetHint = async () => {
+    if (gameStatus !== 'playing') return;
+    if (profile.gold < 1) {
+      showToast("Yetersiz Altın! Reklam izleyerek altın kazanabilirsiniz.", "error");
+      return;
+    }
+
+    // Let's find unrevealed indices in targetWord
+    const unrevealedIndices: number[] = [];
+    const targetWordUpper = targetWord.toUpperCase();
+    for (let i = 0; i < wordLength; i++) {
+      const isGreenInAttempts = attempts.some(att => att.feedback[i] === 'green' && att.word[i].toUpperCase() === targetWordUpper[i]);
+      const isAlreadyHinted = revealedHints[i] !== undefined;
+      if (!isGreenInAttempts && !isAlreadyHinted) {
+        unrevealedIndices.push(i);
+      }
+    }
+
+    if (unrevealedIndices.length > 0) {
+      // Whisper a correct letter
+      const success = await deductGold(1);
+      if (success) {
+        const randomIdx = unrevealedIndices[Math.floor(Math.random() * unrevealedIndices.length)];
+        const charToReveal = targetWordUpper[randomIdx];
+        setRevealedHints(prev => ({ ...prev, [randomIdx]: charToReveal }));
+        showToast("Doğru harf konumu fısıldandı! 🤫", "success");
+        playClickSound(settings.soundEnabled);
+      }
+      return;
+    }
+
+    // Otherwise, delete an unused letter from the keyboard
+    const turkishAlphabet = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ".split("");
+    const unusedAlphabetKeys = turkishAlphabet.filter(letter => {
+      const charLower = letter.toLowerCase();
+      const targetLower = targetWord.toLowerCase();
+      const isCharInTarget = targetLower.includes(charLower);
+      const isCharAlreadyGrey = letterStatuses[letter] === 'grey';
+      return !isCharInTarget && !isCharAlreadyGrey;
+    });
+
+    if (unusedAlphabetKeys.length > 0) {
+      const success = await deductGold(1);
+      if (success) {
+        const randomKey = unusedAlphabetKeys[Math.floor(Math.random() * unusedAlphabetKeys.length)];
+        setLetterStatuses(prev => ({ ...prev, [randomKey]: 'grey' }));
+        showToast(`Klavyeden kullanılmayan '${randomKey}' harfi silindi! 🧹`, "success");
+        playClickSound(settings.soundEnabled);
+      }
+    } else {
+      showToast("Tüm ipuçları zaten açık!", "info");
+    }
+  };
+
+  const handleClaimDailyReward = async () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (profile.lastDailyLoginClaim === todayStr) {
+      showToast("Bugünkü günlük giriş ödülünüzü zaten aldınız!", "info");
+      return;
+    }
+    const currentGold = profile.gold !== undefined ? profile.gold : 20;
+    const updated = {
+      ...profile,
+      gold: currentGold + 10,
+      lastDailyLoginClaim: todayStr,
+      lastUpdated: new Date().toISOString()
+    };
+    setProfile(updated);
+    safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updated));
+    showToast("Günlük giriş ödülü: 10 Altın kazandınız! 🪙", "success");
+    await saveUserProfileToFirestore(updated).catch((err) => {
+      console.warn("Firestore daily claim failed:", err);
+    });
+  };
+
+  const handleWatchRewardedAdReward = async () => {
+    const currentGold = profile.gold !== undefined ? profile.gold : 20;
+    const updated = {
+      ...profile,
+      gold: currentGold + 10,
+      lastUpdated: new Date().toISOString()
+    };
+    setProfile(updated);
+    safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updated));
+    showToast("Tebrikler! Reklam tamamlandı ve 10 Altın kazandınız! 🪙", "success");
+    await saveUserProfileToFirestore(updated).catch((err) => {
+      console.warn("Firestore ad reward failed:", err);
+    });
+  };
 
   const [dictionaryMode, setDictionaryMode] = useState<'tdk_online' | 'no_validation'>(() => {
     const saved = safeLocalStorage.getItem('kelimesavasi_dict_mode');
@@ -672,6 +954,8 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showDefinitionModal, setShowDefinitionModal] = useState<boolean>(false);
   const [showCongratsModal, setShowCongratsModal] = useState<boolean>(false);
+  const [opponentLeftDuringMatch, setOpponentLeftDuringMatch] = useState<boolean>(false);
+  const [isMatchmakingLocked, setIsMatchmakingLocked] = useState<boolean>(false);
   const [unlockedBadgeToShow, setUnlockedBadgeToShow] = useState<Badge | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -839,15 +1123,16 @@ export default function App() {
               if (!active) return;
 
               if (dbProfile) {
+                const finalProfile = ensureProfileFields(dbProfile);
                 // If the profile does not have deviceId set, or has a different deviceId, bind it!
-                if (!dbProfile.deviceId || dbProfile.deviceId !== deviceId) {
-                  dbProfile.deviceId = deviceId;
-                  await saveUserProfileToFirestore(dbProfile);
+                if (!finalProfile.deviceId || finalProfile.deviceId !== deviceId) {
+                  finalProfile.deviceId = deviceId;
+                  await saveUserProfileToFirestore(finalProfile);
                 }
-                setProfile(dbProfile);
-                safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(dbProfile));
-                if (dbProfile.name) {
-                  safeLocalStorage.setItem('saved_username', dbProfile.name);
+                setProfile(finalProfile);
+                safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(finalProfile));
+                if (finalProfile.name) {
+                  safeLocalStorage.setItem('saved_username', finalProfile.name);
                 }
               } else {
                 // No profile exists for this UID. Let's trigger device profile recovery
@@ -855,12 +1140,27 @@ export default function App() {
                   const existingProfile = await fetchUserProfileByDeviceId(deviceId);
                   if (existingProfile && existingProfile.id !== user.uid) {
                     console.log('Found existing profile associated with deviceId. Auto-recovering profile...', existingProfile);
-                    const updatedProfile = {
+                    const savedUsername = safeLocalStorage.getItem('saved_username');
+                    const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
+                    let finalName = existingProfile.name;
+                    let finalAvatar = existingProfile.avatarUrl;
+                    if (savedUsername) {
+                      finalName = savedUsername;
+                    } else if (savedProfileStr) {
+                      try {
+                        const parsed = JSON.parse(savedProfileStr);
+                        if (parsed && parsed.name) finalName = parsed.name;
+                        if (parsed && parsed.avatarUrl) finalAvatar = parsed.avatarUrl;
+                      } catch (e) {}
+                    }
+                    const updatedProfile = ensureProfileFields({
                       ...existingProfile,
                       id: user.uid,
+                      name: finalName,
+                      avatarUrl: finalAvatar,
                       deviceId: deviceId,
                       nameSet: true
-                    };
+                    });
                     setProfile(updatedProfile);
                     await saveUserProfileToFirestore(updatedProfile);
                     // Delete the old profile document to keep usernames unique and avoid duplicate deviceId
@@ -877,19 +1177,22 @@ export default function App() {
                     const savedUsername = safeLocalStorage.getItem('saved_username');
                     const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
                     let finalName = savedUsername || profile.name;
+                    let finalAvatar = profile.avatarUrl || '🧠';
                     if (savedProfileStr) {
                       try {
                         const parsed = JSON.parse(savedProfileStr);
                         if (parsed && parsed.name) finalName = parsed.name;
+                        if (parsed && parsed.avatarUrl) finalAvatar = parsed.avatarUrl;
                       } catch (e) {}
                     }
-                    const updatedProfile = {
+                    const updatedProfile = ensureProfileFields({
                       ...profile,
                       id: user.uid,
                       name: finalName,
+                      avatarUrl: finalAvatar,
                       deviceId: deviceId,
                       nameSet: true
-                    };
+                    });
                     setProfile(updatedProfile);
                     await saveUserProfileToFirestore(updatedProfile);
                     safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
@@ -900,15 +1203,31 @@ export default function App() {
                 } catch (deviceCheckErr) {
                   console.error('Error during automatic device profile recovery after auth:', deviceCheckErr);
                   // Sync current profile state as fallback
-                  const updatedProfile = {
+                  const savedUsername = safeLocalStorage.getItem('saved_username');
+                  const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
+                  let finalName = savedUsername || profile.name;
+                  let finalAvatar = profile.avatarUrl || '🧠';
+                  if (savedProfileStr) {
+                    try {
+                      const parsed = JSON.parse(savedProfileStr);
+                      if (parsed && parsed.name) finalName = parsed.name;
+                      if (parsed && parsed.avatarUrl) finalAvatar = parsed.avatarUrl;
+                    } catch (e) {}
+                  }
+                  const updatedProfile = ensureProfileFields({
                     ...profile,
                     id: user.uid,
+                    name: finalName,
+                    avatarUrl: finalAvatar,
                     deviceId: deviceId,
                     nameSet: true
-                  };
+                  });
                   setProfile(updatedProfile);
                   await saveUserProfileToFirestore(updatedProfile);
                   safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+                  if (updatedProfile.name) {
+                    safeLocalStorage.setItem('saved_username', updatedProfile.name);
+                  }
                 }
               }
 
@@ -1372,11 +1691,28 @@ export default function App() {
               break;
             }
 
-            case 'opponent_left':
-              showToast('Rakip oyundan ayrıldı!', 'error');
+            case 'opponent_left': {
+              showToast('Rakip oyundan ayrıldı! Zafer senin! 🏆', 'success');
+              setOpponentLeftDuringMatch(true);
+              setIsMatchmakingLocked(true); // Lock matchmaking to prevent accidental re-entry
               setGameStatus('won'); // Automatically win if opponent flees
-              setActiveMatch(null);
+              setActiveMatch((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  status: 'ended',
+                  winnerId: profile.id
+                };
+              });
+              if (targetWord) {
+                fetchTargetWordDefinition(targetWord);
+              }
+              // Award Gladiator Badge
+              unlockBadge('gladiator');
+              updateDailyScore(200);
+              triggerVictoryCelebration(settings.soundEnabled);
               break;
+            }
 
             case 'match_end': {
               const { winnerId, players: finalPlayers, roundsWon: rw } = data;
@@ -1568,6 +1904,8 @@ export default function App() {
     // 1. Deneme sayısı sıfırlansın (attempts array'ini boşaltmak deneme sayısını 0 yapar)
     setAttempts([]);
     setCurrentAttempt('');
+    setRevealedHints({});
+    setActiveWordSuggestion(null);
     
     // 2. Ekrandaki harf kutularının içindeki text'leri temizler ve CSS renk sınıflarını (yeşil/sarı/gri) kaldırır
     // (attempts array'i ve currentAttempt temizlendiğinde React GameBoard component'i otomatik olarak her şeyi varsayılana sıfırlar)
@@ -1597,6 +1935,13 @@ export default function App() {
 
   // Start a new solo game
   const startNewGame = async (length: number = wordLength, isDaily: boolean = isDailyPuzzle) => {
+    if (!isDaily) {
+      const hasGold = await deductGold(1);
+      if (!hasGold) {
+        setHasEnteredGame(false);
+        return;
+      }
+    }
     setIsValidating(true);
     softResetGame(length, isDaily);
     setIsValidating(false);
@@ -1632,6 +1977,15 @@ export default function App() {
     setSecondsLeft(20);
     setShowCongratsModal(false);
     setShowLobbyModal(false);
+    if (opponentLeftDuringMatch) {
+      setIsMatchmakingLocked(true);
+      setTimeout(() => {
+        setIsMatchmakingLocked(false);
+      }, 3000); // 3 seconds state lock to prevent accidental queue entry!
+    } else {
+      setIsMatchmakingLocked(false);
+    }
+    setOpponentLeftDuringMatch(false);
     pendingMatchmakingRef.current = null;
 
     // WebSocket cleanup and reconnection block
@@ -1665,7 +2019,7 @@ export default function App() {
         console.warn('Database cleanup failed in handleLeaveMatchToMenu:', err);
       });
     }
-  }, [profile.id]);
+  }, [profile.id, opponentLeftDuringMatch]);
 
   // Expose yeniKelimeyeBasla globally for Android Native WebView integration
   useEffect(() => {
@@ -1859,28 +2213,9 @@ export default function App() {
       currentStreak: 0
     };
 
-    const badgesToUnlockOnLoss = new Set<string>();
-    if (newStats.gamesPlayed >= 1) {
-      badgesToUnlockOnLoss.add('first_step');
-    }
-    if (newStats.gamesPlayed >= 25) {
-      badgesToUnlockOnLoss.add('persistent_player');
-    }
-
-    const newlyUnlocked: Badge[] = [];
-    const updatedBadges = profile.badges.map((b) => {
-      if (badgesToUnlockOnLoss.has(b.id) && !b.unlockedAt) {
-        const unlockedB = { ...b, unlockedAt: new Date().toISOString() };
-        newlyUnlocked.push(unlockedB);
-        return unlockedB;
-      }
-      return b;
-    });
-
     const updatedProfile: UserProfile = {
       ...profile,
       stats: newStats,
-      badges: updatedBadges,
       lastUpdated: new Date().toISOString()
     };
 
@@ -1891,20 +2226,6 @@ export default function App() {
     saveUserProfileToFirestore(updatedProfile).catch((err) => {
       console.warn("Non-blocking profile save after loss failed:", err);
     });
-
-    // Safely trigger toast and modal on macro task queue
-    if (newlyUnlocked.length > 0) {
-      setTimeout(() => {
-        newlyUnlocked.forEach((b, idx) => {
-          setTimeout(() => {
-            showToast(`🏆 YENİ ROZET KAZANILDI: ${b.title}!`, 'success');
-            if (idx === 0) {
-              setUnlockedBadgeToShow(b);
-            }
-          }, idx * 1000);
-        });
-      }, 500);
-    }
 
     // Sync if multiplayer
     syncMatchState(attempts, attempts.length, true, false, 0);
@@ -2248,23 +2569,37 @@ export default function App() {
       return m;
     });
 
-    // Determine which badges should be unlocked
+    // Increment total correct words count for the current wordLength in wordLengthStats
+    const currentWordLengthStats = {
+      ...(profile.wordLengthStats || {
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0
+      })
+    };
+    const key = String(wordLength);
+    currentWordLengthStats[key] = (currentWordLengthStats[key] || 0) + 1;
+
+    // Determine which badges should be unlocked based on new progressive word length stats
     const badgesToUnlock = new Set<string>();
-    if (updatedStats.gamesPlayed >= 1) {
-      badgesToUnlock.add('first_step');
-    }
-    if (updatedStats.gamesWon >= 1) {
-      badgesToUnlock.add('champion');
-    }
-    if (secondsLeft > 10) {
-      badgesToUnlock.add('lightning');
-    }
-    if (attemptCount <= 2) {
-      badgesToUnlock.add('flawless');
-    }
-    if (wordLength === 8) {
-      badgesToUnlock.add('genius');
-    }
+
+    const lengths = [3, 4, 5, 6, 7, 8];
+    lengths.forEach(len => {
+      const count = currentWordLengthStats[String(len)] || 0;
+      if (count >= 10) {
+        badgesToUnlock.add(`solve_${len}_10`);
+      }
+      if (count >= 50) {
+        badgesToUnlock.add(`solve_${len}_50`);
+      }
+      if (count >= 150) {
+        badgesToUnlock.add(`solve_${len}_150`);
+      }
+    });
+
     if (isDailyPuzzle) {
       const { dateStr } = getDailyWordAndLength();
       safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
@@ -2279,48 +2614,7 @@ export default function App() {
         }
       }
       setIsDailyPuzzleCompletedToday(true);
-      badgesToUnlock.add('daily_puzzle_solver');
       scheduleDailyNotifications();
-    }
-    if (updatedStats.gamesWon >= 10) {
-      badgesToUnlock.add('word_detective');
-    }
-    if (updatedStats.gamesWon >= 50) {
-      badgesToUnlock.add('word_guru');
-    }
-    if (updatedStats.gamesWon >= 100) {
-      badgesToUnlock.add('word_master');
-    }
-    if (updatedStats.gamesPlayed >= 25) {
-      badgesToUnlock.add('persistent_player');
-    }
-    if (secondsLeft >= 15) {
-      badgesToUnlock.add('quick_draw');
-    }
-    if (updatedStats.currentStreak >= 5) {
-      badgesToUnlock.add('streak_master');
-    }
-    if (updatedStats.currentStreak >= 10) {
-      badgesToUnlock.add('legend');
-    }
-    if (attemptCount === 1) {
-      badgesToUnlock.add('perfect_brain');
-    }
-    const totalCompletedMissions = updatedMissions.filter(m => m.completed).length;
-    if (totalCompletedMissions >= 5) {
-      badgesToUnlock.add('mission_seeker');
-    }
-    if (totalCompletedMissions >= 20) {
-      badgesToUnlock.add('mission_lord');
-    }
-    const solve3 = updatedMissions.find(m => m.type === 'solve_3')?.current || 0;
-    const solve4 = updatedMissions.find(m => m.type === 'solve_4')?.current || 0;
-    const solve5 = updatedMissions.find(m => m.type === 'solve_5')?.current || 0;
-    const solve6 = updatedMissions.find(m => m.type === 'solve_6')?.current || 0;
-    const solve7 = updatedMissions.find(m => m.type === 'solve_7')?.current || 0;
-    const solve8 = updatedMissions.find(m => m.type === 'solve_8')?.current || 0;
-    if (solve3 >= 1 && solve4 >= 1 && solve5 >= 1 && solve6 >= 1 && solve7 >= 1 && solve8 >= 1) {
-      badgesToUnlock.add('polymath');
     }
 
     // Compute updated badges array and collect newly unlocked badges
@@ -2340,6 +2634,7 @@ export default function App() {
       dailyScore: newScore,
       badges: updatedBadges,
       missions: updatedMissions,
+      wordLengthStats: currentWordLengthStats,
       lastUpdated: new Date().toISOString()
     };
 
@@ -2479,6 +2774,14 @@ export default function App() {
           badges: DEFAULT_BADGES,
           missions: DEFAULT_MISSIONS,
           dailyScore: 0,
+          wordLengthStats: {
+            "3": 0,
+            "4": 0,
+            "5": 0,
+            "6": 0,
+            "7": 0,
+            "8": 0
+          },
           lastUpdated: new Date().toISOString()
         };
         setProfile(updatedProfile);
@@ -2651,6 +2954,11 @@ export default function App() {
 
 
   const handleStartMatchmaking = async (matchWordsCount?: number) => {
+    if (isMatchmakingLocked) {
+      showToast('Eşleşme kuyruğuna giriş geçici olarak kilitlendi. Lütfen birkaç saniye bekleyin.', 'info');
+      return;
+    }
+
     if (!isOnline) {
       showToast('Kuyruğa girmek için sunucuya bağlı olmalısınız. Lütfen bekleyin veya çevrimdışı modu oynayın.', 'error');
       return;
@@ -2673,6 +2981,10 @@ export default function App() {
         });
       }
     } else {
+      // Deduct 1 gold entry fee for Canlı Oyun
+      const hasGold = await deductGold(1);
+      if (!hasGold) return;
+
       // RADICAL CLEANUP BEFORE STARTING MATCHMAKING
       console.log("Radical matchmaking starting: performing complete database and socket cleanup first...");
       setMatchmakingStatus('idle');
@@ -2874,7 +3186,17 @@ export default function App() {
       let loserScore = 0;
 
       const winnerEntry = playersList.find(([_, pState]: [string, any]) => pState.won);
-      if (winnerEntry) {
+      const bothCompleted = playersList.length === 2 && playersList.every(([_, pState]: [string, any]) => pState.completed);
+      const neitherWon = playersList.every(([_, pState]: [string, any]) => !pState.won);
+
+      if (activeMatch.winnerId === 'draw' || (bothCompleted && neitherWon)) {
+        winnerId = 'draw';
+        winnerName = 'Berabere';
+        winnerScore = 0;
+        loserId = 'draw';
+        loserName = 'Berabere';
+        loserScore = 0;
+      } else if (winnerEntry) {
         winnerId = winnerEntry[0];
         winnerName = (winnerEntry[1] as any).name || 'Oyuncu';
         winnerScore = (winnerEntry[1] as any).score || 0;
@@ -3034,6 +3356,11 @@ export default function App() {
             onDeclineChallenge={handleDeclineChallenge}
             onStartDailyPuzzle={handleStartDailyPuzzle}
             isDailyPuzzleCompletedToday={isDailyPuzzleCompletedToday}
+            isMatchmakingLocked={isMatchmakingLocked}
+            onAddGold={addGold}
+            onDeductGold={deductGold}
+            onClaimDailyReward={handleClaimDailyReward}
+            onWatchRewardedAdReward={handleWatchRewardedAdReward}
           />
         ) : (
           <>
@@ -3284,7 +3611,63 @@ export default function App() {
               wordLength={wordLength}
               boardTheme={settings.boardTheme}
               isGameOver={gameStatus !== 'playing'}
+              revealedHints={revealedHints}
             />
+          )}
+
+          {/* 💡 ACTIVE WORD SUGGESTION DRAWER */}
+          {activeWordSuggestion && gameStatus === 'playing' && !isMatchEnded && (
+            <div className="w-full max-w-sm mx-auto bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3 text-center mb-1 mt-1 animate-scale-up flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-base">💡</span>
+                <div className="text-left">
+                  <span className="text-[9px] text-gray-400 font-mono block uppercase">Önerilen Kelime</span>
+                  <strong className="text-sm font-black text-emerald-400 tracking-wider uppercase font-mono leading-none">{activeWordSuggestion}</strong>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setCurrentAttempt(activeWordSuggestion.slice(0, wordLength));
+                  playClickSound(settings.soundEnabled);
+                }}
+                className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-md"
+              >
+                Doldur
+              </button>
+            </div>
+          )}
+
+          {/* 🤫 HINT & SUGGESTION CONTROLS ROW */}
+          {!isMatchEnded && gameStatus === 'playing' && (
+            <div className="w-full max-w-sm mx-auto flex gap-2 justify-center py-1.5 px-1 shrink-0">
+              {/* HINT BUTTON */}
+              <button
+                onClick={handleGetHint}
+                disabled={attempts.length >= 6}
+                className="flex-1 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 hover:from-amber-500/20 hover:to-yellow-500/20 active:scale-95 border border-amber-500/20 text-[#FAF6E9] py-2 px-3 rounded-2xl transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+                title="Doğru Harf Fısılda veya Klavye Temizle"
+              >
+                <span className="text-base leading-none">🤫</span>
+                <div className="text-left leading-tight">
+                  <span className="block text-[10px] font-black uppercase tracking-wide">İpucu Al</span>
+                  <span className="block text-[8px] text-amber-400 font-mono font-bold leading-none">1 Altın</span>
+                </div>
+              </button>
+
+              {/* WORD SUGGESTION BUTTON */}
+              <button
+                onClick={handleGetWordSuggestion}
+                disabled={attempts.length >= 6}
+                className="flex-1 bg-gradient-to-r from-teal-500/10 to-emerald-500/10 hover:from-teal-500/20 hover:to-emerald-500/20 active:scale-95 border border-teal-500/20 text-[#FAF6E9] py-2 px-3 rounded-2xl transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+                title="Kurallara Uyan Kelime Öner"
+              >
+                <span className="text-base leading-none">💡</span>
+                <div className="text-left leading-tight">
+                  <span className="block text-[10px] font-black uppercase tracking-wide">Tavsiye Ver</span>
+                  <span className="block text-[8px] text-teal-400 font-mono font-bold leading-none">1 Altın</span>
+                </div>
+              </button>
+            </div>
           )}
 
           {/* Victory Celebration is now handled via the lightweight showCongratsModal popup to prevent layout shifts, lag and WebView/AdMob crashes */}
@@ -3477,6 +3860,11 @@ export default function App() {
                     </div>
                     <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest mt-1.5 font-mono">DÜELLO GALİBİ</span>
                     <h2 className="text-xl font-black text-[#FAF6E9] uppercase tracking-wide leading-none mt-0.5">ZAFER SENİN!</h2>
+                    {opponentLeftDuringMatch && (
+                      <span className="text-[11px] font-bold text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20 mt-1.5 inline-block">
+                        Rakip oyundan çıktı!
+                      </span>
+                    )}
                   </div>
                 ) : activeMatch.winnerId === 'draw' ? (
                   <div className="relative flex flex-col items-center">

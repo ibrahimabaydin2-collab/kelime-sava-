@@ -7,6 +7,7 @@ interface GameBoardProps {
   maxAttempts?: number;
   boardTheme?: 'classic' | 'ocean' | 'neon' | 'autumn' | 'pastel';
   isGameOver?: boolean;
+  revealedHints?: { [index: number]: string };
 }
 
 export default function GameBoard({
@@ -15,7 +16,8 @@ export default function GameBoard({
   wordLength,
   maxAttempts = 6,
   boardTheme = 'classic',
-  isGameOver = false
+  isGameOver = false,
+  revealedHints = {}
 }: GameBoardProps) {
   const rows = [...attempts];
   const isCompleted = rows.length >= maxAttempts;
@@ -115,17 +117,26 @@ export default function GameBoard({
           <div key={rowIndex} className="flex gap-[clamp(0.08rem,0.4vw,0.22rem)]">
             {wordChars.map((char, charIndex) => {
               const feedback = row.feedback?.[charIndex];
-              const cellClass = getCellClass(char, charIndex, isSubmitted, feedback);
+              const isHinted = isActive && char === ' ' && revealedHints[charIndex] !== undefined;
+              
+              let finalClass = getCellClass(char, charIndex, isSubmitted, feedback);
+              let displayChar = char !== ' ' ? char : '';
+              
+              if (isHinted) {
+                const sizeClass = getCellSizeClass();
+                finalClass = `${sizeClass} flex items-center justify-center font-bold uppercase transition-all duration-350 select-none border-emerald-500/70 bg-emerald-500/10 text-emerald-400 border-dashed animate-pulse scale-[1.02]`;
+                displayChar = revealedHints[charIndex];
+              }
 
               if (isGameOver) {
                 return (
                   <div
                     key={charIndex}
-                    className={cellClass}
+                    className={finalClass}
                     id={`cell-${rowIndex}-${charIndex}`}
                   >
                     <span className="font-sans font-bold">
-                      {char !== ' ' ? char : ''}
+                      {displayChar}
                     </span>
                   </div>
                 );
@@ -145,11 +156,11 @@ export default function GameBoard({
                       ? { scale: [1, 1.1, 1] }
                       : {}
                   }
-                  className={cellClass}
+                  className={finalClass}
                   id={`cell-${rowIndex}-${charIndex}`}
                 >
                   <span className="font-sans font-bold">
-                    {char !== ' ' ? char : ''}
+                    {displayChar}
                   </span>
                 </motion.div>
               );

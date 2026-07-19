@@ -283,6 +283,7 @@ export async function saveUserProfileToFirestore(profile: UserProfile): Promise<
     // Attempt background save to Firestore (without hard-failing the app if network is slow/offline)
     setDoc(userDocRef, {
       ...profile,
+      name_lowercase: profile.name ? profile.name.toLowerCase() : '',
       lastUpdated: new Date().toISOString(),
       updatedAt: serverTimestamp()
     }, { merge: true }).catch(error => {
@@ -391,18 +392,92 @@ export async function fetchUsersWhoAddedMe(uid: string): Promise<UserProfile[]> 
 }
 
 /**
- * Searches for user profiles matching a specific username exactly
+ * Searches for user profiles matching a specific username exactly or by prefix (case-insensitive)
  */
 export async function searchUserByName(name: string): Promise<UserProfile[]> {
   try {
+    const term = name.trim();
+    if (!term) return [];
+
     const usersCollection = collection(db, 'users');
-    const q = query(usersCollection, where('name', '==', name));
-    const querySnapshot = await getDocs(q);
-    const results: UserProfile[] = [];
-    querySnapshot.forEach((docSnap) => {
-      results.push(docSnap.data() as UserProfile);
+    const termLower = term.toLowerCase();
+
+    // Query 1: Case-insensitive prefix search using name_lowercase
+    const q1 = query(
+      usersCollection,
+      where('name_lowercase', '>=', termLower),
+      where('name_lowercase', '<=', termLower + '\uf8ff'),
+      limit(50)
+    );
+
+    // Query 2: Case-sensitive exact match
+    const q2 = query(
+      usersCollection,
+      where('name', '==', term),
+      limit(20)
+    );
+
+    // Query 3: Client-side robust fallback querying the first 150 users
+    const qFallback = query(
+      usersCollection,
+      limit(150)
+    );
+
+    const [snap1, snap2, snapFallback] = await Promise.all([
+      getDocs(q1).catch((err) => {
+        console.warn('q1 search error:', err);
+        return null;
+      }),
+      getDocs(q2).catch((err) => {
+        console.warn('q2 search error:', err);
+        return null;
+      }),
+      getDocs(qFallback).catch((err) => {
+        console.warn('qFallback search error:', err);
+        return null;
+      })
+    ]);
+
+    const resultMap = new Map<string, UserProfile>();
+
+    const processSnap = (snap: any) => {
+      if (snap && !snap.empty) {
+        snap.forEach((docSnap: any) => {
+          const data = docSnap.data() as UserProfile;
+          if (data && data.id) {
+            resultMap.set(data.id, data);
+          }
+        });
+      }
+    };
+
+    processSnap(snap1);
+    processSnap(snap2);
+    processSnap(snapFallback);
+
+    const allUsers = Array.from(resultMap.values());
+
+    // Filter client-side: case-insensitive match anywhere in the name
+    const filtered = allUsers.filter(user => {
+      if (!user.name) return false;
+      const userNameLower = user.name.toLowerCase();
+      return userNameLower.includes(termLower);
     });
-    return results;
+
+    // Sort: exact match first, then starts with, then includes
+    filtered.sort((a, b) => {
+      const aName = (a.name || '').toLowerCase();
+      const bName = (b.name || '').toLowerCase();
+      if (aName === termLower && bName !== termLower) return -1;
+      if (bName === termLower && aName !== termLower) return 1;
+      const aStarts = aName.startsWith(termLower);
+      const bStarts = bName.startsWith(termLower);
+      if (aStarts && !bStarts) return -1;
+      if (bStarts && !aStarts) return 1;
+      return aName.localeCompare(bName);
+    });
+
+    return filtered.slice(0, 20);
   } catch (error) {
     console.error('Failed to search user by name:', error);
     return [];
