@@ -70,12 +70,14 @@ public class MainActivity extends BridgeActivity {
                                 mAdViewTop.clearFocus();
                                 mAdViewTop.clearAnimation();
                                 
-                                // Lock layout height strictly to 50dp in pixels
+                                // Lock layout height strictly to 50dp in pixels ONLY if it differs from the current height
                                 ViewGroup.LayoutParams params = mAdViewTop.getLayoutParams();
                                 if (params != null) {
                                     int heightPx = (int) (50 * MainActivity.this.getResources().getDisplayMetrics().density);
-                                    params.height = heightPx;
-                                    mAdViewTop.setLayoutParams(params);
+                                    if (params.height != heightPx) {
+                                        params.height = heightPx;
+                                        mAdViewTop.setLayoutParams(params);
+                                    }
                                 }
                             }
                             if (mAdViewBottom != null) {
@@ -85,8 +87,10 @@ public class MainActivity extends BridgeActivity {
                                 ViewGroup.LayoutParams params = mAdViewBottom.getLayoutParams();
                                 if (params != null) {
                                     int heightPx = (int) (50 * MainActivity.this.getResources().getDisplayMetrics().density);
-                                    params.height = heightPx;
-                                    mAdViewBottom.setLayoutParams(params);
+                                    if (params.height != heightPx) {
+                                        params.height = heightPx;
+                                        mAdViewBottom.setLayoutParams(params);
+                                    }
                                 }
                             }
                         } catch (Exception e) {

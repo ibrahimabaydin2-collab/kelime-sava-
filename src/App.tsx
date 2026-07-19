@@ -116,6 +116,19 @@ const triggerVictoryCelebration = (soundEnabled: boolean) => {
   // Play grand synthesized victory chords/arpeggio
   playVictorySound(soundEnabled);
 
+  // Skip canvas-confetti rendering completely inside the Android hybrid webview environment
+  // to avoid intensive GPU memory context losses, paint cycle flickering, and WebView crashes (white screens)
+  const isAndroidHybrid = typeof window !== 'undefined' && (
+    (window as any).AndroidBridge || 
+    (navigator.userAgent && navigator.userAgent.toLowerCase().includes('android-hybrid')) ||
+    (document.documentElement && document.documentElement.classList.contains('android-hybrid'))
+  );
+
+  if (isAndroidHybrid) {
+    console.log("Android hybrid app environment detected: Skipping canvas-confetti rendering for absolute stability and 0% crash rate.");
+    return;
+  }
+
   // Extremely lightweight, single-frame burst of minimal particles to guarantee 0% WebView crashes/reloads
   try {
     confetti({

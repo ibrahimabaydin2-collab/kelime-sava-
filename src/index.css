@@ -379,3 +379,27 @@ main {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
+
+/* Disable expensive backdrop blurs and heavy filter blurs inside the Android hybrid app webview
+   to prevent GPU rendering thread crashes, memory context leaks, flickering, and permanent white screens */
+.android-hybrid .backdrop-blur-sm,
+.android-hybrid .backdrop-blur-md,
+.android-hybrid .backdrop-blur-lg,
+.android-hybrid .backdrop-blur-xl,
+.android-hybrid .backdrop-blur-2xl,
+.android-hybrid .backdrop-blur-3xl {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background-color: rgba(15, 23, 42, 0.96) !important; /* solid high-contrast fallback for backdrop */
+}
+
+/* Completely remove expensive blurred background light decorations on Android hybrid to avoid layout thrashing */
+.android-hybrid .blur-3xl,
+.android-hybrid .blur-2xl,
+.android-hybrid .blur-xl,
+.android-hybrid .blur-lg {
+  filter: none !important;
+  -webkit-filter: none !important;
+  display: none !important;
+}
+
