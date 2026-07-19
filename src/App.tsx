@@ -410,9 +410,42 @@ export default function App() {
     };
   });
 
-  // Firebase Auth states
-  const [firebaseUser, setFirebaseUser] = useState<any>(null);
-  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  // Firebase Auth states with fast-path and optimistic rendering optimizations
+  const [firebaseUser, setFirebaseUser] = useState<any>(() => {
+    try {
+      const saved = safeLocalStorage.getItem('kelimesavasi_profile');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id) {
+          // Return a tentative placeholder user so the Welcome screen renders instantly on mount
+          return {
+            uid: parsed.id,
+            displayName: parsed.name,
+            isAnonymous: safeLocalStorage.getItem('kelimesavasi_is_registered') !== 'true',
+            photoURL: parsed.avatarUrl
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading cached user for optimistic load:', e);
+    }
+    return null;
+  });
+
+  const [authLoading, setAuthLoading] = useState<boolean>(() => {
+    try {
+      const saved = safeLocalStorage.getItem('kelimesavasi_profile');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id) {
+          // If we have a local cached profile, skip the loader immediately to prevent any screen flickers
+          console.log('Optimistic rendering: local cached profile found, skipping initial loading view.');
+          return false;
+        }
+      }
+    } catch (e) {}
+    return true;
+  });
 
   // Game Play State
   const [wordLength, setWordLength] = useState<number>(5);
@@ -676,6 +709,7 @@ export default function App() {
   const wasOnlineRef = useRef<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const pendingMatchmakingRef = useRef<number | null>(null);
+  const justLoggedInUidRef = useRef<string | null>(null);
 
   const handleManualReconnect = () => {
     addNetworkLog('info', 'Manuel yeniden bağlanma tetiklendi.');
@@ -721,6 +755,18 @@ export default function App() {
           try {
             window.localStorage.setItem('kelimesavasi_is_registered', (!user.isAnonymous).toString());
           } catch (e) {}
+
+          // Check if we just completed login/registration via onAuthComplete to skip redundant heavy fetches
+          if (justLoggedInUidRef.current === user.uid) {
+            console.log('Skipping onAuthStateChanged sync because user was just logged in via onAuthComplete');
+            if (active && !resolved) {
+              resolved = true;
+              setAuthLoading(false);
+              clearTimeout(timeoutId);
+            }
+            return;
+          }
+
           // Check if we have a pending restoration profile
           const pendingRestorationJson = safeLocalStorage.getItem('pending_restoration_profile');
           if (pendingRestorationJson) {
@@ -744,10 +790,40 @@ export default function App() {
               safeLocalStorage.setItem('saved_username', updatedProfile.name);
             }
             showToast(`Profiliniz başarıyla geri yüklendi: ${updatedProfile.name}! 🎉`, 'success');
+            
+            if (active && !resolved) {
+              resolved = true;
+              setAuthLoading(false);
+              clearTimeout(timeoutId);
+            }
           } else {
-            // Normal fetch
-            const dbProfile = await fetchUserProfile(user.uid);
-            if (active) {
+            // Standard profile loading path (with Fast-Path optimization)
+            const cachedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
+            let hasResolvedFast = false;
+            
+            if (cachedProfileStr) {
+              try {
+                const cachedProfile = JSON.parse(cachedProfileStr);
+                if (cachedProfile && cachedProfile.id === user.uid) {
+                  setProfile(cachedProfile);
+                  hasResolvedFast = true;
+                  if (active && !resolved) {
+                    resolved = true;
+                    setAuthLoading(false);
+                    clearTimeout(timeoutId);
+                    console.log('Fast-path optimization: resolved user session instantly using cached profile.');
+                  }
+                }
+              } catch (e) {
+                console.warn('Failed parsing cached profile for fast-path:', e);
+              }
+            }
+
+            // Define the profile sync logic (can be run blocking or in background/SWR mode)
+            const syncAndFetchProfile = async () => {
+              const dbProfile = await fetchUserProfile(user.uid);
+              if (!active) return;
+
               if (dbProfile) {
                 // If the profile does not have deviceId set, or has a different deviceId, bind it!
                 if (!dbProfile.deviceId || dbProfile.deviceId !== deviceId) {
@@ -760,7 +836,7 @@ export default function App() {
                   safeLocalStorage.setItem('saved_username', dbProfile.name);
                 }
               } else {
-                // No profile exists for this UID. Let's trigger device profile recovery now that we are successfully authenticated!
+                // No profile exists for this UID. Let's trigger device profile recovery
                 try {
                   const existingProfile = await fetchUserProfileByDeviceId(deviceId);
                   if (existingProfile && existingProfile.id !== user.uid) {
@@ -821,12 +897,23 @@ export default function App() {
                   safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
                 }
               }
+
+              if (active && !resolved) {
+                resolved = true;
+                setAuthLoading(false);
+                clearTimeout(timeoutId);
+              }
+            };
+
+            if (hasResolvedFast) {
+              // Run profile sync in background so the UI renders immediately without network block!
+              syncAndFetchProfile().catch((err) => {
+                console.warn('Background profile sync completed with error/warning:', err);
+              });
+            } else {
+              // Blocking path: wait for Firestore to get profile so we don't render empty screen
+              await syncAndFetchProfile();
             }
-          }
-          if (active && !resolved) {
-            resolved = true;
-            setAuthLoading(false);
-            clearTimeout(timeoutId);
           }
         } else {
           if (active) {
@@ -2828,10 +2915,15 @@ export default function App() {
         ) : !firebaseUser ? (
           <AuthScreen
             onAuthComplete={(updatedProfile, fUser) => {
+              if (fUser && fUser.uid) {
+                justLoggedInUidRef.current = fUser.uid;
+              }
               // Ensure deviceId is stored on the registered/logged-in profile!
               if (!updatedProfile.deviceId || updatedProfile.deviceId !== deviceId) {
                 updatedProfile.deviceId = deviceId;
-                saveUserProfileToFirestore(updatedProfile);
+                saveUserProfileToFirestore(updatedProfile).catch((err) => {
+                  console.warn('Non-blocking profile save during onAuthComplete failed:', err);
+                });
               }
               setProfile(updatedProfile);
               setFirebaseUser(fUser);
