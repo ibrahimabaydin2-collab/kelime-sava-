@@ -20,7 +20,7 @@ public class MainActivity extends BridgeActivity {
     private WebView mWebView;
     private boolean mAdsInitialized = false;
     private final Handler mHandler = new Handler(Looper.getMainLooper());
-    private com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd mRewardedInterstitialAd;
+    private com.google.android.gms.ads.rewarded.RewardedAd mRewardedAd;
     private boolean mIsAdLoading = false;
 
     @Override
@@ -204,7 +204,7 @@ public class MainActivity extends BridgeActivity {
 
                 @android.webkit.JavascriptInterface
                 public boolean isRewardedAdLoaded() {
-                    return MainActivity.this.mRewardedInterstitialAd != null;
+                    return MainActivity.this.mRewardedAd != null;
                 }
             }, "AndroidBridge");
         }
@@ -346,27 +346,27 @@ public class MainActivity extends BridgeActivity {
     }
 
     public void loadRewardedAd() {
-        if (mRewardedInterstitialAd != null || mIsAdLoading) {
+        if (mRewardedAd != null || mIsAdLoading) {
             return;
         }
         mIsAdLoading = true;
         mHandler.post(() -> {
             try {
                 AdRequest adRequest = new AdRequest.Builder().build();
-                com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd.load(
+                com.google.android.gms.ads.rewarded.RewardedAd.load(
                     MainActivity.this, 
                     "ca-app-pub-1284515268865249/3066667522",
                     adRequest, 
-                    new com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoadCallback() {
+                    new com.google.android.gms.ads.rewarded.RewardedAdLoadCallback() {
                         @Override
-                        public void onAdLoaded(@NonNull com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd rewardedInterstitialAd) {
-                            mRewardedInterstitialAd = rewardedInterstitialAd;
+                        public void onAdLoaded(@NonNull com.google.android.gms.ads.rewarded.RewardedAd rewardedAd) {
+                            mRewardedAd = rewardedAd;
                             mIsAdLoading = false;
                             
-                            mRewardedInterstitialAd.setFullScreenContentCallback(new com.google.android.gms.ads.FullScreenContentCallback() {
+                            mRewardedAd.setFullScreenContentCallback(new com.google.android.gms.ads.FullScreenContentCallback() {
                                 @Override
                                 public void onAdDismissedFullScreenContent() {
-                                    mRewardedInterstitialAd = null;
+                                    mRewardedAd = null;
                                     loadRewardedAd();
                                     mHandler.post(() -> {
                                         if (mWebView != null) {
@@ -377,7 +377,7 @@ public class MainActivity extends BridgeActivity {
 
                                 @Override
                                 public void onAdFailedToShowFullScreenContent(com.google.android.gms.ads.AdError adError) {
-                                    mRewardedInterstitialAd = null;
+                                    mRewardedAd = null;
                                     loadRewardedAd();
                                     mHandler.post(() -> {
                                         if (mWebView != null) {
@@ -396,7 +396,7 @@ public class MainActivity extends BridgeActivity {
 
                         @Override
                         public void onAdFailedToLoad(@NonNull com.google.android.gms.ads.LoadAdError loadAdError) {
-                            mRewardedInterstitialAd = null;
+                            mRewardedAd = null;
                             mIsAdLoading = false;
                             mHandler.post(() -> {
                                 if (mWebView != null) {
@@ -415,8 +415,8 @@ public class MainActivity extends BridgeActivity {
 
     public void showRewardedAd() {
         mHandler.post(() -> {
-            if (mRewardedInterstitialAd != null) {
-                mRewardedInterstitialAd.show(MainActivity.this, rewardItem -> {
+            if (mRewardedAd != null) {
+                mRewardedAd.show(MainActivity.this, rewardItem -> {
                     mHandler.post(() -> {
                         if (mWebView != null) {
                             mWebView.evaluateJavascript("if (window.onAndroidAdRewarded) { window.onAndroidAdRewarded(); }", null);
