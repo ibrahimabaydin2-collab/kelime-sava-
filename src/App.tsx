@@ -1048,7 +1048,7 @@ export default function App() {
             // ignore
           }
         }
-      }, 20000);
+      }, 35000);
 
       ws.onopen = () => {
         clearTimeout(connTimeout);
@@ -1645,12 +1645,11 @@ export default function App() {
     // Force trigger a fresh, clean WebSocket connection on return to menu
     setReconnectCounter((prev) => prev + 1);
 
-    try {
-      if (profile && profile.id) {
-        await clearMatchmakingState(profile.id);
-      }
-    } catch (err) {
-      console.warn('Database cleanup failed in handleLeaveMatchToMenu:', err);
+    // Clean up matchmaking state in Firestore in the background
+    if (profile && profile.id) {
+      clearMatchmakingState(profile.id).catch((err) => {
+        console.warn('Database cleanup failed in handleLeaveMatchToMenu:', err);
+      });
     }
   }, [profile.id]);
 
@@ -1839,52 +1838,59 @@ export default function App() {
       scheduleDailyNotifications();
     }
 
-    // Increment gamesPlayed and reset streak
-    setProfile((prev) => {
-      const newStats = {
-        ...prev.stats,
-        gamesPlayed: prev.stats.gamesPlayed + 1,
-        currentStreak: 0
-      };
+    // Calculate updated profile state first, completely outside setProfile, to avoid side-effect triggers in render phase
+    const newStats = {
+      ...profile.stats,
+      gamesPlayed: profile.stats.gamesPlayed + 1,
+      currentStreak: 0
+    };
 
-      const badgesToUnlockOnLoss = new Set<string>();
-      if (newStats.gamesPlayed >= 1) {
-        badgesToUnlockOnLoss.add('first_step');
+    const badgesToUnlockOnLoss = new Set<string>();
+    if (newStats.gamesPlayed >= 1) {
+      badgesToUnlockOnLoss.add('first_step');
+    }
+    if (newStats.gamesPlayed >= 25) {
+      badgesToUnlockOnLoss.add('persistent_player');
+    }
+
+    const newlyUnlocked: Badge[] = [];
+    const updatedBadges = profile.badges.map((b) => {
+      if (badgesToUnlockOnLoss.has(b.id) && !b.unlockedAt) {
+        const unlockedB = { ...b, unlockedAt: new Date().toISOString() };
+        newlyUnlocked.push(unlockedB);
+        return unlockedB;
       }
-      if (newStats.gamesPlayed >= 25) {
-        badgesToUnlockOnLoss.add('persistent_player');
-      }
-
-      const newlyUnlocked: Badge[] = [];
-      const updatedBadges = prev.badges.map((b) => {
-        if (badgesToUnlockOnLoss.has(b.id) && !b.unlockedAt) {
-          const unlockedB = { ...b, unlockedAt: new Date().toISOString() };
-          newlyUnlocked.push(unlockedB);
-          return unlockedB;
-        }
-        return b;
-      });
-
-      if (newlyUnlocked.length > 0) {
-        setTimeout(() => {
-          newlyUnlocked.forEach((b, idx) => {
-            setTimeout(() => {
-              showToast(`🏆 YENİ ROZET KAZANILDI: ${b.title}!`, 'success');
-              if (idx === 0) {
-                setUnlockedBadgeToShow(b);
-              }
-            }, idx * 1000);
-          });
-        }, 500);
-      }
-
-      return {
-        ...prev,
-        stats: newStats,
-        badges: updatedBadges,
-        lastUpdated: new Date().toISOString()
-      };
+      return b;
     });
+
+    const updatedProfile: UserProfile = {
+      ...profile,
+      stats: newStats,
+      badges: updatedBadges,
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Update React state cleanly without side effects in the updater function
+    setProfile(updatedProfile);
+
+    // Save profile asynchronously to Firestore so stats are safely synchronized
+    saveUserProfileToFirestore(updatedProfile).catch((err) => {
+      console.warn("Non-blocking profile save after loss failed:", err);
+    });
+
+    // Safely trigger toast and modal on macro task queue
+    if (newlyUnlocked.length > 0) {
+      setTimeout(() => {
+        newlyUnlocked.forEach((b, idx) => {
+          setTimeout(() => {
+            showToast(`🏆 YENİ ROZET KAZANILDI: ${b.title}!`, 'success');
+            if (idx === 0) {
+              setUnlockedBadgeToShow(b);
+            }
+          }, idx * 1000);
+        });
+      }, 500);
+    }
 
     // Sync if multiplayer
     syncMatchState(attempts, attempts.length, true, false, 0);
@@ -2164,231 +2170,264 @@ export default function App() {
       timerRef.current = null;
     }
 
-    setProfile((prev) => {
-      const newPlayed = prev.stats.gamesPlayed + 1;
-      const newWon = prev.stats.gamesWon + 1;
-      const newStreak = prev.stats.currentStreak + 1;
-      const newMaxStreak = Math.max(newStreak, prev.stats.maxStreak);
-      const newDistribution = [...prev.stats.winDistribution];
+    // 1. Calculate stats updates
+    const newPlayed = profile.stats.gamesPlayed + 1;
+    const newWon = profile.stats.gamesWon + 1;
+    const newStreak = profile.stats.currentStreak + 1;
+    const newMaxStreak = Math.max(newStreak, profile.stats.maxStreak);
+    const newDistribution = [...profile.stats.winDistribution];
+    
+    // AttemptCount is 1-indexed (index 0 corresponds to 1st attempt)
+    if (attemptCount >= 1 && attemptCount <= 6) {
+      newDistribution[attemptCount - 1] += 1;
+    }
+
+    const updatedStats = {
+      gamesPlayed: newPlayed,
+      gamesWon: newWon,
+      currentStreak: newStreak,
+      maxStreak: newMaxStreak,
+      winDistribution: newDistribution
+    };
+
+    // Beş puandan fazla ödül hiçbir şekilde verilmesin. Puan silme diye de bir ceza olmasın.
+    const cappedScoreAwarded = scoreAwarded > 0 ? Math.min(scoreAwarded, 5) : 0;
+    const newScore = profile.dailyScore + cappedScoreAwarded;
+    
+    // Synchronously update the DOM element to keep responsiveness instant
+    const scoreEl = document.getElementById('score');
+    if (scoreEl) {
+      scoreEl.innerText = `${newScore} Puan`;
+    }
+
+    // Missions to update progress
+    const missionIncrements: { [key: string]: number } = {
+      play: 1,
+      win: 1,
+      streak: 1,
+      [`solve_${wordLength}`]: 1,
+    };
+    if (secondsLeft > 10) {
+      missionIncrements['fast_solve'] = 1;
+    }
+    if (attemptCount === 1) {
+      missionIncrements['perfect'] = 1;
+    }
+
+    // Compute updated missions and collect newly completed ones
+    const newlyCompletedMissions: typeof profile.missions = [];
+    const updatedMissions = profile.missions.map((m) => {
+      const inc = missionIncrements[m.type];
+      if (inc && !m.completed) {
+        const newCurrent = m.current + inc;
+        const isCompleted = newCurrent >= m.target;
+        const updatedM = {
+          ...m,
+          current: newCurrent,
+          completed: isCompleted
+        };
+        if (isCompleted) {
+          newlyCompletedMissions.push(updatedM);
+        }
+        return updatedM;
+      }
+      return m;
+    });
+
+    // Determine which badges should be unlocked
+    const badgesToUnlock = new Set<string>();
+    if (updatedStats.gamesPlayed >= 1) {
+      badgesToUnlock.add('first_step');
+    }
+    if (updatedStats.gamesWon >= 1) {
+      badgesToUnlock.add('champion');
+    }
+    if (secondsLeft > 10) {
+      badgesToUnlock.add('lightning');
+    }
+    if (attemptCount <= 2) {
+      badgesToUnlock.add('flawless');
+    }
+    if (wordLength === 8) {
+      badgesToUnlock.add('genius');
+    }
+    if (isDailyPuzzle) {
+      const { dateStr } = getDailyWordAndLength();
+      safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
+      safeLocalStorage.setItem('last_played_date', dateStr);
+      safeLocalStorage.setItem('is_daily_completed', 'true');
       
-      // AttemptCount is 1-indexed (index 0 corresponds to 1st attempt)
-      if (attemptCount >= 1 && attemptCount <= 6) {
-        newDistribution[attemptCount - 1] += 1;
+      if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.saveDailyPuzzleStatus) {
+        try {
+          (window as any).AndroidBridge.saveDailyPuzzleStatus(dateStr, true);
+        } catch (e) {
+          console.error(e);
+        }
       }
+      setIsDailyPuzzleCompletedToday(true);
+      badgesToUnlock.add('daily_puzzle_solver');
+      scheduleDailyNotifications();
+    }
+    if (updatedStats.gamesWon >= 10) {
+      badgesToUnlock.add('word_detective');
+    }
+    if (updatedStats.gamesWon >= 50) {
+      badgesToUnlock.add('word_guru');
+    }
+    if (updatedStats.gamesWon >= 100) {
+      badgesToUnlock.add('word_master');
+    }
+    if (updatedStats.gamesPlayed >= 25) {
+      badgesToUnlock.add('persistent_player');
+    }
+    if (secondsLeft >= 15) {
+      badgesToUnlock.add('quick_draw');
+    }
+    if (updatedStats.currentStreak >= 5) {
+      badgesToUnlock.add('streak_master');
+    }
+    if (updatedStats.currentStreak >= 10) {
+      badgesToUnlock.add('legend');
+    }
+    if (attemptCount === 1) {
+      badgesToUnlock.add('perfect_brain');
+    }
+    const totalCompletedMissions = updatedMissions.filter(m => m.completed).length;
+    if (totalCompletedMissions >= 5) {
+      badgesToUnlock.add('mission_seeker');
+    }
+    if (totalCompletedMissions >= 20) {
+      badgesToUnlock.add('mission_lord');
+    }
+    const solve3 = updatedMissions.find(m => m.type === 'solve_3')?.current || 0;
+    const solve4 = updatedMissions.find(m => m.type === 'solve_4')?.current || 0;
+    const solve5 = updatedMissions.find(m => m.type === 'solve_5')?.current || 0;
+    const solve6 = updatedMissions.find(m => m.type === 'solve_6')?.current || 0;
+    const solve7 = updatedMissions.find(m => m.type === 'solve_7')?.current || 0;
+    const solve8 = updatedMissions.find(m => m.type === 'solve_8')?.current || 0;
+    if (solve3 >= 1 && solve4 >= 1 && solve5 >= 1 && solve6 >= 1 && solve7 >= 1 && solve8 >= 1) {
+      badgesToUnlock.add('polymath');
+    }
 
-      const updatedStats = {
-        gamesPlayed: newPlayed,
-        gamesWon: newWon,
-        currentStreak: newStreak,
-        maxStreak: newMaxStreak,
-        winDistribution: newDistribution
-      };
+    // Compute updated badges array and collect newly unlocked badges
+    const newlyUnlockedBadges: Badge[] = [];
+    const updatedBadges = profile.badges.map((b) => {
+      if (badgesToUnlock.has(b.id) && !b.unlockedAt) {
+        const unlockedBadge = { ...b, unlockedAt: new Date().toISOString() };
+        newlyUnlockedBadges.push(unlockedBadge);
+        return unlockedBadge;
+      }
+      return b;
+    });
 
-      // Beş puandan fazla ödül hiçbir şekilde verilmesin. Puan silme diye de bir ceza olmasın.
-      const cappedScoreAwarded = scoreAwarded > 0 ? Math.min(scoreAwarded, 5) : 0;
-      const newScore = prev.dailyScore + cappedScoreAwarded;
+    const updatedProfile: UserProfile = {
+      ...profile,
+      stats: updatedStats,
+      dailyScore: newScore,
+      badges: updatedBadges,
+      missions: updatedMissions,
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Update React state cleanly without side effects in the updater function
+    setProfile(updatedProfile);
+
+    // Save profile asynchronously to Firestore so stats are safely synchronized
+    saveUserProfileToFirestore(updatedProfile).catch((err) => {
+      console.warn("Non-blocking profile save after win failed:", err);
+    });
+
+    // Safely trigger toasts and modals on macro task queue
+    let staggerDelay = 100;
+    
+    // Show newly completed missions
+    newlyCompletedMissions.forEach((m) => {
       setTimeout(() => {
-        const scoreEl = document.getElementById('score');
-        if (scoreEl) {
-          scoreEl.innerText = `${newScore} Puan`;
-        }
-      }, 0);
+        showToast(`🎯 GÜNLÜK GÖREV TAMAMLANDI: ${m.title}!`, 'success');
+      }, staggerDelay);
+      staggerDelay += 800;
+    });
 
-      // Missions to update progress
-      const missionIncrements: { [key: string]: number } = {
-        play: 1,
-        win: 1,
-        streak: 1,
-        [`solve_${wordLength}`]: 1,
-      };
-      if (secondsLeft > 10) {
-        missionIncrements['fast_solve'] = 1;
-      }
-      if (attemptCount === 1) {
-        missionIncrements['perfect'] = 1;
-      }
-
-      // Compute updated missions and collect newly completed ones
-      const newlyCompletedMissions: typeof prev.missions = [];
-      const updatedMissions = prev.missions.map((m) => {
-        const inc = missionIncrements[m.type];
-        if (inc && !m.completed) {
-          const newCurrent = m.current + inc;
-          const isCompleted = newCurrent >= m.target;
-          const updatedM = {
-            ...m,
-            current: newCurrent,
-            completed: isCompleted
-          };
-          if (isCompleted) {
-            newlyCompletedMissions.push(updatedM);
-          }
-          return updatedM;
-        }
-        return m;
-      });
-
-      // Determine which badges should be unlocked
-      const badgesToUnlock = new Set<string>();
-      if (updatedStats.gamesPlayed >= 1) {
-        badgesToUnlock.add('first_step');
-      }
-      if (updatedStats.gamesWon >= 1) {
-        badgesToUnlock.add('champion');
-      }
-      if (secondsLeft > 10) {
-        badgesToUnlock.add('lightning');
-      }
-      if (attemptCount <= 2) {
-        badgesToUnlock.add('flawless');
-      }
-      if (wordLength === 8) {
-        badgesToUnlock.add('genius');
-      }
-      if (isDailyPuzzle) {
-        const { dateStr } = getDailyWordAndLength();
-        safeLocalStorage.setItem('kelimesavasi_daily_completed_date', dateStr);
-        safeLocalStorage.setItem('last_played_date', dateStr);
-        safeLocalStorage.setItem('is_daily_completed', 'true');
-        setTimeout(() => {
-          if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.saveDailyPuzzleStatus) {
-            try {
-              (window as any).AndroidBridge.saveDailyPuzzleStatus(dateStr, true);
-            } catch (e) {
-              console.error(e);
-            }
-          }
-          setIsDailyPuzzleCompletedToday(true);
-        }, 0);
-        badgesToUnlock.add('daily_puzzle_solver');
-        scheduleDailyNotifications();
-      }
-      if (updatedStats.gamesWon >= 10) {
-        badgesToUnlock.add('word_detective');
-      }
-      if (updatedStats.gamesWon >= 50) {
-        badgesToUnlock.add('word_guru');
-      }
-      if (updatedStats.gamesWon >= 100) {
-        badgesToUnlock.add('word_master');
-      }
-      if (updatedStats.gamesPlayed >= 25) {
-        badgesToUnlock.add('persistent_player');
-      }
-      if (secondsLeft >= 15) {
-        badgesToUnlock.add('quick_draw');
-      }
-      if (updatedStats.currentStreak >= 5) {
-        badgesToUnlock.add('streak_master');
-      }
-      if (updatedStats.currentStreak >= 10) {
-        badgesToUnlock.add('legend');
-      }
-      if (attemptCount === 1) {
-        badgesToUnlock.add('perfect_brain');
-      }
-      const totalCompletedMissions = updatedMissions.filter(m => m.completed).length;
-      if (totalCompletedMissions >= 5) {
-        badgesToUnlock.add('mission_seeker');
-      }
-      if (totalCompletedMissions >= 20) {
-        badgesToUnlock.add('mission_lord');
-      }
-      const solve3 = updatedMissions.find(m => m.type === 'solve_3')?.current || 0;
-      const solve4 = updatedMissions.find(m => m.type === 'solve_4')?.current || 0;
-      const solve5 = updatedMissions.find(m => m.type === 'solve_5')?.current || 0;
-      const solve6 = updatedMissions.find(m => m.type === 'solve_6')?.current || 0;
-      const solve7 = updatedMissions.find(m => m.type === 'solve_7')?.current || 0;
-      const solve8 = updatedMissions.find(m => m.type === 'solve_8')?.current || 0;
-      if (solve3 >= 1 && solve4 >= 1 && solve5 >= 1 && solve6 >= 1 && solve7 >= 1 && solve8 >= 1) {
-        badgesToUnlock.add('polymath');
-      }
-
-      // Compute updated badges array and collect newly unlocked badges
-      const newlyUnlockedBadges: Badge[] = [];
-      const updatedBadges = prev.badges.map((b) => {
-        if (badgesToUnlock.has(b.id) && !b.unlockedAt) {
-          const unlockedBadge = { ...b, unlockedAt: new Date().toISOString() };
-          newlyUnlockedBadges.push(unlockedBadge);
-          return unlockedBadge;
-        }
-        return b;
-      });
-
-      // Safely schedule UI toasts and modals on the macro-task event queue
+    // Show newly unlocked badges and trigger modal
+    newlyUnlockedBadges.forEach((b, idx) => {
       setTimeout(() => {
-        let staggerDelay = 100;
-        
-        // Show newly completed missions
-        newlyCompletedMissions.forEach((m) => {
-          setTimeout(() => {
-            showToast(`🎯 GÜNLÜK GÖREV TAMAMLANDI: ${m.title}!`, 'success');
-          }, staggerDelay);
-          staggerDelay += 800;
-        });
-
-        // Show newly unlocked badges and trigger modal
-        newlyUnlockedBadges.forEach((b, idx) => {
-          setTimeout(() => {
-            showToast(`🏆 YENİ ROZET KAZANILDI: ${b.title}!`, 'success');
-            if (idx === 0) {
-              setUnlockedBadgeToShow(b);
-            }
-          }, staggerDelay);
-          staggerDelay += 1000;
-        });
-      }, 0);
-
-      return {
-        ...prev,
-        stats: updatedStats,
-        dailyScore: newScore,
-        badges: updatedBadges,
-        missions: updatedMissions,
-        lastUpdated: new Date().toISOString()
-      };
+        showToast(`🏆 YENİ ROZET KAZANILDI: ${b.title}!`, 'success');
+        if (idx === 0) {
+          setUnlockedBadgeToShow(b);
+        }
+      }, staggerDelay);
+      staggerDelay += 1000;
     });
   };
 
   // Profile Badges unlocking
   const unlockBadge = (id: string) => {
-    setProfile((prev) => {
-      let newlyUnlocked: Badge | null = null;
-      const badges = prev.badges.map((b) => {
-        if (b.id === id && !b.unlockedAt) {
-          showToast(`🏆 YENİ ROZET KAZANILDI: ${b.title}!`, 'success');
-          newlyUnlocked = { ...b, unlockedAt: new Date().toISOString() };
-          return newlyUnlocked;
-        }
-        return b;
-      });
-      if (newlyUnlocked) {
-        setUnlockedBadgeToShow(newlyUnlocked);
+    let newlyUnlocked: Badge | null = null;
+    const badges = profile.badges.map((b) => {
+      if (b.id === id && !b.unlockedAt) {
+        newlyUnlocked = { ...b, unlockedAt: new Date().toISOString() };
+        return newlyUnlocked;
       }
-      return { ...prev, badges };
+      return b;
     });
+
+    if (newlyUnlocked) {
+      const updatedProfile = {
+        ...profile,
+        badges,
+        lastUpdated: new Date().toISOString()
+      };
+      setProfile(updatedProfile);
+      
+      saveUserProfileToFirestore(updatedProfile).catch((err) => {
+        console.warn("Non-blocking profile save during badge unlock failed:", err);
+      });
+
+      const badgeToUnlock = newlyUnlocked;
+      setTimeout(() => {
+        showToast(`🏆 YENİ ROZET KAZANILDI: ${(badgeToUnlock as Badge).title}!`, 'success');
+        setUnlockedBadgeToShow(badgeToUnlock);
+      }, 100);
+    }
   };
 
   // Update Mission Progress
   const updateMissionProgress = (type: string, amount: number) => {
-    setProfile((prev) => {
-      const missions = prev.missions.map((m) => {
-        if (m.type === type && !m.completed) {
-          const newCurrent = m.current + amount;
-          const isCompleted = newCurrent >= m.target;
-          if (isCompleted) {
-            showToast(`🎯 GÜNLÜK GÖREV TAMAMLANDI: ${m.title}!`, 'success');
-          }
-          return {
-            ...m,
-            current: newCurrent,
-            completed: isCompleted
-          };
+    let completedMissionTitle: string | null = null;
+    const missions = profile.missions.map((m) => {
+      if (m.type === type && !m.completed) {
+        const newCurrent = m.current + amount;
+        const isCompleted = newCurrent >= m.target;
+        if (isCompleted) {
+          completedMissionTitle = m.title;
         }
-        return m;
-      });
-      return { ...prev, missions };
+        return {
+          ...m,
+          current: newCurrent,
+          completed: isCompleted
+        };
+      }
+      return m;
     });
+
+    if (completedMissionTitle || missions !== profile.missions) {
+      const updatedProfile = {
+        ...profile,
+        missions,
+        lastUpdated: new Date().toISOString()
+      };
+      setProfile(updatedProfile);
+      saveUserProfileToFirestore(updatedProfile).catch((err) => {
+        console.warn("Non-blocking profile save during mission update failed:", err);
+      });
+
+      if (completedMissionTitle) {
+        const title = completedMissionTitle;
+        setTimeout(() => {
+          showToast(`🎯 GÜNLÜK GÖREV TAMAMLANDI: ${title}!`, 'success');
+        }, 100);
+      }
+    }
   };
 
   // Update Daily Score
@@ -2396,19 +2435,22 @@ export default function App() {
     // Beş puandan fazla ödül hiçbir şekilde verilmesin. Puan silme diye de bir ceza olmasın.
     if (score <= 0) return;
     const cappedScore = Math.min(score, 5);
-    setProfile((prev) => {
-      const newScore = prev.dailyScore + cappedScore;
-      setTimeout(() => {
-        const scoreEl = document.getElementById('score');
-        if (scoreEl) {
-          scoreEl.innerText = `${newScore} Puan`;
-        }
-      }, 0);
-      return {
-        ...prev,
-        dailyScore: newScore
-      };
+    const newScore = profile.dailyScore + cappedScore;
+
+    const updatedProfile = {
+      ...profile,
+      dailyScore: newScore,
+      lastUpdated: new Date().toISOString()
+    };
+    setProfile(updatedProfile);
+    saveUserProfileToFirestore(updatedProfile).catch((err) => {
+      console.warn("Non-blocking profile save during score update failed:", err);
     });
+
+    const scoreEl = document.getElementById('score');
+    if (scoreEl) {
+      scoreEl.innerText = `${newScore} Puan`;
+    }
   };
 
   // Reset User stats
@@ -2417,19 +2459,23 @@ export default function App() {
       'İstatistikleri Sıfırla',
       'Tüm ilerleme ve istatistiklerinizi sıfırlamak istediğinize emin misiniz? Bu işlem geri alınamaz.',
       () => {
-        setTimeout(() => {
-          const scoreEl = document.getElementById('score');
-          if (scoreEl) {
-            scoreEl.innerText = '0 Puan';
-          }
-        }, 0);
-        setProfile((prev) => ({
-          ...prev,
+        const updatedProfile = {
+          ...profile,
           stats: INITIAL_STATS,
           badges: DEFAULT_BADGES,
           missions: DEFAULT_MISSIONS,
-          dailyScore: 0
-        }));
+          dailyScore: 0,
+          lastUpdated: new Date().toISOString()
+        };
+        setProfile(updatedProfile);
+        saveUserProfileToFirestore(updatedProfile).catch((err) => {
+          console.warn("Non-blocking profile save during stats reset failed:", err);
+        });
+
+        const scoreEl = document.getElementById('score');
+        if (scoreEl) {
+          scoreEl.innerText = '0 Puan';
+        }
         showToast('Tüm istatistikler sıfırlandı.', 'info');
       }
     );
@@ -2580,13 +2626,11 @@ export default function App() {
     setHasEnteredGame(false);
     startNewGame(wordLength);
 
-    // Clean up matchmaking and room states in Firestore
-    try {
-      if (profile && profile.id) {
-        await clearMatchmakingState(profile.id);
-      }
-    } catch (err) {
-      console.warn('Database cleanup failed in handleLeaveMatch:', err);
+    // Clean up matchmaking and room states in Firestore in the background
+    if (profile && profile.id) {
+      clearMatchmakingState(profile.id).catch((err) => {
+        console.warn('Database cleanup failed in handleLeaveMatch:', err);
+      });
     }
   };
 
@@ -2609,12 +2653,10 @@ export default function App() {
         type: 'leave_matchmaking'
       }));
       setMatchmakingStatus('idle');
-      try {
-        if (profile && profile.id) {
-          await clearMatchmakingState(profile.id);
-        }
-      } catch (err) {
-        console.warn('Database cleanup failed in handleStartMatchmaking leave:', err);
+      if (profile && profile.id) {
+        clearMatchmakingState(profile.id).catch((err) => {
+          console.warn('Database cleanup failed in handleStartMatchmaking leave:', err);
+        });
       }
     } else {
       // RADICAL CLEANUP BEFORE STARTING MATCHMAKING
@@ -2625,12 +2667,10 @@ export default function App() {
       setAttempts([]);
       setCurrentAttempt('');
       
-      try {
-        if (profile && profile.id) {
-          await clearMatchmakingState(profile.id);
-        }
-      } catch (err) {
-        console.warn('Database cleanup failed in handleStartMatchmaking join:', err);
+      if (profile && profile.id) {
+        clearMatchmakingState(profile.id).catch((err) => {
+          console.warn('Database cleanup failed in handleStartMatchmaking join:', err);
+        });
       }
 
       // No redundant leave messages or timeout! Connect immediately to prevent race conditions.
