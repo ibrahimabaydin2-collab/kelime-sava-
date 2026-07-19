@@ -12,6 +12,7 @@ import { validateUsername } from '../utils/usernameValidation.js';
 import { getDailyWordAndLength } from '../data/wordlist.js';
 import { getXPForLevel, getLevelForScore } from '../utils/scoring.js';
 import { fetchUsersWhoAddedMe, searchUserByName } from '../lib/firebase.js';
+import GoldWallet from './GoldWallet.js';
 
 interface WelcomeScreenProps {
   profile: UserProfile;
@@ -92,6 +93,9 @@ export default function WelcomeScreen({
   const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [selectedMatchWords, setSelectedMatchWords] = useState<number>(3);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isDailyClaimed = profile.lastDailyLoginClaim === todayStr;
   
   // Game setup states
   const [showGameSetup, setShowGameSetup] = useState<boolean>(false);
@@ -114,6 +118,7 @@ export default function WelcomeScreen({
   const [isWatchingAd, setIsWatchingAd] = useState<boolean>(false);
   const [adCountdown, setAdCountdown] = useState<number>(5);
   const [showAdSuccess, setShowAdSuccess] = useState<boolean>(false);
+  const [isAdLoading, setIsAdLoading] = useState<boolean>(false);
   
   // Daily Puzzle reset countdown timer state
   const [timeLeftToReset, setTimeLeftToReset] = useState<string>('');
@@ -242,32 +247,100 @@ export default function WelcomeScreen({
     }
   };
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).onAndroidAdRewarded = () => {
+        setIsWatchingAd(false);
+        setIsAdLoading(false);
+        onWatchRewardedAdReward?.();
+        setShowAdSuccess(true);
+      };
+
+      (window as any).onAndroidAdDismissed = () => {
+        setIsWatchingAd(false);
+        setIsAdLoading(false);
+      };
+
+      (window as any).onAndroidAdFailedToShow = (err: string) => {
+        setIsWatchingAd(false);
+        setIsAdLoading(false);
+        alert("Reklam gösterilemedi: " + err);
+      };
+
+      (window as any).onAndroidAdFailedToLoad = (err: string) => {
+        setIsAdLoading(false);
+        alert("Reklam yüklenemedi: " + err);
+      };
+
+      (window as any).onAndroidAdLoaded = () => {
+        setIsAdLoading(false);
+        try {
+          if ((window as any).AndroidBridge && (window as any).AndroidBridge.showRewardedAd) {
+            (window as any).AndroidBridge.showRewardedAd();
+          }
+        } catch (e) {
+          console.error("Error showing ad after load:", e);
+        }
+      };
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as any).onAndroidAdRewarded;
+        delete (window as any).onAndroidAdDismissed;
+        delete (window as any).onAndroidAdFailedToShow;
+        delete (window as any).onAndroidAdFailedToLoad;
+        delete (window as any).onAndroidAdLoaded;
+      }
+    };
+  }, [onWatchRewardedAdReward]);
+
   const startRewardedAdWatch = () => {
     if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+      setIsAdLoading(true);
       try {
-        if ((window as any).AndroidBridge.loadAdBackground) {
-          (window as any).AndroidBridge.loadAdBackground();
+        if ((window as any).AndroidBridge.isRewardedAdLoaded && (window as any).AndroidBridge.isRewardedAdLoaded()) {
+          if ((window as any).AndroidBridge.showRewardedAd) {
+            (window as any).AndroidBridge.showRewardedAd();
+          }
+        } else {
+          if ((window as any).AndroidBridge.loadRewardedAd) {
+            (window as any).AndroidBridge.loadRewardedAd();
+          }
+          // Fallback timer: if it doesn't load in 2.5 seconds, try showing or notify
+          setTimeout(() => {
+            setIsAdLoading(curr => {
+              if (curr) {
+                if ((window as any).AndroidBridge && (window as any).AndroidBridge.showRewardedAd) {
+                  (window as any).AndroidBridge.showRewardedAd();
+                }
+              }
+              return curr;
+            });
+          }, 2500);
         }
       } catch (e) {
         console.error("Error triggering native ad:", e);
+        setIsAdLoading(false);
       }
+    } else {
+      // Browser simulation
+      setIsWatchingAd(true);
+      setAdCountdown(5);
+
+      const interval = setInterval(() => {
+        setAdCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setIsWatchingAd(false);
+            onWatchRewardedAdReward?.();
+            setShowAdSuccess(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
-
-    setIsWatchingAd(true);
-    setAdCountdown(5);
-
-    const interval = setInterval(() => {
-      setAdCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setIsWatchingAd(false);
-          onWatchRewardedAdReward?.();
-          setShowAdSuccess(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
   };
 
   useEffect(() => {
@@ -821,10 +894,30 @@ export default function WelcomeScreen({
     <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto bg-[#1E2532] rounded-[2.5rem] p-5 sm:p-7 shadow-2xl relative overflow-hidden flex flex-col justify-between gap-y-4 sm:gap-y-5 min-h-[82vh] md:min-h-0 md:max-h-none md:h-auto transition-all duration-200 text-white animate-scale-up" id="welcome-screen-root">
       
       {/* App Title Header with AKTİF status */}
-      <div className="flex items-center justify-between w-full relative z-10" id="welcome-header-title">
-        <div className="w-6" /> {/* Spacer to center title relative to right status badge */}
+      <div className="flex items-center justify-between w-full relative z-10 gap-2" id="welcome-header-title">
+        {/* Shimmering Gold Wallet in welcome header with Daily Bonus Status Indicator */}
+        <div className="flex flex-col items-start gap-1 shrink-0">
+          <GoldWallet gold={profile.gold !== undefined ? profile.gold : 20} />
+          <button
+            onClick={() => {
+              if (!isDailyClaimed && onClaimDailyReward) {
+                onClaimDailyReward();
+              }
+            }}
+            disabled={isDailyClaimed}
+            className={`flex items-center gap-1 text-[8px] font-black uppercase tracking-wider font-mono px-2 py-0.5 rounded-full border transition-all ${
+              isDailyClaimed
+                ? "bg-slate-800/40 border-white/5 text-gray-500 cursor-default"
+                : "bg-amber-500/10 hover:bg-amber-500/20 active:scale-95 border-amber-500/30 text-amber-300 cursor-pointer shadow-[0_0_8px_rgba(245,158,11,0.2)]"
+            }`}
+            title={isDailyClaimed ? "Bugünkü günlük giriş ödülü alındı" : "Günlük bonusun hazır! Almak için tıkla."}
+          >
+            <span className={`w-1 h-1 rounded-full ${isDailyClaimed ? "bg-gray-500" : "bg-amber-400 animate-pulse"}`} />
+            <span>Bonus: {isDailyClaimed ? "ALINDI" : "HAZIR!"}</span>
+          </button>
+        </div>
         
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2 flex-1 md:flex-initial">
           {/* Stylized Golden Emblem */}
           <div className="w-5 h-5 flex items-center justify-center text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
@@ -832,7 +925,7 @@ export default function WelcomeScreen({
               <line x1="12" y1="5" x2="12" y2="19" strokeWidth="1.5" />
             </svg>
           </div>
-          <h1 className="text-lg sm:text-xl font-serif tracking-[0.15em] text-[#F3EFE0] uppercase font-semibold">
+          <h1 className="text-sm xs:text-base sm:text-xl font-serif tracking-[0.1em] sm:tracking-[0.15em] text-[#F3EFE0] uppercase font-semibold text-center truncate">
             KELİME SAVAŞI
           </h1>
         </div>
@@ -1669,6 +1762,22 @@ export default function WelcomeScreen({
             <div className="text-xs font-black text-amber-400 font-mono tracking-widest leading-none">
               REKLAM SÜRESİ: {adCountdown} saniye
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ⏳ AD-LOADING OVERLAY */}
+      {isAdLoading && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in pointer-events-auto">
+          <div className="w-full max-w-sm bg-slate-900 border border-amber-500/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative">
+            <div className="absolute inset-0 rounded-3xl border border-dashed border-amber-500/20 animate-spin [animation-duration:15s]" />
+            <div className="w-10 h-10 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-[#FAF6E9] font-serif text-lg sm:text-xl font-bold uppercase tracking-wide leading-tight mb-2">
+              Reklam Yükleniyor...
+            </h3>
+            <p className="text-gray-400 text-xs leading-relaxed">
+              AdMob reklamı güvenli şekilde hazırlanıyor. Lütfen bekleyin...
+            </p>
           </div>
         </div>
       )}

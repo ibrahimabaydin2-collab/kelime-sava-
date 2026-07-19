@@ -18,6 +18,7 @@ import Lobby from './components/Lobby.js';
 import StatsModal from './components/StatsModal.js';
 import MissionsModal from './components/MissionsModal.js';
 import WelcomeScreen from './components/WelcomeScreen.js';
+import GoldWallet from './components/GoldWallet.js';
 import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import AuthScreen from './components/AuthScreen.js';
 import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
@@ -3559,6 +3560,9 @@ export default function App() {
                       Deneme: {attempts.length}/6
                     </span>
                   </div>
+
+                  {/* Shimmering Gold Wallet in playing screen top bar */}
+                  <GoldWallet gold={profile.gold !== undefined ? profile.gold : 20} />
 
                   <div className="flex items-center gap-2">
                     {gameMode === 'timed' && !activeMatch && !isDailyPuzzle ? (

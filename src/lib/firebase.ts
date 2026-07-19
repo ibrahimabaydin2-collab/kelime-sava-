@@ -214,11 +214,14 @@ export async function fetchUserProfileByDeviceId(deviceId: string): Promise<User
  */
 export async function deleteUserProfile(uid: string): Promise<void> {
   try {
+    if (auth.currentUser && uid !== auth.currentUser.uid) {
+      console.warn(`Skipping deleteUserProfile for ${uid} because it does not match current authenticated user ID ${auth.currentUser.uid}`);
+      return;
+    }
     const userDocRef = doc(db, 'users', uid);
     await deleteDoc(userDocRef);
   } catch (error) {
-    console.error('Failed to delete user profile:', error);
-    handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
+    console.warn('Failed to delete old user profile (expected/non-fatal):', error);
   }
 }
 
@@ -278,6 +281,15 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
  */
 export async function saveUserProfileToFirestore(profile: UserProfile): Promise<void> {
   try {
+    if (auth.currentUser && profile.id !== auth.currentUser.uid) {
+      console.warn(`Skipping saveUserProfileToFirestore for profile ID ${profile.id} because it is different from currently authenticated user UID ${auth.currentUser.uid}`);
+      // Still update local storage so client-side state is perfectly synchronized
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem('kelimesavasi_profile', JSON.stringify(profile));
+      }
+      return;
+    }
+
     const userDocRef = doc(db, 'users', profile.id);
     
     // Attempt background save to Firestore (without hard-failing the app if network is slow/offline)

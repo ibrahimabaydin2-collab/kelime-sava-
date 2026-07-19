@@ -12,6 +12,7 @@ import com.getcapacitor.BridgeActivity;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.AdView;
 import com.google.android.gms.ads.MobileAds;
+import androidx.annotation.NonNull;
 
 public class MainActivity extends BridgeActivity {
     private AdView mAdViewTop;
@@ -19,6 +20,8 @@ public class MainActivity extends BridgeActivity {
     private WebView mWebView;
     private boolean mAdsInitialized = false;
     private final Handler mHandler = new Handler(Looper.getMainLooper());
+    private com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd mRewardedInterstitialAd;
+    private boolean mIsAdLoading = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -188,6 +191,21 @@ public class MainActivity extends BridgeActivity {
                         }
                     });
                 }
+
+                @android.webkit.JavascriptInterface
+                public void showRewardedAd() {
+                    MainActivity.this.showRewardedAd();
+                }
+
+                @android.webkit.JavascriptInterface
+                public void loadRewardedAd() {
+                    MainActivity.this.loadRewardedAd();
+                }
+
+                @android.webkit.JavascriptInterface
+                public boolean isRewardedAdLoaded() {
+                    return MainActivity.this.mRewardedInterstitialAd != null;
+                }
             }, "AndroidBridge");
         }
 
@@ -209,6 +227,7 @@ public class MainActivity extends BridgeActivity {
                 MobileAds.initialize(MainActivity.this, initializationStatus -> {
                     mAdsInitialized = true;
                     loadBanners();
+                    loadRewardedAd();
                 });
             } catch (Exception e) {
                 e.printStackTrace();
@@ -324,6 +343,95 @@ public class MainActivity extends BridgeActivity {
         if (hasFocus) {
             ImmersiveModeHelper.enableImmersiveMode(this);
         }
+    }
+
+    public void loadRewardedAd() {
+        if (mRewardedInterstitialAd != null || mIsAdLoading) {
+            return;
+        }
+        mIsAdLoading = true;
+        mHandler.post(() -> {
+            try {
+                AdRequest adRequest = new AdRequest.Builder().build();
+                com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd.load(
+                    MainActivity.this, 
+                    "ca-app-pub-1284515268865249/3066667522",
+                    adRequest, 
+                    new com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoadCallback() {
+                        @Override
+                        public void onAdLoaded(@NonNull com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd rewardedInterstitialAd) {
+                            mRewardedInterstitialAd = rewardedInterstitialAd;
+                            mIsAdLoading = false;
+                            
+                            mRewardedInterstitialAd.setFullScreenContentCallback(new com.google.android.gms.ads.FullScreenContentCallback() {
+                                @Override
+                                public void onAdDismissedFullScreenContent() {
+                                    mRewardedInterstitialAd = null;
+                                    loadRewardedAd();
+                                    mHandler.post(() -> {
+                                        if (mWebView != null) {
+                                            mWebView.evaluateJavascript("if (window.onAndroidAdDismissed) { window.onAndroidAdDismissed(); }", null);
+                                        }
+                                    });
+                                }
+
+                                @Override
+                                public void onAdFailedToShowFullScreenContent(com.google.android.gms.ads.AdError adError) {
+                                    mRewardedInterstitialAd = null;
+                                    loadRewardedAd();
+                                    mHandler.post(() -> {
+                                        if (mWebView != null) {
+                                            mWebView.evaluateJavascript("if (window.onAndroidAdFailedToShow) { window.onAndroidAdFailedToShow('" + adError.getMessage().replace("'", "\\'") + "'); }", null);
+                                        }
+                                    });
+                                }
+                            });
+
+                            mHandler.post(() -> {
+                                if (mWebView != null) {
+                                    mWebView.evaluateJavascript("if (window.onAndroidAdLoaded) { window.onAndroidAdLoaded(); }", null);
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void onAdFailedToLoad(@NonNull com.google.android.gms.ads.LoadAdError loadAdError) {
+                            mRewardedInterstitialAd = null;
+                            mIsAdLoading = false;
+                            mHandler.post(() -> {
+                                if (mWebView != null) {
+                                    mWebView.evaluateJavascript("if (window.onAndroidAdFailedToLoad) { window.onAndroidAdFailedToLoad('" + loadAdError.getMessage().replace("'", "\\'") + "'); }", null);
+                                }
+                            });
+                        }
+                    }
+                );
+            } catch (Exception e) {
+                e.printStackTrace();
+                mIsAdLoading = false;
+            }
+        });
+    }
+
+    public void showRewardedAd() {
+        mHandler.post(() -> {
+            if (mRewardedInterstitialAd != null) {
+                mRewardedInterstitialAd.show(MainActivity.this, rewardItem -> {
+                    mHandler.post(() -> {
+                        if (mWebView != null) {
+                            mWebView.evaluateJavascript("if (window.onAndroidAdRewarded) { window.onAndroidAdRewarded(); }", null);
+                        }
+                    });
+                });
+            } else {
+                loadRewardedAd();
+                mHandler.post(() -> {
+                    if (mWebView != null) {
+                        mWebView.evaluateJavascript("if (window.onAndroidAdFailedToShow) { window.onAndroidAdFailedToShow('Ad not loaded yet. Loading started, please try again.'); }", null);
+                    }
+                });
+            }
+        });
     }
 
     @Override
