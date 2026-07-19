@@ -263,6 +263,17 @@ app.post('/api/daily-puzzle', async (req, res) => {
     const rawIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
     const ip = String(rawIp).replace(/[^a-zA-Z0-9]/g, '_');
 
+    const deviceDocRef = doc(db, 'daily_puzzles', `${dateStr}_${deviceId}`);
+    
+    // Check if a completed document already exists to prevent resets / replay hacks
+    const existingSnap = await getDoc(deviceDocRef);
+    if (existingSnap.exists()) {
+      const existingData = existingSnap.data();
+      if (existingData.solved || existingData.failed || (existingData.attempts && existingData.attempts.length >= 6)) {
+        return res.status(403).json({ error: 'Oyun tamamlandı, tekrar deneme yapılamaz.', dailyState: existingData });
+      }
+    }
+
     const dailyState = {
       dateStr,
       deviceId,
@@ -274,7 +285,6 @@ app.post('/api/daily-puzzle', async (req, res) => {
     };
 
     // Save to deviceId doc
-    const deviceDocRef = doc(db, 'daily_puzzles', `${dateStr}_${deviceId}`);
     await setDoc(deviceDocRef, dailyState);
 
     // Save to IP doc for cheat/exploit protection

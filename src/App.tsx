@@ -120,6 +120,7 @@ const triggerVictoryCelebration = (soundEnabled: boolean) => {
   // to avoid intensive GPU memory context losses, paint cycle flickering, and WebView crashes (white screens)
   const isAndroidHybrid = typeof window !== 'undefined' && (
     (window as any).AndroidBridge || 
+    /android/i.test(navigator.userAgent) ||
     (navigator.userAgent && navigator.userAgent.toLowerCase().includes('android-hybrid')) ||
     (document.documentElement && document.documentElement.classList.contains('android-hybrid'))
   );
@@ -3043,7 +3044,7 @@ export default function App() {
                 <div className="flex justify-between items-center w-full">
                   <button
                     onClick={() => {
-                      if (gameStatus === 'playing' && attempts.length > 0) {
+                      if (gameStatus === 'playing' && attempts.length > 0 && !isDailyPuzzle) {
                         showConfirm(
                           'Oyundan Çık',
                           'Mevcut oyundan çıkıp giriş ekranına dönmek istiyor musunuz? İlerlemeniz sıfırlanacaktır.',
@@ -3062,97 +3063,91 @@ export default function App() {
                     <span>Giriş Ekranı</span>
                   </button>
 
-                  <div className="flex items-center gap-1.5">
-                    {gameStatus === 'playing' && (
+                  {!isDailyPuzzle && (
+                    <div className="flex items-center gap-1.5">
+                      {gameStatus === 'playing' && (
+                        <button
+                          onClick={() => {
+                            showConfirm(
+                              'Pes Et',
+                              'Pes etmek ve doğru kelimeyi görmek istediğinize emin misiniz?',
+                              () => {
+                                handleGameLoss('Pes Ettiniz');
+                              }
+                            );
+                          }}
+                          className="px-2.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 border border-rose-500/20 transition duration-150 flex items-center gap-1 text-[11px] font-black uppercase tracking-wider font-mono cursor-pointer shrink-0"
+                          title="Pes Et ve Kelimeyi Gör"
+                        >
+                          <AlertCircle size={12} className="stroke-[2.5]" />
+                          Pes Et
+                        </button>
+                      )}
+
                       <button
                         onClick={() => {
-                          showConfirm(
-                            'Pes Et',
-                            'Pes etmek ve doğru kelimeyi görmek istediğinize emin misiniz?',
-                            () => {
-                              handleGameLoss('Pes Ettiniz');
-                            }
-                          );
+                          if (gameStatus === 'playing' && attempts.length > 0) {
+                            showConfirm(
+                              'Oyunu Yeniden Başlat',
+                              'Oyunu yeniden başlatmak istiyor musunuz? Mevcut ilerleme sıfırlanacaktır.',
+                              () => {
+                                startNewGame(wordLength);
+                              }
+                            );
+                          } else {
+                            startNewGame(wordLength);
+                          }
                         }}
-                        className="px-2.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 border border-rose-500/20 transition duration-150 flex items-center gap-1 text-[11px] font-black uppercase tracking-wider font-mono cursor-pointer shrink-0"
-                        title="Pes Et ve Kelimeyi Gör"
+                        className="px-2.5 py-2 rounded-xl bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border border-[#EBE6D5] font-black transition duration-150 flex items-center gap-1 text-[11px] uppercase tracking-wider font-mono cursor-pointer shrink-0"
+                        title="Yeni Kelime Al"
                       >
-                        <AlertCircle size={12} className="stroke-[2.5]" />
-                        Pes Et
+                        <RotateCcw size={12} className="stroke-[2.5]" />
+                        Yenile
                       </button>
-                    )}
-
-                    <button
-                      onClick={() => {
-                        if (isDailyPuzzle) {
-                          showConfirm(
-                            'Yeniden Dene',
-                            'Günün Bulmacasını sıfırlayıp tekrar denemek istiyor musunuz?',
-                            () => {
-                              startNewGame(wordLength, true);
-                            }
-                          );
-                          return;
-                        }
-                        if (gameStatus === 'playing' && attempts.length > 0) {
-                          showConfirm(
-                            'Oyunu Yeniden Başlat',
-                            'Oyunu yeniden başlatmak istiyor musunuz? Mevcut ilerleme sıfırlanacaktır.',
-                            () => {
-                              startNewGame(wordLength);
-                            }
-                          );
-                        } else {
-                          startNewGame(wordLength);
-                        }
-                      }}
-                      className="px-2.5 py-2 rounded-xl bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border border-[#EBE6D5] font-black transition duration-150 flex items-center gap-1 text-[11px] uppercase tracking-wider font-mono cursor-pointer shrink-0"
-                      title="Yeni Kelime Al"
-                    >
-                      <RotateCcw size={12} className="stroke-[2.5]" />
-                      Yenile
-                    </button>
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Row 2: Harf Sayısı Selector & Mode tag */}
-                <div className="flex justify-between items-center w-full bg-[#3D4756]/85 backdrop-blur-md border border-[#3E485A] rounded-xl px-2.5 py-1.5 shadow-sm text-white">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider font-mono">Harf:</span>
-                    <div className="flex gap-0.5 bg-black/30 p-0.5 rounded-lg">
-                      {[3, 4, 5, 6, 7, 8].map((len) => (
-                        <button
-                          key={len}
-                          onClick={() => {
-                            if (gameStatus === 'playing' && attempts.length > 0) {
-                              showConfirm(
-                                'Harf Sayısını Değiştir',
-                                'Mevcut oyunu sıfırlayıp harf sayısını değiştirmek istediğinize emin misiniz?',
-                                () => {
-                                  setWordLength(len);
-                                }
-                              );
-                            } else {
-                              setWordLength(len);
-                            }
-                          }}
-                          className={`w-6.5 h-6.5 rounded-md text-[10px] font-black transition-all duration-150 flex items-center justify-center cursor-pointer ${
-                            wordLength === len
-                              ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 shadow-xs scale-105'
-                              : 'text-gray-300 hover:bg-white/10 hover:text-white'
-                          }`}
-                        >
-                          {len}
-                        </button>
-                      ))}
+                {!isDailyPuzzle && (
+                  <div className="flex justify-between items-center w-full bg-[#3D4756]/85 backdrop-blur-md border border-[#3E485A] rounded-xl px-2.5 py-1.5 shadow-sm text-white">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider font-mono">Harf:</span>
+                      <div className="flex gap-0.5 bg-black/30 p-0.5 rounded-lg">
+                        {[3, 4, 5, 6, 7, 8].map((len) => (
+                          <button
+                            key={len}
+                            onClick={() => {
+                              if (gameStatus === 'playing' && attempts.length > 0) {
+                                showConfirm(
+                                  'Harf Sayısını Değiştir',
+                                  'Mevcut oyunu sıfırlayıp harf sayısını değiştirmek istediğinize emin misiniz?',
+                                  () => {
+                                    setWordLength(len);
+                                  }
+                                );
+                              } else {
+                                setWordLength(len);
+                              }
+                            }}
+                            className={`w-6.5 h-6.5 rounded-md text-[10px] font-black transition-all duration-150 flex items-center justify-center cursor-pointer ${
+                              wordLength === len
+                                ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 shadow-xs scale-105'
+                                : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                            }`}
+                          >
+                            {len}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="text-[10px] font-bold text-gray-300 flex items-center gap-1 font-mono uppercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                      <span>{gameMode === 'timed' ? 'Süreli' : 'Süresiz'}</span>
                     </div>
                   </div>
-
-                  <div className="text-[10px] font-bold text-gray-300 flex items-center gap-1 font-mono uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
-                    <span>{gameMode === 'timed' ? 'Süreli' : 'Süresiz'}</span>
-                  </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -3295,7 +3290,7 @@ export default function App() {
           {/* Victory Celebration is now handled via the lightweight showCongratsModal popup to prevent layout shifts, lag and WebView/AdMob crashes */}
 
           {/* Standard Game Over (Loss) Screen */}
-          {gameStatus === 'lost' && !activeMatch && (
+          {gameStatus === 'lost' && !activeMatch && !isDailyPuzzle && (
             <div className="w-full text-center py-2 space-y-2.5 max-w-sm animate-scale-up" id="game-over-loss-container">
               <div className="p-2.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900 rounded-xl space-y-1">
                 <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest font-mono">DENEME HAKKI VEYA SÜRE BİTTİ</p>
@@ -3339,6 +3334,55 @@ export default function App() {
                   <span>Ana Sayfaya Dön</span>
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Daily Puzzle Completion Board */}
+          {isDailyPuzzle && (gameStatus === 'won' || gameStatus === 'lost') && (
+            <div className="w-full text-center py-4 px-5 bg-[#2E3748] border border-[#3E485A] rounded-2xl space-y-3.5 max-w-sm animate-scale-up" id="daily-puzzle-completion-board">
+              <div className="space-y-1.5">
+                {gameStatus === 'won' ? (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase tracking-wider font-mono">
+                      🎉 BAŞARIYLA ÇÖZÜLDÜ
+                    </div>
+                    <h4 className="text-sm font-extrabold text-[#FAF6E9] mt-1">Günün Bulmacasını Tamamladınız!</h4>
+                    <p className="text-[11px] text-gray-300">Tebrikler, hanenize +5 Puan eklendi!</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-black uppercase tracking-wider font-mono">
+                      💥 DENEME HAKKINIZ BİTTİ
+                    </div>
+                    <h4 className="text-sm font-extrabold text-[#FAF6E9] mt-1">Günün Kelimesini Bulamadınız!</h4>
+                    <p className="text-[11px] text-gray-300 font-medium">Üzülmeyin, yarın yeni bir kelime ile tekrar deneyebilirsiniz.</p>
+                  </>
+                )}
+              </div>
+
+              <div className="p-3 bg-black/20 rounded-xl border border-white/5 space-y-1 text-white">
+                <span className="text-[9px] text-gray-400 uppercase font-mono tracking-widest block">GÜNÜN KELİMESİ</span>
+                <strong className="text-xl text-amber-500 tracking-widest font-black uppercase block leading-none">{targetWord}</strong>
+                {wordDefinition && wordDefinition !== 'loading' ? (
+                  <p className="text-[11px] text-gray-300 italic font-serif leading-relaxed line-clamp-3 mt-1.5">
+                    "{wordDefinition}"
+                  </p>
+                ) : wordDefinition === 'loading' ? (
+                  <p className="text-[10px] text-gray-400 italic animate-pulse mt-1.5">Anlamı yükleniyor...</p>
+                ) : null}
+              </div>
+
+              <button
+                onClick={() => {
+                  playClickSound(settings.soundEnabled);
+                  handleLeaveMatchToMenu();
+                }}
+                className="w-full bg-slate-700 hover:bg-slate-650 text-slate-100 font-extrabold py-3 px-4 rounded-xl border border-[#3E485A] text-xs uppercase tracking-wider active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5"
+                id="daily-ended-back-to-lobby-button"
+              >
+                <ArrowLeft size={14} className="stroke-[2.5]" />
+                <span>Ana Sayfaya Dön</span>
+              </button>
             </div>
           )}
 
@@ -3904,18 +3948,20 @@ export default function App() {
 
             {/* Action buttons matching the loss restart button but themed in emerald */}
             <div className="flex flex-col gap-2 relative z-10">
-              <button
-                onClick={() => {
-                  playClickSound(settings.soundEnabled);
-                  startNewGame(wordLength);
-                  setShowCongratsModal(false);
-                }}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs py-3 px-4 rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider"
-                id="congrats-new-game-button"
-              >
-                <RotateCcw size={14} />
-                <span>Yeni Kelimeye Başla</span>
-              </button>
+              {!isDailyPuzzle && (
+                <button
+                  onClick={() => {
+                    playClickSound(settings.soundEnabled);
+                    startNewGame(wordLength);
+                    setShowCongratsModal(false);
+                  }}
+                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs py-3 px-4 rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider"
+                  id="congrats-new-game-button"
+                >
+                  <RotateCcw size={14} />
+                  <span>Yeni Kelimeye Başla</span>
+                </button>
+              )}
 
                <button
                 onClick={() => {

@@ -77,7 +77,7 @@ export function isWordInCuratedList(word: string, length: number): boolean {
   return list.includes(normalized);
 }
 
-// Determines the daily word and length deterministically based on date
+// Determines the daily word and length deterministically based on date with anti-bug validation
 export function getDailyWordAndLength(): { word: string; length: number; dateStr: string } {
   const now = new Date();
   const year = now.getFullYear();
@@ -90,17 +90,41 @@ export function getDailyWordAndLength(): { word: string; length: number; dateStr
     hash += dateStr.charCodeAt(i) * (i + 1);
   }
 
-  // Length cycle: 3, 4, 5, 6 based on hash
-  // Using modulo 4 gives values 0..3, so adding 3 gives 3, 4, 5, 6
-  const length = 3 + (hash % 4);
+  // Length cycle: 3, 4, 5, 6, 7, 8 based on hash
+  // Using modulo 6 gives values 0..5, so adding 3 gives 3, 4, 5, 6, 7, 8
+  const length = 3 + (hash % 6);
 
   // Get words of this length from the popular list
   const list = populerKelimeler[length] || [];
-  let word = 'SAVAŞ';
+  let selectedWord = '';
+
+  const dictionary = COMMON_TURKISH_WORDS[length] || [];
+
   if (list.length > 0) {
-    const wordIndex = hash % list.length;
-    word = list[wordIndex].toUpperCase();
+    const startIndex = hash % list.length;
+    // Iterate through the popular list deterministically to find a word that is definitely in the dictionary
+    for (let i = 0; i < list.length; i++) {
+      const candidate = list[(startIndex + i) % list.length];
+      const lowerCandidate = candidate.toLocaleLowerCase('tr-TR').trim();
+      if (dictionary.includes(lowerCandidate)) {
+        selectedWord = candidate.toLocaleUpperCase('tr-TR').trim();
+        break;
+      }
+    }
   }
-  
-  return { word: turkishUpper(word), length, dateStr };
+
+  // Absolute fallback if no popular word is validated against the dictionary
+  if (!selectedWord) {
+    const fallbackWords: { [key: number]: string } = {
+      3: 'ARA',
+      4: 'ALAN',
+      5: 'KALEM',
+      6: 'BARDAK',
+      7: 'ARKADAŞ',
+      8: 'ÖĞRETMEN'
+    };
+    selectedWord = fallbackWords[length] || 'KALEM';
+  }
+
+  return { word: selectedWord, length, dateStr };
 }
