@@ -279,6 +279,52 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
 }
 
 /**
+ * Normalizes Turkish letters to English counterparts for fuzzy case-insensitive matching
+ */
+export function turkishToEnglishFriendly(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/İ/g, 'i')
+    .replace(/I/g, 'i')
+    .replace(/ı/g, 'i')
+    .replace(/ç/g, 'c')
+    .replace(/Ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/Ğ/g, 'g')
+    .replace(/ö/g, 'o')
+    .replace(/Ö/g, 'o')
+    .replace(/ş/g, 's')
+    .replace(/Ş/g, 's')
+    .replace(/ü/g, 'u')
+    .replace(/Ü/g, 'u')
+    .toLowerCase();
+}
+
+/**
+ * Checks if a username matches a search term in any case/Turkish-locale variation
+ */
+export function matchesSearchTerm(userName: string, searchTerm: string): boolean {
+  if (!userName || !searchTerm) return false;
+  const term = searchTerm.trim().toLowerCase();
+  if (!term) return false;
+
+  const uName = userName.trim().toLowerCase();
+  const uNameTr = userName.trim().toLocaleLowerCase('tr-TR');
+  const termTr = searchTerm.trim().toLocaleLowerCase('tr-TR');
+  const uNameClean = turkishToEnglishFriendly(userName);
+  const termClean = turkishToEnglishFriendly(searchTerm);
+
+  return (
+    uName.includes(term) ||
+    uNameTr.includes(termTr) ||
+    uNameClean.includes(termClean) ||
+    term.includes(uName) ||
+    termTr.includes(uNameTr) ||
+    termClean.includes(uNameClean)
+  );
+}
+
+/**
  * Saves or updates the user profile in Firestore
  */
 export async function saveUserProfileToFirestore(profile: UserProfile): Promise<void> {
@@ -294,19 +340,25 @@ export async function saveUserProfileToFirestore(profile: UserProfile): Promise<
 
     const userDocRef = doc(db, 'users', profile.id);
     
-    // Attempt background save to Firestore (without hard-failing the app if network is slow/offline)
-    setDoc(userDocRef, {
+    const cleanName = profile.name ? profile.name.trim() : '';
+    const termLower = cleanName.toLowerCase();
+    const termLowerTr = cleanName.toLocaleLowerCase('tr-TR');
+    const termClean = turkishToEnglishFriendly(cleanName);
+
+    const dataToSave = {
       ...profile,
-      name_lowercase: profile.name ? profile.name.toLowerCase() : '',
+      name: cleanName,
+      name_lowercase: termLower,
+      name_lowercase_tr: termLowerTr,
+      name_clean: termClean,
       lastUpdated: new Date().toISOString(),
       updatedAt: serverTimestamp()
-    }, { merge: true }).catch(error => {
-      console.warn('Background Firestore profile save queued/deferred:', error);
-      if (error instanceof Error && (error.message.includes('permission') || error.message.includes('Permission'))) {
-        handleFirestoreError(error, OperationType.WRITE, `users/${profile.id}`);
-      }
-    });
-    
+    };
+
+    // We await setDoc so we are 100% sure the write is committed to local cache/network
+    await setDoc(userDocRef, dataToSave, { merge: true });
+    console.log(`Successfully saved user profile to Firestore for UID ${profile.id} (${cleanName})`);
+
     // Update browser local storage immediately so client-side state is always perfectly synchronized
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem('kelimesavasi_profile', JSON.stringify(profile));
@@ -406,7 +458,7 @@ export async function fetchUsersWhoAddedMe(uid: string): Promise<UserProfile[]> 
 }
 
 /**
- * Searches for user profiles matching a specific username exactly or by prefix (case-insensitive)
+ * Searches for user profiles matching a specific username exactly or by prefix (case-insensitive and Turkish-aware)
  */
 export async function searchUserByName(name: string): Promise<UserProfile[]> {
   try {
@@ -415,6 +467,8 @@ export async function searchUserByName(name: string): Promise<UserProfile[]> {
 
     const usersCollection = collection(db, 'users');
     const termLower = term.toLowerCase();
+    const termLowerTr = term.toLocaleLowerCase('tr-TR');
+    const termClean = turkishToEnglishFriendly(term);
 
     // Query 1: Case-insensitive prefix search using name_lowercase
     const q1 = query(
@@ -424,26 +478,61 @@ export async function searchUserByName(name: string): Promise<UserProfile[]> {
       limit(50)
     );
 
-    // Query 2: Case-sensitive exact match
+    // Query 2: Case-insensitive prefix search using name_lowercase_tr
     const q2 = query(
+      usersCollection,
+      where('name_lowercase_tr', '>=', termLowerTr),
+      where('name_lowercase_tr', '<=', termLowerTr + '\uf8ff'),
+      limit(50)
+    );
+
+    // Query 3: English friendly prefix search using name_clean
+    const q3 = query(
+      usersCollection,
+      where('name_clean', '>=', termClean),
+      where('name_clean', '<=', termClean + '\uf8ff'),
+      limit(50)
+    );
+
+    // Query 4: Case-sensitive exact match
+    const qExact1 = query(
       usersCollection,
       where('name', '==', term),
       limit(20)
     );
 
-    // Query 3: Client-side robust fallback querying the first 150 users
-    const qFallback = query(
+    // Query 5: Case-insensitive exact match on name_lowercase
+    const qExact2 = query(
       usersCollection,
-      limit(150)
+      where('name_lowercase', '==', termLower),
+      limit(20)
     );
 
-    const [snap1, snap2, snapFallback] = await Promise.all([
+    // Query 6: Robust fallback querying the first 300 users for perfect offline/sync client-side search
+    const qFallback = query(
+      usersCollection,
+      limit(300)
+    );
+
+    const [snap1, snap2, snap3, snapE1, snapE2, snapFallback] = await Promise.all([
       getDocs(q1).catch((err) => {
         console.warn('q1 search error:', err);
         return null;
       }),
       getDocs(q2).catch((err) => {
         console.warn('q2 search error:', err);
+        return null;
+      }),
+      getDocs(q3).catch((err) => {
+        console.warn('q3 search error:', err);
+        return null;
+      }),
+      getDocs(qExact1).catch((err) => {
+        console.warn('qExact1 search error:', err);
+        return null;
+      }),
+      getDocs(qExact2).catch((err) => {
+        console.warn('qExact2 search error:', err);
         return null;
       }),
       getDocs(qFallback).catch((err) => {
@@ -470,31 +559,46 @@ export async function searchUserByName(name: string): Promise<UserProfile[]> {
 
     processSnap(snap1);
     processSnap(snap2);
+    processSnap(snap3);
+    processSnap(snapE1);
+    processSnap(snapE2);
     processSnap(snapFallback);
 
     const allUsers = Array.from(resultMap.values());
 
-    // Filter client-side: case-insensitive match anywhere in the name
+    // Filter client-side: case-insensitive/Turkish-aware match anywhere in the name
     const filtered = allUsers.filter(user => {
       if (!user.name) return false;
-      const userNameLower = user.name.toLowerCase();
-      return userNameLower.includes(termLower);
+      return matchesSearchTerm(user.name, term);
     });
 
-    // Sort: exact match first, then starts with, then includes
+    // Sort: exact match first, then starts with, then locale compare
     filtered.sort((a, b) => {
-      const aName = (a.name || '').toLowerCase();
-      const bName = (b.name || '').toLowerCase();
-      if (aName === termLower && bName !== termLower) return -1;
-      if (bName === termLower && aName !== termLower) return 1;
-      const aStarts = aName.startsWith(termLower);
-      const bStarts = bName.startsWith(termLower);
-      if (aStarts && !bStarts) return -1;
-      if (bStarts && !aStarts) return 1;
-      return aName.localeCompare(bName);
+      const aName = a.name || '';
+      const bName = b.name || '';
+      
+      const aLower = aName.toLowerCase();
+      const bLower = bName.toLowerCase();
+      const aLowerTr = aName.toLocaleLowerCase('tr-TR');
+      const bLowerTr = bName.toLocaleLowerCase('tr-TR');
+      const aClean = turkishToEnglishFriendly(aName);
+      
+      const isExactA = aLower === termLower || aLowerTr === termLowerTr || aClean === termClean;
+      const isExactB = bLower === termLower || bLowerTr === termLowerTr || turkishToEnglishFriendly(bName) === termClean;
+      
+      if (isExactA && !isExactB) return -1;
+      if (!isExactA && isExactB) return 1;
+      
+      const startsA = aLower.startsWith(termLower) || aLowerTr.startsWith(termLowerTr) || aClean.startsWith(termClean);
+      const startsB = bLower.startsWith(termLower) || bLowerTr.startsWith(termLowerTr) || turkishToEnglishFriendly(bName).startsWith(termClean);
+      
+      if (startsA && !startsB) return -1;
+      if (!startsA && startsB) return 1;
+      
+      return aName.localeCompare(bName, 'tr');
     });
 
-    return filtered.slice(0, 20);
+    return filtered.slice(0, 30);
   } catch (error) {
     console.error('Failed to search user by name:', error);
     return [];
@@ -502,41 +606,42 @@ export async function searchUserByName(name: string): Promise<UserProfile[]> {
 }
 
 /**
- * Checks if a username is already taken by another user in the database (case-insensitive)
+ * Checks if a username is already taken by another user in the database (case-insensitive and Turkish-aware)
  */
 export async function checkUsernameExists(username: string, currentUserId?: string): Promise<boolean> {
   try {
     const term = username.trim();
     if (!term) return false;
+    
     const termLower = term.toLowerCase();
+    const termLowerTr = term.toLocaleLowerCase('tr-TR');
+    const termClean = turkishToEnglishFriendly(term);
     const usersCollection = collection(db, 'users');
 
-    // Query 1: Case-insensitive match on name_lowercase
-    const q1 = query(usersCollection, where('name_lowercase', '==', termLower));
-    const snap1 = await getDocs(q1);
+    const queries = [
+      query(usersCollection, where('name_lowercase', '==', termLower)),
+      query(usersCollection, where('name_lowercase_tr', '==', termLowerTr)),
+      query(usersCollection, where('name_clean', '==', termClean)),
+      query(usersCollection, where('name', '==', term))
+    ];
 
-    if (!snap1.empty) {
-      let isTaken = false;
-      snap1.forEach(docSnap => {
-        if (!currentUserId || docSnap.id !== currentUserId) {
-          isTaken = true;
-        }
-      });
-      if (isTaken) return true;
-    }
+    const snapshots = await Promise.all(
+      queries.map(q => getDocs(q).catch(err => {
+        console.warn('Username check query failed:', err);
+        return null;
+      }))
+    );
 
-    // Query 2: Exact match on name
-    const q2 = query(usersCollection, where('name', '==', term));
-    const snap2 = await getDocs(q2);
-
-    if (!snap2.empty) {
-      let isTaken = false;
-      snap2.forEach(docSnap => {
-        if (!currentUserId || docSnap.id !== currentUserId) {
-          isTaken = true;
-        }
-      });
-      if (isTaken) return true;
+    for (const snap of snapshots) {
+      if (snap && !snap.empty) {
+        let isTaken = false;
+        snap.forEach(docSnap => {
+          if (!currentUserId || docSnap.id !== currentUserId) {
+            isTaken = true;
+          }
+        });
+        if (isTaken) return true;
+      }
     }
 
     return false;

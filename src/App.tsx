@@ -1803,7 +1803,7 @@ export default function App() {
             case 'opponent_left': {
               showToast('Rakip oyundan ayrıldı! Zafer senin! 🏆', 'success');
               setOpponentLeftDuringMatch(true);
-              setIsMatchmakingLocked(true); // Lock matchmaking to prevent accidental re-entry
+              setIsMatchmakingLocked(false); // Unconditionally allow immediate re-entry
               setGameStatus('won'); // Automatically win if opponent flees
               setActiveMatch((prev) => {
                 if (!prev) return null;
@@ -1820,11 +1820,19 @@ export default function App() {
               unlockBadge('gladiator');
               updateDailyScore(200);
               triggerVictoryCelebration(settings.soundEnabled);
+
+              // Clear matchmaking state in Firestore immediately
+              if (profile && profile.id) {
+                clearMatchmakingState(profile.id).catch((err) => {
+                  console.warn('Database cleanup failed in opponent_left:', err);
+                });
+              }
               break;
             }
 
             case 'match_end': {
               const { winnerId, players: finalPlayers, roundsWon: rw } = data;
+              setIsMatchmakingLocked(false); // Unconditionally allow immediate re-entry
               setActiveMatch((prev) => {
                 if (!prev) return null;
                 return {
@@ -1852,6 +1860,13 @@ export default function App() {
               } else {
                 showToast('Maçı rakibin kazandı. Daha hızlı olmalısın!', 'error');
                 playDefeatSound(settings.soundEnabled);
+              }
+
+              // Clear matchmaking state in Firestore immediately
+              if (profile && profile.id) {
+                clearMatchmakingState(profile.id).catch((err) => {
+                  console.warn('Database cleanup failed in match_end:', err);
+                });
               }
               break;
             }
@@ -2093,14 +2108,7 @@ export default function App() {
     setSecondsLeft(20);
     setShowCongratsModal(false);
     setShowLobbyModal(false);
-    if (opponentLeftDuringMatch) {
-      setIsMatchmakingLocked(true);
-      setTimeout(() => {
-        setIsMatchmakingLocked(false);
-      }, 3000); // 3 seconds state lock to prevent accidental queue entry!
-    } else {
-      setIsMatchmakingLocked(false);
-    }
+    setIsMatchmakingLocked(false);
     setOpponentLeftDuringMatch(false);
     pendingMatchmakingRef.current = null;
 
@@ -3450,7 +3458,7 @@ export default function App() {
   };
 
   const opponent = activeMatch ? Object.values(activeMatch.players).find(p => (p as any).name !== profile.name) as any : null;
-  const isMatchEnded = !!(activeMatch && (activeMatch.status === 'ended' || Object.values(activeMatch.players).some((p: any) => p.won)));
+  const isMatchEnded = !!(activeMatch && (activeMatch.status === 'ended' || (activeMatch.matchWordsCount !== 3 && Object.values(activeMatch.players).some((p: any) => p.won))));
 
   // Triggers when 1v1 match ends (isMatchEnded turns true) or when user exits a match, loading AdMob asynchronously in the background and freeing layout calculations
   useEffect(() => {
@@ -3908,16 +3916,39 @@ export default function App() {
             <div className="flex-1 min-h-[0.25rem] sm:min-h-[0.5rem]" />
           )}
 
-          {/* Letter Grid */}
+          {/* Letter Grid or Waiting Card */}
           {!isMatchEnded && (
-            <GameBoard
-              attempts={attempts}
-              currentAttempt={currentAttempt}
-              wordLength={wordLength}
-              boardTheme={settings.boardTheme}
-              isGameOver={gameStatus !== 'playing'}
-              revealedHints={revealedHints}
-            />
+            activeMatch && activeMatch.matchWordsCount === 3 && gameStatus === 'idle' ? (
+              <div className="w-full max-w-sm sm:max-w-md mx-auto bg-slate-900/80 border border-emerald-500/30 rounded-3xl p-6 text-center shadow-xl animate-scale-up my-4 flex flex-col items-center gap-4" id="match-waiting-card">
+                <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20 animate-pulse">
+                  <Hourglass size={28} className="text-emerald-400 animate-spin" style={{ animationDuration: '3s' }} />
+                </div>
+                <h3 className="text-base font-black text-emerald-400 uppercase tracking-widest font-mono">Tebrikler!</h3>
+                <p className="text-xs text-gray-300 leading-relaxed max-w-xs">
+                  Tüm kelimeleri tamamladınız! Rakibinizin de 3. kelimeyi bitirmesi bekleniyor... ⏳
+                </p>
+                <div className="w-full bg-black/30 rounded-xl p-3 border border-white/5 space-y-1">
+                  <span className="text-[10px] font-black font-mono text-gray-400 uppercase tracking-wider block">Mevcut Durum</span>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-300">Senin İlerlemen:</span>
+                    <span className="text-emerald-400 font-bold font-mono">3 / 3 Tamamlandı</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-300">Rakibin İlerlemesi:</span>
+                    <span className="text-amber-400 font-bold font-mono">{(opponent?.currentWordIndex || 0) + 1} / 3 Kelimede</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <GameBoard
+                attempts={attempts}
+                currentAttempt={currentAttempt}
+                wordLength={wordLength}
+                boardTheme={settings.boardTheme}
+                isGameOver={gameStatus !== 'playing'}
+                revealedHints={revealedHints}
+              />
+            )
           )}
 
           {/* 💡 ACTIVE WORD SUGGESTION DRAWER */}
@@ -4232,10 +4263,19 @@ export default function App() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 font-mono font-bold">
-                        <span className="text-gray-400">Deneme:</span>
-                        <span className={playerState.won ? 'text-emerald-400' : 'text-rose-400'}>
-                          {playerState.won ? `${playerState.attempts.length} / 6` : 'BİLEMEDİ'}
-                        </span>
+                        {activeMatch.matchWordsCount === 3 ? (
+                          <>
+                            <span className="text-gray-400">Toplam Skor:</span>
+                            <span className="text-amber-400">{playerState.score || 0} Puan</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-gray-400">Deneme:</span>
+                            <span className={playerState.won ? 'text-emerald-400' : 'text-rose-400'}>
+                              {playerState.won ? `${playerState.attempts.length} / 6` : 'BİLEMEDİ'}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   );

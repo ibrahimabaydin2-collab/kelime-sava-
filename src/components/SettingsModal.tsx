@@ -27,6 +27,7 @@ import { validateUsername, validatePassword } from '../utils/usernameValidation.
 import PrivacyPolicyModal from './PrivacyPolicyModal.js';
 import { 
   auth, 
+  db,
   linkGuestToEmailAndPassword, 
   sendVerificationEmail,
   linkGuestWithGoogle,
@@ -35,6 +36,7 @@ import {
   linkWithCredential,
   checkUsernameExists
 } from '../lib/firebase.js';
+import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
 
 export interface AppSettings {
   boardTheme: 'classic' | 'ocean' | 'neon' | 'autumn' | 'pastel';
@@ -101,6 +103,62 @@ export default function SettingsModal({
   const [phoneStep, setPhoneStep] = useState<'number' | 'otp'>('number');
   const [phoneVerificationId, setPhoneVerificationId] = useState<string | null>(null);
   const [phoneLoading, setPhoneLoading] = useState<boolean>(false);
+
+  // Database Purge state
+  const [isClearingDb, setIsClearingDb] = useState<boolean>(false);
+  const [clearDbMessage, setClearDbMessage] = useState<string | null>(null);
+  const [clearDbError, setClearDbError] = useState<string | null>(null);
+
+  const handlePurgeUsersDatabase = async () => {
+    if (!window.confirm('Firestore "users" koleksiyonundaki tüm eski/hayalet oyuncu profillerini tamamen silmek istediğinizden emin misiniz? (Kendi profiliniz korunacak ve arkadaş listeleri sıfırlanacaktır)')) {
+      return;
+    }
+
+    setIsClearingDb(true);
+    setClearDbError(null);
+    setClearDbMessage('Kullanıcı listesi alınıyor...');
+
+    try {
+      const usersCol = collection(db, 'users');
+      const querySnapshot = await getDocs(usersCol);
+      
+      if (querySnapshot.empty) {
+        setClearDbMessage('Temizlenecek eski kullanıcı bulunamadı.');
+        setIsClearingDb(false);
+        return;
+      }
+
+      setClearDbMessage(`${querySnapshot.size} kullanıcı bulundu, temizleniyor...`);
+      
+      const currentUid = auth.currentUser?.uid;
+      const batch = writeBatch(db);
+      let deletedCount = 0;
+
+      querySnapshot.forEach((docSnap) => {
+        if (docSnap.id !== currentUid) {
+          batch.delete(docSnap.ref);
+          deletedCount++;
+        } else {
+          // Clear current user's friends to avoid broken/stale friend requests/links
+          batch.update(docSnap.ref, { friends: [] });
+        }
+      });
+
+      await batch.commit();
+      
+      setClearDbMessage(`Başarılı! ${deletedCount} eski/hayalet kullanıcı temizlendi, arkadaş listeleri sıfırlandı.`);
+      
+      // Update local profile state immediately if needed or trigger profile update
+      if (currentUid) {
+        onUpdateProfile(profile.name, profile.avatarUrl);
+      }
+    } catch (err: any) {
+      console.error('Failed to clear users database:', err);
+      setClearDbError(err.message || 'Sıfırlama işlemi başarısız oldu.');
+    } finally {
+      setIsClearingDb(false);
+    }
+  };
 
   const currentUser = auth.currentUser;
   const isAnonymous = currentUser ? currentUser.isAnonymous : true;
@@ -1229,6 +1287,44 @@ export default function SettingsModal({
                   </div>
                 )}
               </div>
+
+              {/* Card 2: Veritabanı Temizliği (Purge Admin) */}
+              <div className="inner-theme border border-theme rounded-2xl p-4.5 space-y-3 text-left shadow-md mt-4">
+                <h4 className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-2">
+                  <AlertTriangle size={14} className="animate-pulse" />
+                  Veritabanı Temizliği ve Senkronizasyonu (Geliştirici)
+                </h4>
+                <p className="text-[10px] text-slate-300/80 leading-normal">
+                  Firestore <code className="px-1 py-0.5 rounded bg-black/30 font-mono text-rose-300">users</code> koleksiyonundaki tüm eski, hayalet ve kalıntı kullanıcı profili dokümanlarını tamamen silerek veritabanını sıfırlayabilirsiniz. Kendi oyuncu profiliniz korunacak, arkadaş listeniz temizlenecektir.
+                </p>
+                
+                {clearDbMessage && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-[11px] font-medium leading-relaxed">
+                    {clearDbMessage}
+                  </div>
+                )}
+                
+                {clearDbError && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-[11px] font-medium leading-relaxed">
+                    {clearDbError}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  disabled={isClearingDb}
+                  onClick={handlePurgeUsersDatabase}
+                  className="w-full mt-1.5 py-3 px-4 rounded-xl border border-rose-500/30 bg-rose-500/5 hover:bg-rose-500/10 disabled:opacity-50 text-rose-400 text-xs font-black transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isClearingDb ? (
+                    <div className="w-4 h-4 border-2 border-rose-500/30 border-t-rose-400 rounded-full animate-spin" />
+                  ) : (
+                    <AlertTriangle size={14} />
+                  )}
+                  <span>{isClearingDb ? 'Temizleniyor...' : 'Eski/Hayalet Oyuncuları Temizle'}</span>
+                </button>
+              </div>
+
             </div>
           )}
 
