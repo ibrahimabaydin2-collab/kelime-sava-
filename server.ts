@@ -300,6 +300,46 @@ app.post('/api/daily-puzzle', async (req, res) => {
   }
 });
 
+// Helper to extract a clean definition from Wikisözlük (Wiktionary) wikitext content
+function extractWiktionaryDefinition(content: string, word: string): string | null {
+  if (!content) return null;
+  
+  // Find the Turkish section index
+  const trIndex = content.indexOf('== Türkçe ==') !== -1 ? content.indexOf('== Türkçe ==') : content.indexOf('==Türkçe==');
+  let turkishContent = content;
+  if (trIndex !== -1) {
+    turkishContent = content.substring(trIndex);
+    // Limit content to only the Turkish section, in case there are subsequent language sections
+    const nextLangIndex = turkishContent.indexOf('==', 12);
+    if (nextLangIndex !== -1) {
+      turkishContent = turkishContent.substring(0, nextLangIndex);
+    }
+  }
+
+  const lines = turkishContent.split('\n');
+  for (const line of lines) {
+    // Look for lines starting with '#' (definition lines), but skip sub-definitions (##), examples/notes (#* or #:)
+    if (line.startsWith('#') && !line.startsWith('##') && !line.startsWith('#*') && !line.startsWith('#:') && line.length > 4) {
+      let cleanLine = line.substring(1).trim();
+      
+      // Remove mediawiki links: [[meyve|meyveler]] -> meyveler, [[elma]] -> elma
+      cleanLine = cleanLine.replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_, p1, p2) => p2 || p1);
+      
+      // Remove templates: {{belediye|Türkiye}} -> "", {{Sözlük|Türkçe}} -> ""
+      cleanLine = cleanLine.replace(/\{\{[^}]+\}\}/g, '');
+      
+      // Remove triple/double quotes for bold/italic formatting
+      cleanLine = cleanLine.replace(/'''?/g, '');
+      
+      cleanLine = cleanLine.trim();
+      if (cleanLine.length > 2) {
+        return cleanLine;
+      }
+    }
+  }
+  return null;
+}
+
 // Core hybrid validation function
 async function validateWordHybrid(word: string, skipLocalCheck = false): Promise<{ valid: boolean; definition: string }> {
   try {
@@ -377,24 +417,7 @@ async function validateWordHybrid(word: string, skipLocalCheck = false): Promise
       console.log(`[Wiktionary Result] Word "${lowerWord}" is VALID (Found Turkish section)`);
       
       // Try to extract a clean definition from the wikitext content for display
-      const lines = content.split('\n');
-      let definition = '';
-      for (const line of lines) {
-        if (line.startsWith('#') && !line.startsWith('##') && line.length > 5) {
-          let cleanLine = line.substring(1).trim();
-          cleanLine = cleanLine.replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_, p1, p2) => p2 || p1);
-          cleanLine = cleanLine.replace(/\{\{[^}]+\}\}/g, '');
-          cleanLine = cleanLine.replace(/'''?/g, '');
-          if (cleanLine.length > 3) {
-            definition = cleanLine;
-            break;
-          }
-        }
-      }
-
-      if (!definition) {
-        definition = 'Wikisözlük\'te kayıtlı geçerli bir Türkçe sözcüktür.';
-      }
+      const definition = extractWiktionaryDefinition(content, lowerWord) || 'Wikisözlük\'te kayıtlı geçerli bir Türkçe sözcüktür.';
 
       return {
         valid: true,
@@ -510,6 +533,76 @@ app.post('/api/validate-word', async (req, res) => {
   }
 });
 
+// Helper function to fetch word definition using TDK API (sozluk.gov.tr)
+async function getDefinitionFromTDK(word: string): Promise<string | null> {
+  try {
+    const cleanWord = word.trim().toLocaleLowerCase('tr-TR');
+    const url = `https://sozluk.gov.tr/goster?kemles=${encodeURIComponent(cleanWord)}`;
+    console.log(`[TDK Definition] Fetching definition for: "${cleanWord}"`);
+    
+    const response = await axios.get(url, {
+      timeout: 5000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+      const entry = response.data[0];
+      if (entry.anlamlarListe && Array.isArray(entry.anlamlarListe) && entry.anlamlarListe.length > 0) {
+        const anlam = entry.anlamlarListe[0].anlam;
+        if (anlam) {
+          const cleanAnlam = anlam.trim();
+          if (cleanAnlam.length > 1) {
+            console.log(`[TDK Definition Success] Found meaning for "${word}": ${cleanAnlam}`);
+            return cleanAnlam;
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error(`[TDK Definition Error] Failed to get definition for "${word}" from TDK:`, err?.message || err);
+  }
+  return null;
+}
+
+// Helper function to fetch word definition using Gemini API
+async function getDefinitionFromGemini(word: string): Promise<string | null> {
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn('[Gemini Definition] GEMINI_API_KEY is not defined, skipping.');
+    return null;
+  }
+  try {
+    console.log(`[Gemini Definition] Fetching definition for: "${word}"`);
+    
+    const prompt = `Sen Türkçe dilinde bir kelime oyunu sözlük asistanısın. 
+"${word}" Türkçe kelimesinin kısa, net ve tam sözlük tanımını (anlamını) ver.
+Sadece kelimenin anlamını içeren tek bir açıklayıcı cümle veya kısa bir cümle grubu dön. 
+Örnek cümle ekleme, başka ek açıklama yapma. Yanıt doğrudan kelimenin tanımı olsun.
+Eğer kelime argo veya küfür değilse, kesinlikle anlamını açıkla. 
+Örnek format: "Bir yerin veya bir şeyin sınırları dışında kalan kısım, dışarı."`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        temperature: 0.2,
+        maxOutputTokens: 100
+      }
+    });
+
+    if (response && response.text) {
+      const def = response.text.trim().replace(/^"|"$/g, '');
+      if (def && def.length > 3 && !def.toLowerCase().includes('üzgünüm') && !def.toLowerCase().includes('hata')) {
+        return def;
+      }
+    }
+  } catch (err: any) {
+    console.error(`[Gemini Definition Error] Failed to generate definition for "${word}":`, err?.message || err);
+  }
+  return null;
+}
+
 // Endpoint to fetch direct definition of any target word
 app.post('/api/get-definition', async (req, res) => {
   try {
@@ -543,7 +636,7 @@ app.post('/api/get-definition', async (req, res) => {
       const wordDocRef = doc(db, 'dictionary', normalized);
       const wordSnap = await Promise.race([
         getDoc(wordDocRef),
-        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 2000))
+        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Firestore read timeout')), 4000))
       ]);
       if (wordSnap && wordSnap.exists()) {
         const dbData = wordSnap.data();
@@ -570,12 +663,32 @@ app.post('/api/get-definition', async (req, res) => {
       console.warn('Firestore database read for definition failed/timed out:', dbErr);
     }
 
-    // Retrieve via hybrid validation (Wiktionary/Local) - skip local list to force Wiktionary fetch
-    const validationResult = await validateWordHybrid(normalized, true);
+    // 1. Fetch definition directly from word validation source (Wiktionary/Local) FIRST
+    console.log(`[Get Definition] Fetching definition directly from word validation source (Wiktionary/Local) for: "${normalized}"`);
+    const validationResult = await validateWordHybrid(normalized, true); // skipLocalCheck=true to force querying Wiktionary content
     let definition = validationResult.definition;
 
+    let isGeneric = !definition ||
+                    definition === 'Yerel kelime listesinde kayıtlı geçerli bir Türkçe sözcüktür.' ||
+                    definition === 'Wikisözlük\'te kayıtlı geçerli bir Türkçe sözcüktür.' ||
+                    definition.includes('doğrulandı') ||
+                    definition.includes('bulunamadı') ||
+                    definition.includes('yüklenemedi') ||
+                    definition.includes('erişilemiyor') ||
+                    definition.includes('Hata');
+
+    // 2. Fallback to Gemini if wiktionary definition was not found or was generic, ensuring we always have a good definition
+    if (isGeneric || !definition) {
+      console.log(`[Get Definition] Word validation source returned generic or missing definition for "${normalized}". Trying Gemini as fallback...`);
+      const geminiDef = await getDefinitionFromGemini(normalized);
+      if (geminiDef) {
+        definition = geminiDef;
+        isGeneric = false;
+      }
+    }
+
     // Use a clean custom fallback sentence if definition is missing or generic/not found
-    const isFallback = !definition || 
+    const isFallback = isGeneric || !definition || 
                       definition === 'Yerel kelime listesinde kayıtlı geçerli bir Türkçe sözcüktür.' ||
                       definition === 'Wikisözlük\'te kayıtlı geçerli bir Türkçe sözcüktür.' ||
                       definition.includes('bulunamadı') || 

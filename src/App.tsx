@@ -1236,8 +1236,45 @@ export default function App() {
                     // No existing profile found with this deviceId. Sync current profile state
                     const savedUsername = safeLocalStorage.getItem('saved_username');
                     const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
-                    let finalName = savedUsername || profile.name;
-                    let finalAvatar = profile.avatarUrl || '🧠';
+                    
+                    setProfile((prevProfile) => {
+                      let finalName = savedUsername || prevProfile.name;
+                      let finalAvatar = prevProfile.avatarUrl || '🧠';
+                      
+                      if (savedUsername && !savedUsername.startsWith('Oyuncu_')) {
+                        finalName = savedUsername;
+                      } else if (savedProfileStr) {
+                        try {
+                          const parsed = JSON.parse(savedProfileStr);
+                          if (parsed && parsed.name) finalName = parsed.name;
+                          if (parsed && parsed.avatarUrl) finalAvatar = parsed.avatarUrl;
+                        } catch (e) {}
+                      }
+                      const updatedProfile = ensureProfileFields({
+                        ...prevProfile,
+                        id: user.uid,
+                        name: finalName,
+                        avatarUrl: finalAvatar,
+                        deviceId: deviceId,
+                        nameSet: true
+                      });
+                      saveUserProfileToFirestore(updatedProfile).catch(err => console.warn(err));
+                      safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+                      if (updatedProfile.name) {
+                        safeLocalStorage.setItem('saved_username', updatedProfile.name);
+                      }
+                      return updatedProfile;
+                    });
+                  }
+                } catch (deviceCheckErr) {
+                  console.error('Error during automatic device profile recovery after auth:', deviceCheckErr);
+                  // Sync current profile state as fallback
+                  const savedUsername = safeLocalStorage.getItem('saved_username');
+                  const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
+                  
+                  setProfile((prevProfile) => {
+                    let finalName = savedUsername || prevProfile.name;
+                    let finalAvatar = prevProfile.avatarUrl || '🧠';
                     
                     if (savedUsername && !savedUsername.startsWith('Oyuncu_')) {
                       finalName = savedUsername;
@@ -1249,51 +1286,20 @@ export default function App() {
                       } catch (e) {}
                     }
                     const updatedProfile = ensureProfileFields({
-                      ...profile,
+                      ...prevProfile,
                       id: user.uid,
                       name: finalName,
                       avatarUrl: finalAvatar,
                       deviceId: deviceId,
                       nameSet: true
                     });
-                    setProfile(updatedProfile);
-                    await saveUserProfileToFirestore(updatedProfile);
+                    saveUserProfileToFirestore(updatedProfile).catch(err => console.warn(err));
                     safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
                     if (updatedProfile.name) {
                       safeLocalStorage.setItem('saved_username', updatedProfile.name);
                     }
-                  }
-                } catch (deviceCheckErr) {
-                  console.error('Error during automatic device profile recovery after auth:', deviceCheckErr);
-                  // Sync current profile state as fallback
-                  const savedUsername = safeLocalStorage.getItem('saved_username');
-                  const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
-                  let finalName = savedUsername || profile.name;
-                  let finalAvatar = profile.avatarUrl || '🧠';
-                  
-                  if (savedUsername && !savedUsername.startsWith('Oyuncu_')) {
-                    finalName = savedUsername;
-                  } else if (savedProfileStr) {
-                    try {
-                      const parsed = JSON.parse(savedProfileStr);
-                      if (parsed && parsed.name) finalName = parsed.name;
-                      if (parsed && parsed.avatarUrl) finalAvatar = parsed.avatarUrl;
-                    } catch (e) {}
-                  }
-                  const updatedProfile = ensureProfileFields({
-                    ...profile,
-                    id: user.uid,
-                    name: finalName,
-                    avatarUrl: finalAvatar,
-                    deviceId: deviceId,
-                    nameSet: true
+                    return updatedProfile;
                   });
-                  setProfile(updatedProfile);
-                  await saveUserProfileToFirestore(updatedProfile);
-                  safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
-                  if (updatedProfile.name) {
-                    safeLocalStorage.setItem('saved_username', updatedProfile.name);
-                  }
                 }
               }
 
@@ -1362,7 +1368,9 @@ export default function App() {
 
   // Persist User Profile
   useEffect(() => {
-    safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(profile));
+    if (profile && profile.nameSet) {
+      safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(profile));
+    }
   }, [profile]);
 
   useEffect(() => {
@@ -2168,28 +2176,72 @@ export default function App() {
     };
   }, [isAppActive, gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch, isDailyPuzzle, targetWord]); // Resets interval on attempt submission or validation change or exit or gameMode change
 
-  // Fetch direct definition for the target word
+  // Fetch direct definition for the target word with multi-layered client-side fallbacks
   const fetchTargetWordDefinition = async (wordToFetch: string) => {
     if (!wordToFetch) return;
     setWordDefinition('loading');
+    
+    // Step 1: Try fetching from our robust full-stack backend with a strict timeout
+    let definitionFound = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
     try {
+      console.log(`[Client Definition] Attempting to fetch from backend for: "${wordToFetch}"`);
       const response = await fetch(getApiUrl('/api/get-definition'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: wordToFetch })
+        body: JSON.stringify({ word: wordToFetch }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
-        if (data.definition) {
-          setWordDefinition(data.definition);
+        if (data && data.definition) {
+          const isGeneric = data.definition === 'Bu kelimenin resmi sözlük tanımına şu an ulaşılamıyor.' ||
+                            data.definition.includes('tanımına şu an ulaşılamıyor') ||
+                            data.definition.includes('Yerel kelime listesinde kayıtlı geçerli');
+          
+          if (!isGeneric) {
+            setWordDefinition(data.definition);
+            definitionFound = true;
+            return;
+          } else {
+            console.warn('[Client Definition] Backend returned a generic fallback definition, executing client-side fallbacks.');
+          }
+        }
+      }
+    } catch (e: any) {
+      clearTimeout(timeoutId);
+      console.warn('[Client Definition] Backend fetch failed or timed out:', e?.message || e);
+    }
+
+    if (definitionFound) return;
+
+    // Step 2: Fallback - Fetch directly from Wiktionary/validation source using the client-side parsing utility
+    try {
+      console.log(`[Client Definition Fallback] Attempting direct Wiktionary/validation query for: "${wordToFetch}"`);
+      const wikiRes = await validateWordClientSide(wordToFetch, wordToFetch.length);
+      if (wikiRes && wikiRes.valid && wikiRes.definition) {
+        const isGeneric = wikiRes.definition.includes('bulunamadı') || 
+                          wikiRes.definition.includes('Hata') ||
+                          wikiRes.definition.includes('yerel sözlükte bulundu') ||
+                          wikiRes.definition.includes('Wikisözlük\'te doğrulandı');
+                          
+        if (!isGeneric && wikiRes.definition.length > 5) {
+          console.log(`[Client Definition Fallback Success] Direct Wiktionary found meaning:`, wikiRes.definition);
+          setWordDefinition(wikiRes.definition);
           return;
         }
       }
-      setWordDefinition('Bu kelimenin resmi sözlük tanımına şu an ulaşılamıyor.');
-    } catch (e) {
-      console.error('Failed to fetch target word definition:', e);
-      setWordDefinition('Bu kelimenin resmi sözlük tanımına şu an ulaşılamıyor.');
+    } catch (wikiErr: any) {
+      console.warn('[Client Definition Fallback] Direct Wiktionary utility query failed:', wikiErr?.message || wikiErr);
     }
+
+    // Default ultimate fallback if all layers failed
+    setWordDefinition('Bu kelimenin resmi sözlük tanımına şu an ulaşılamıyor.');
   };
 
   // Prefetch target word definition in the background when the target word is determined (active game)
