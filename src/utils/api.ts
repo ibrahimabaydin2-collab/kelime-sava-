@@ -107,7 +107,44 @@ if (typeof window !== 'undefined') {
 export function getBaseUrl(): string {
   if (typeof window !== 'undefined') {
     try {
+      const ua = navigator.userAgent || '';
+      const isAndroid = /android/i.test(ua);
+      const isIOS = /iphone|ipad|ipod/i.test(ua);
+      const isMobile = isAndroid || isIOS;
+      
+      const isWebView = ua.includes('wv') || 
+                        ua.includes('WebView') || 
+                        (isAndroid && !ua.includes('Chrome')) ||
+                        (isIOS && !ua.includes('Safari')) ||
+                        (window as any).Android || 
+                        !!(window as any).AndroidBridge ||
+                        ((window as any).webkit && (window as any).webkit.messageHandlers);
+      
+      const isCapacitor = !!(window as any).Capacitor;
+      const protocol = window.location.protocol || '';
       const hostname = window.location.hostname || '';
+      
+      const isHybrid = protocol === 'file:' || 
+                       protocol.startsWith('capacitor') || 
+                       protocol.startsWith('ionic') || 
+                       isWebView ||
+                       isCapacitor ||
+                       isMobile;
+
+      // 1. Standalone hybrid apps (like Capacitor APK, Android WebView, mobile etc)
+      // must always default to the remote production backend (unless explicitly configured to dev/custom)
+      if (isHybrid) {
+        const type = window.localStorage.getItem('kelimesavasi_server_type');
+        if (type === 'dev') {
+          return DEV_APP_URL;
+        } else if (type === 'custom') {
+          const customUrl = window.localStorage.getItem('kelimesavasi_custom_server_url');
+          if (customUrl) return customUrl;
+        }
+        return DEPLOYED_APP_URL;
+      }
+
+      // 2. Browser dev environment (where we serve locally and need local relative endpoint, e.g. local browser at localhost:3000)
       const isDevEnv = hostname.includes('run.app') || 
                        hostname === 'localhost' || 
                        hostname === '127.0.0.1';
@@ -124,20 +161,6 @@ export function getBaseUrl(): string {
       } else if (type === 'custom') {
         const customUrl = window.localStorage.getItem('kelimesavasi_custom_server_url');
         if (customUrl) return customUrl;
-      }
-      
-      // If no explicit setting exists (e.g., fresh install), auto-detect based on host/platform:
-      const isCapacitor = !!(window as any).Capacitor;
-      const protocol = window.location.protocol || '';
-      
-      // Standalone hybrid apps (like Capacitor APK) must default to the public live server out-of-the-box
-      const isHybrid = protocol === 'file:' || 
-                       protocol.startsWith('capacitor') || 
-                       protocol.startsWith('ionic') || 
-                       isCapacitor;
-      
-      if (isHybrid) {
-        return DEPLOYED_APP_URL;
       }
       
       return DEPLOYED_APP_URL;

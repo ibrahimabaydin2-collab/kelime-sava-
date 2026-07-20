@@ -602,16 +602,17 @@ export default function App() {
 
     const targetLower = targetWord.toLowerCase();
 
+    // Pre-create lowercase sets of clean and common words for O(1) lightning-fast lookups
+    const cleanedPool = CLEANED_TURKISH_WORDS[wordLength] || [];
+    const commonPool = COMMON_TURKISH_WORDS[wordLength] || [];
+    const cleanedSet = new Set(cleanedPool.map(x => turkishLower(x).trim()));
+    const commonSet = new Set(commonPool.map(x => turkishLower(x).trim()));
+
     // Helper to verify a candidate word is linguistically valid and strictly exists in COMMON_TURKISH_WORDS and CLEANED_TURKISH_WORDS pools
     const isLinguisticallyValid = (w: string): boolean => {
       const lower = turkishLower(w).trim();
-      const cleanedPool = CLEANED_TURKISH_WORDS[wordLength] || [];
-      const commonPool = COMMON_TURKISH_WORDS[wordLength] || [];
 
-      const inCleaned = cleanedPool.some(x => turkishLower(x).trim() === lower);
-      const inCommon = commonPool.some(x => turkishLower(x).trim() === lower);
-
-      if (!inCleaned || !inCommon) return false;
+      if (!cleanedSet.has(lower) || !commonSet.has(lower)) return false;
 
       const upper = turkishUpper(w);
       return validateTurkishLinguistics(upper, wordLength).valid;
