@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Swords, Play, Globe, ShieldAlert, Sparkles, 
   Trophy, Users, HelpCircle, ChevronDown, ChevronUp, 
@@ -115,6 +115,7 @@ export default function WelcomeScreen({
   const [friendsSearchTerm, setFriendsSearchTerm] = useState<string>('');
   
   // Rewarded Ad and Daily Claim States
+  const adRequestActiveRef = useRef<boolean>(false);
   const [isWatchingAd, setIsWatchingAd] = useState<boolean>(false);
   const [adCountdown, setAdCountdown] = useState<number>(5);
   const [showAdSuccess, setShowAdSuccess] = useState<boolean>(false);
@@ -250,6 +251,7 @@ export default function WelcomeScreen({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as any).onAndroidAdRewarded = () => {
+        adRequestActiveRef.current = false;
         setIsWatchingAd(false);
         setIsAdLoading(false);
         onWatchRewardedAdReward?.();
@@ -257,22 +259,31 @@ export default function WelcomeScreen({
       };
 
       (window as any).onAndroidAdDismissed = () => {
+        adRequestActiveRef.current = false;
         setIsWatchingAd(false);
         setIsAdLoading(false);
       };
 
       (window as any).onAndroidAdFailedToShow = (err: string) => {
+        adRequestActiveRef.current = false;
         setIsWatchingAd(false);
         setIsAdLoading(false);
         alert("Reklam gösterilemedi: " + err);
       };
 
       (window as any).onAndroidAdFailedToLoad = (err: string) => {
+        adRequestActiveRef.current = false;
         setIsAdLoading(false);
         alert("Reklam yüklenemedi: " + err);
       };
 
       (window as any).onAndroidAdLoaded = () => {
+        // Only trigger showRewardedAd if the user explicitly requested it!
+        if (!adRequestActiveRef.current) {
+          console.log("onAndroidAdLoaded triggered, but no active user request. Skipping auto-show.");
+          return;
+        }
+        adRequestActiveRef.current = false; // Reset the flag
         setIsAdLoading(false);
         try {
           if ((window as any).AndroidBridge && (window as any).AndroidBridge.showRewardedAd) {
@@ -297,10 +308,12 @@ export default function WelcomeScreen({
 
   const startRewardedAdWatch = () => {
     if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+      adRequestActiveRef.current = true; // Set active request flag
       setIsAdLoading(true);
       try {
         if ((window as any).AndroidBridge.isRewardedAdLoaded && (window as any).AndroidBridge.isRewardedAdLoaded()) {
           if ((window as any).AndroidBridge.showRewardedAd) {
+            adRequestActiveRef.current = false; // Will be shown immediately, reset the flag
             (window as any).AndroidBridge.showRewardedAd();
           }
         } else {
@@ -311,7 +324,8 @@ export default function WelcomeScreen({
           setTimeout(() => {
             setIsAdLoading(curr => {
               if (curr) {
-                if ((window as any).AndroidBridge && (window as any).AndroidBridge.showRewardedAd) {
+                if (adRequestActiveRef.current && (window as any).AndroidBridge && (window as any).AndroidBridge.showRewardedAd) {
+                  adRequestActiveRef.current = false; // Reset flag before showing
                   (window as any).AndroidBridge.showRewardedAd();
                 }
               }
@@ -321,6 +335,7 @@ export default function WelcomeScreen({
         }
       } catch (e) {
         console.error("Error triggering native ad:", e);
+        adRequestActiveRef.current = false;
         setIsAdLoading(false);
       }
     } else {
