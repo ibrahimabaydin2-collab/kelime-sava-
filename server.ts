@@ -820,6 +820,7 @@ const matches = new Map<string, {
   id: string;
   wordLength: number;
   targetWord: string;
+  targetWords?: string[];
   matchWordsCount?: number;
   currentRound?: number;
   roundsWon?: { [id: string]: number };
@@ -1119,7 +1120,7 @@ const setupWebSocket = (server: any) => {
           }
 
           case 'game_update': {
-            const { matchId, attempts, currentAttempt, completed, won, score, timeRemaining, kelime_bulundu_zamani } = data;
+            const { matchId, attempts, currentAttempt, completed, won, score, timeRemaining, kelime_bulundu_zamani, currentWordIndex } = data;
             const match = matches.get(matchId);
 
             if (match && match.status === 'playing') {
@@ -1131,6 +1132,9 @@ const setupWebSocket = (server: any) => {
                 player.won = won;
                 player.score = score;
                 player.timeRemaining = timeRemaining;
+                if (currentWordIndex !== undefined) {
+                  (player as any).currentWordIndex = currentWordIndex;
+                }
                 if (won) {
                   (player as any).kelime_bulundu_zamani = kelime_bulundu_zamani || Date.now();
                 }
@@ -1151,6 +1155,7 @@ const setupWebSocket = (server: any) => {
                         won,
                         score,
                         timeRemaining,
+                        currentWordIndex,
                         kelime_bulundu_zamani: won ? (kelime_bulundu_zamani || Date.now()) : null
                       },
                       roundsWon: match.roundsWon || { [playerId]: 0, [opponentId]: 0 }
@@ -1466,15 +1471,30 @@ const setupWebSocket = (server: any) => {
 
                 // Use the player's requested wordLength or fallback
                 const finalWordLength = wordLength || opponentInfo.wordLength || 5;
-                const finalMatchWordsCount = 1;
-                const targetWord = getRandomWord(finalWordLength);
+                const finalMatchWordsCount = requestedWordsCount || opponentInfo.matchWordsCount || 1;
+                
+                let targetWord = getRandomWord(finalWordLength);
+                let targetWords: string[] = [targetWord];
+                if (finalMatchWordsCount === 3) {
+                  let w2 = getRandomWord(finalWordLength);
+                  while (w2 === targetWord) {
+                    w2 = getRandomWord(finalWordLength);
+                  }
+                  let w3 = getRandomWord(finalWordLength);
+                  while (w3 === targetWord || w3 === w2) {
+                    w3 = getRandomWord(finalWordLength);
+                  }
+                  targetWords.push(w2);
+                  targetWords.push(w3);
+                }
                 const matchId = `match_${Date.now()}`;
 
                 matches.set(matchId, {
                   id: matchId,
                   wordLength: finalWordLength,
                   targetWord,
-                  matchWordsCount: 1,
+                  targetWords,
+                  matchWordsCount: finalMatchWordsCount,
                   currentRound: 1,
                   roundsWon: {
                     [playerId]: 0,
@@ -1513,6 +1533,7 @@ const setupWebSocket = (server: any) => {
                   type: 'match_start',
                   matchId,
                   targetWord,
+                  targetWords,
                   wordLength: finalWordLength,
                   matchWordsCount: finalMatchWordsCount,
                   currentRound: 1,
@@ -1532,6 +1553,7 @@ const setupWebSocket = (server: any) => {
                   type: 'match_start',
                   matchId,
                   targetWord,
+                  targetWords,
                   wordLength: finalWordLength,
                   matchWordsCount: finalMatchWordsCount,
                   currentRound: 1,

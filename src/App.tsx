@@ -516,6 +516,9 @@ export default function App() {
     return localCompleted;
   });
   const [targetWord, setTargetWord] = useState<string>('');
+  const [targetWords, setTargetWords] = useState<string[] | null>(null);
+  const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
+  const [cumulativeScore, setCumulativeScore] = useState<number>(0);
   const [attempts, setAttempts] = useState<GameAttempt[]>([]);
   const [currentAttempt, setCurrentAttempt] = useState<string>('');
   const [gameStatus, setGameStatus] = useState<'idle' | 'playing' | 'won' | 'lost'>('idle');
@@ -1621,7 +1624,7 @@ export default function App() {
             }
 
             case 'match_start': {
-              const { matchId, targetWord: sharedWord, wordLength: len, opponentId, opponentName, matchWordsCount, currentRound, roundsWon } = data;
+              const { matchId, targetWord: sharedWord, targetWords: sharedWords, wordLength: len, opponentId, opponentName, matchWordsCount, currentRound, roundsWon } = data;
               showToast(`Maç Başladı! Rakip: ${opponentName}`, 'success');
               
               // Transition to match state
@@ -1641,6 +1644,16 @@ export default function App() {
               setRematchRequested(false);
               setOpponentRematchRequested(false);
 
+              // 3-Round Mode initialization
+              if (sharedWords && sharedWords.length > 0) {
+                setTargetWords(sharedWords);
+                setTargetWord(sharedWords[0]);
+              } else {
+                setTargetWords(null);
+              }
+              setCurrentWordIndex(0);
+              setCumulativeScore(0);
+
               // Set active match reference
               setActiveMatch({
                 id: matchId,
@@ -1657,7 +1670,8 @@ export default function App() {
                     completed: false,
                     timeRemaining: 20,
                     score: 0,
-                    won: false
+                    won: false,
+                    currentWordIndex: 0
                   },
                   [opponentId]: {
                     name: opponentName,
@@ -1666,7 +1680,8 @@ export default function App() {
                     completed: false,
                     timeRemaining: 20,
                     score: 0,
-                    won: false
+                    won: false,
+                    currentWordIndex: 0
                   }
                 },
                 status: 'playing'
@@ -1729,7 +1744,8 @@ export default function App() {
                       completed: playerUpdate.completed,
                       won: playerUpdate.won,
                       score: playerUpdate.score,
-                      timeRemaining: playerUpdate.timeRemaining
+                      timeRemaining: playerUpdate.timeRemaining,
+                      currentWordIndex: playerUpdate.currentWordIndex !== undefined ? playerUpdate.currentWordIndex : (prev.players[playerUpdate.id]?.currentWordIndex || 0)
                     }
                   }
                 };
@@ -1956,7 +1972,8 @@ export default function App() {
     completed: boolean,
     won: boolean,
     score: number,
-    kelime_bulundu_zamani?: number | null
+    kelime_bulundu_zamani?: number | null,
+    passedWordIndex?: number
   ) => {
     if (activeMatch && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
@@ -1968,7 +1985,8 @@ export default function App() {
         won,
         score,
         timeRemaining: secondsLeft,
-        kelime_bulundu_zamani: kelime_bulundu_zamani || null
+        kelime_bulundu_zamani: kelime_bulundu_zamani || null,
+        currentWordIndex: passedWordIndex !== undefined ? passedWordIndex : currentWordIndex
       }));
     }
   };
@@ -2408,8 +2426,15 @@ export default function App() {
 
   // Submit Guessed Word
   const submitGuess = async () => {
-    const isAnyPlayerSolved = activeMatch ? Object.values(activeMatch.players).some((p: any) => p.won) : false;
-    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended' || isAnyPlayerSolved;
+    const isAnyPlayerSolved = activeMatch && activeMatch.matchWordsCount !== 3 
+      ? Object.values(activeMatch.players).some((p: any) => p.won) 
+      : false;
+    
+    const isSelfCompletedAllRounds = activeMatch && activeMatch.matchWordsCount === 3 
+      ? (currentWordIndex >= 2 && (activeMatch.players[profile.id]?.completed || gameStatus === 'won'))
+      : (activeMatch?.players[profile.id]?.completed || false);
+
+    const localCompleted = isSelfCompletedAllRounds || activeMatch?.status === 'ended' || isAnyPlayerSolved;
     if (localCompleted || gameStatus !== 'playing') {
       return;
     }
@@ -2519,71 +2544,162 @@ export default function App() {
       }
 
       if (activeMatch) {
-        if (hasWon) {
-          showToast(`TEBRİKLER! Savaşı Kazandın!`, 'success');
-          playEnterSound(settings.soundEnabled);
-          
-          // Get opponent info
-          const opponentEntry = Object.entries(activeMatch.players).find(([pId]) => pId !== profile.id);
-          const loserId = opponentEntry ? opponentEntry[0] : 'rakip_id';
-          const loserName = opponentEntry ? (opponentEntry[1] as any).name : 'Rakip';
-          const loserScore = opponentEntry ? ((opponentEntry[1] as any).score || 0) : 0;
-          
-          // Sync match state first
-          syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded, Date.now());
+        if (activeMatch.matchWordsCount === 3) {
+          if (hasWon) {
+            if (currentWordIndex < 2) {
+              const nextIndex = currentWordIndex + 1;
+              const nextWord = targetWords ? targetWords[nextIndex] : null;
+              showToast(`Tebrikler! ${currentWordIndex + 1}. kelimeyi çözdünüz! Sonraki kelimeye geçiliyor... 🚀`, 'success');
+              playEnterSound(settings.soundEnabled);
 
-          // Stop all timer intervals
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          
-          // Set game status to block keyboard listeners
-          setGameStatus('idle');
-          
-          // Force set isMatchEndedRef.current to true so keyboard listener ignores any events
-          isMatchEndedRef.current = true;
-          
-          // Close the websocket to stop receiving or sending any more messages
-          if (socketRef.current) {
-            try {
-              socketRef.current.close();
-            } catch (e) {
-              console.error("Error closing socket:", e);
-            }
-            socketRef.current = null;
-          }
-
-          // Redirect instantly to ResultActivity via AndroidBridge
-          if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
-            try {
-              (window as any).AndroidBridge.loadAdBackground();
-              if ((window as any).AndroidBridge.redirectToResultActivity) {
-                console.log("Instantly directing winner to native ResultActivity via AndroidBridge...");
-                (window as any).AndroidBridge.redirectToResultActivity(
-                  profile.id,
-                  profile.name,
-                  scoreAwarded,
-                  loserId,
-                  loserName,
-                  loserScore,
-                  activeMatch.targetWord || targetWord || '',
-                  true // isWinner = true
-                );
+              setCurrentWordIndex(nextIndex);
+              setAttempts([]);
+              setCurrentAttempt('');
+              setRevealedHints({});
+              setLetterStatuses({});
+              setSecondsLeft(20);
+              if (nextWord) {
+                setTargetWord(nextWord);
               }
-            } catch (e) {
-              console.error("Error calling native AndroidBridge:", e);
+              const newCumulative = cumulativeScore + scoreAwarded;
+              setCumulativeScore(newCumulative);
+
+              syncMatchState([], 0, false, false, newCumulative, null, nextIndex);
+            } else {
+              // 3rd and final word solved! Complete win.
+              showToast(`TEBRİKLER! Tüm kelimeleri tamamlayarak Savaşı Kazandın! 🏆`, 'success');
+              playEnterSound(settings.soundEnabled);
+
+              const totalScore = cumulativeScore + scoreAwarded;
+              setCumulativeScore(totalScore);
+
+              const opponentEntry = Object.entries(activeMatch.players).find(([pId]) => pId !== profile.id);
+              const loserId = opponentEntry ? opponentEntry[0] : 'rakip_id';
+              const loserName = opponentEntry ? (opponentEntry[1] as any).name : 'Rakip';
+              const loserScore = opponentEntry ? ((opponentEntry[1] as any).score || 0) : 0;
+
+              syncMatchState(updatedAttempts, updatedAttempts.length, true, true, totalScore, Date.now(), 2);
+
+              if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+              }
+              setGameStatus('idle');
+              isMatchEndedRef.current = true;
+
+              if (socketRef.current) {
+                try {
+                  socketRef.current.close();
+                } catch (e) {
+                  console.error("Error closing socket:", e);
+                }
+                socketRef.current = null;
+              }
+
+              if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+                try {
+                  (window as any).AndroidBridge.loadAdBackground();
+                  if ((window as any).AndroidBridge.redirectToResultActivity) {
+                    (window as any).AndroidBridge.redirectToResultActivity(
+                      profile.id,
+                      profile.name,
+                      totalScore,
+                      loserId,
+                      loserName,
+                      loserScore,
+                      activeMatch.targetWord || targetWord || '',
+                      true
+                    );
+                  }
+                } catch (e) {
+                  console.error("Error calling native AndroidBridge:", e);
+                }
+              }
             }
+          } else if (updatedAttempts.length >= 6) {
+            if (currentWordIndex < 2) {
+              const nextIndex = currentWordIndex + 1;
+              const nextWord = targetWords ? targetWords[nextIndex] : null;
+              showToast(`Tahmin hakkınız tükendi. Doğru kelime: ${targetWord}. Sonraki kelimeye geçiliyor... ⏩`, 'info');
+              playDefeatSound(settings.soundEnabled);
+
+              setCurrentWordIndex(nextIndex);
+              setAttempts([]);
+              setCurrentAttempt('');
+              setRevealedHints({});
+              setLetterStatuses({});
+              setSecondsLeft(20);
+              if (nextWord) {
+                setTargetWord(nextWord);
+              }
+
+              syncMatchState([], 0, false, false, cumulativeScore, null, nextIndex);
+            } else {
+              showToast(`Tahmin haklarınız bitti! Rakibin de bitirmesi bekleniyor... Doğru kelime: ${targetWord}`, 'info');
+              playDefeatSound(settings.soundEnabled);
+
+              syncMatchState(updatedAttempts, updatedAttempts.length, true, false, cumulativeScore, null, 2);
+            }
+          } else {
+            playEnterSound(settings.soundEnabled);
+            syncMatchState(updatedAttempts, updatedAttempts.length, false, false, cumulativeScore);
           }
-        } else if (updatedAttempts.length >= 6) {
-          showToast(`6 tahmin hakkınız tükendi! Rakibin de tamamlaması bekleniyor... Doğru kelime: ${targetWord}`, 'info');
-          playDefeatSound(settings.soundEnabled);
-          
-          // Send completed=true, won=false state to the server and wait
-          syncMatchState(updatedAttempts, updatedAttempts.length, true, false, 0);
         } else {
-          playEnterSound(settings.soundEnabled);
-          syncMatchState(updatedAttempts, updatedAttempts.length, false, false, 0);
+          // Normal Single Round Duel
+          if (hasWon) {
+            showToast(`TEBRİKLER! Savaşı Kazandın!`, 'success');
+            playEnterSound(settings.soundEnabled);
+            
+            const opponentEntry = Object.entries(activeMatch.players).find(([pId]) => pId !== profile.id);
+            const loserId = opponentEntry ? opponentEntry[0] : 'rakip_id';
+            const loserName = opponentEntry ? (opponentEntry[1] as any).name : 'Rakip';
+            const loserScore = opponentEntry ? ((opponentEntry[1] as any).score || 0) : 0;
+            
+            syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded, Date.now());
+
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
+            setGameStatus('idle');
+            isMatchEndedRef.current = true;
+            
+            if (socketRef.current) {
+              try {
+                socketRef.current.close();
+              } catch (e) {
+                console.error("Error closing socket:", e);
+              }
+              socketRef.current = null;
+            }
+
+            if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+              try {
+                (window as any).AndroidBridge.loadAdBackground();
+                if ((window as any).AndroidBridge.redirectToResultActivity) {
+                  (window as any).AndroidBridge.redirectToResultActivity(
+                    profile.id,
+                    profile.name,
+                    scoreAwarded,
+                    loserId,
+                    loserName,
+                    loserScore,
+                    activeMatch.targetWord || targetWord || '',
+                    true
+                  );
+                }
+              } catch (e) {
+                console.error("Error calling native AndroidBridge:", e);
+              }
+            }
+          } else if (updatedAttempts.length >= 6) {
+            showToast(`6 tahmin hakkınız tükendi! Rakibin de tamamlaması bekleniyor... Doğru kelime: ${targetWord}`, 'info');
+            playDefeatSound(settings.soundEnabled);
+            syncMatchState(updatedAttempts, updatedAttempts.length, true, false, 0);
+          } else {
+            playEnterSound(settings.soundEnabled);
+            syncMatchState(updatedAttempts, updatedAttempts.length, false, false, 0);
+          }
         }
       } else {
         if (hasWon) {
@@ -3635,16 +3751,24 @@ export default function App() {
                   <h4 className="font-bold text-xs text-gray-800 dark:text-white">Kelime Savaşı Sürüyor!</h4>
                   {activeMatch.matchWordsCount && (
                     <span className="text-[9px] font-black font-mono bg-emerald-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-                      Tur {activeMatch.currentRound}/{activeMatch.matchWordsCount}
+                      {activeMatch.matchWordsCount === 3 ? '⚡ 3 TURLU YARIŞ' : `Tur ${activeMatch.currentRound}/${activeMatch.matchWordsCount}`}
                     </span>
                   )}
                 </div>
-                {activeMatch.roundsWon && (
+                {activeMatch.matchWordsCount === 3 ? (
                   <div className="flex gap-2.5 mt-0.5 text-[10px] font-bold font-mono">
-                    <span className="text-emerald-600 dark:text-emerald-400">SEN: {activeMatch.roundsWon[profile.id] || 0}</span>
+                    <span className="text-emerald-600 dark:text-emerald-400">SENİN İLERLEMEN: Kelime {currentWordIndex + 1}/3</span>
                     <span className="text-gray-400">|</span>
-                    <span className="text-amber-500">RAKİP: {activeMatch.roundsWon[opponent?.id || ''] || 0}</span>
+                    <span className="text-amber-500">RAKİBİN İLERLEMESİ: Kelime {(opponent?.currentWordIndex || 0) + 1}/3</span>
                   </div>
+                ) : (
+                  activeMatch.roundsWon && (
+                    <div className="flex gap-2.5 mt-0.5 text-[10px] font-bold font-mono">
+                      <span className="text-emerald-600 dark:text-emerald-400">SEN: {activeMatch.roundsWon[profile.id] || 0}</span>
+                      <span className="text-gray-400">|</span>
+                      <span className="text-amber-500">RAKİP: {activeMatch.roundsWon[opponent?.id || ''] || 0}</span>
+                    </div>
+                  )
                 )}
               </div>
             </div>

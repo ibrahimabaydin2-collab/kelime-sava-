@@ -13,7 +13,8 @@ import {
   linkWithCredential,
   auth,
   RecaptchaVerifier,
-  signInWithPhoneNumber
+  signInWithPhoneNumber,
+  checkUsernameExists
 } from '../lib/firebase.js';
 
 interface AuthScreenProps {
@@ -332,6 +333,15 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
     setLoading(true);
 
     try {
+      if (mode === 'guest' || mode === 'register') {
+        const usernameTaken = await checkUsernameExists(username);
+        if (usernameTaken) {
+          setFirebaseError('Bu kullanıcı adı daha önce alınmıştır, lütfen başka bir tane seçin.');
+          setLoading(false);
+          return;
+        }
+      }
+
       if (mode === 'guest') {
         // Save the manual username and preset profile to local storage first so that the onAuthStateChanged listener picks it up immediately
         try {

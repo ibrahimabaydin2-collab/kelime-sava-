@@ -238,7 +238,8 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
     ]) as any;
     
     if (userSnap && userSnap.exists()) {
-      return userSnap.data() as UserProfile;
+      const data = userSnap.data() as UserProfile;
+      return { ...data, id: data.id || userSnap.id };
     }
   } catch (error) {
     console.warn('Failed to fetch user profile from server, trying offline cache:', error);
@@ -250,7 +251,8 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
       const userSnap = await getDocFromCache(userDocRef);
       if (userSnap && userSnap.exists()) {
         console.log('Successfully fetched user profile from Firestore offline cache.');
-        return userSnap.data() as UserProfile;
+        const data = userSnap.data() as UserProfile;
+        return { ...data, id: data.id || userSnap.id };
       }
     } catch (cacheError) {
       console.warn('Failed to fetch from Firestore offline cache:', cacheError);
@@ -456,8 +458,11 @@ export async function searchUserByName(name: string): Promise<UserProfile[]> {
       if (snap && !snap.empty) {
         snap.forEach((docSnap: any) => {
           const data = docSnap.data() as UserProfile;
-          if (data && data.id) {
-            resultMap.set(data.id, data);
+          if (data) {
+            const userId = data.id || docSnap.id;
+            if (userId) {
+              resultMap.set(userId, { ...data, id: userId });
+            }
           }
         });
       }
@@ -493,6 +498,51 @@ export async function searchUserByName(name: string): Promise<UserProfile[]> {
   } catch (error) {
     console.error('Failed to search user by name:', error);
     return [];
+  }
+}
+
+/**
+ * Checks if a username is already taken by another user in the database (case-insensitive)
+ */
+export async function checkUsernameExists(username: string, currentUserId?: string): Promise<boolean> {
+  try {
+    const term = username.trim();
+    if (!term) return false;
+    const termLower = term.toLowerCase();
+    const usersCollection = collection(db, 'users');
+
+    // Query 1: Case-insensitive match on name_lowercase
+    const q1 = query(usersCollection, where('name_lowercase', '==', termLower));
+    const snap1 = await getDocs(q1);
+
+    if (!snap1.empty) {
+      let isTaken = false;
+      snap1.forEach(docSnap => {
+        if (!currentUserId || docSnap.id !== currentUserId) {
+          isTaken = true;
+        }
+      });
+      if (isTaken) return true;
+    }
+
+    // Query 2: Exact match on name
+    const q2 = query(usersCollection, where('name', '==', term));
+    const snap2 = await getDocs(q2);
+
+    if (!snap2.empty) {
+      let isTaken = false;
+      snap2.forEach(docSnap => {
+        if (!currentUserId || docSnap.id !== currentUserId) {
+          isTaken = true;
+        }
+      });
+      if (isTaken) return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Failed to check if username exists:', error);
+    return false;
   }
 }
 

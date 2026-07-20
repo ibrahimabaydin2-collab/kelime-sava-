@@ -50,7 +50,6 @@ public class MainActivity extends BridgeActivity {
                 // Optimize rendering speed and graphics performance
                 webSettings.setRenderPriority(WebSettings.RenderPriority.HIGH);
             }
-            mWebView.setWebChromeClient(new WebChromeClient());
             
             // Forces hardware accelerated rendering context to relieve graphics memory and prevent white screens or flickering
             mWebView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);

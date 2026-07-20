@@ -11,7 +11,7 @@ import { getBaseUrl } from '../utils/api.js';
 import { validateUsername } from '../utils/usernameValidation.js';
 import { getDailyWordAndLength } from '../data/wordlist.js';
 import { getXPForLevel, getLevelForScore } from '../utils/scoring.js';
-import { fetchUsersWhoAddedMe, searchUserByName } from '../lib/firebase.js';
+import { fetchUsersWhoAddedMe, searchUserByName, checkUsernameExists } from '../lib/firebase.js';
 import GoldWallet from './GoldWallet.js';
 
 interface WelcomeScreenProps {
@@ -404,8 +404,10 @@ export default function WelcomeScreen({
   const [editName, setEditName] = useState<string>(profile.name);
   const [selectedAvatar, setSelectedAvatar] = useState<string>(profile.avatarUrl || '🧠');
   const [isTouched, setIsTouched] = useState<boolean>(false);
+  const [dbUsernameError, setDbUsernameError] = useState<string | null>(null);
+  const [isCheckingName, setIsCheckingName] = useState<boolean>(false);
 
-  const error = isTouched || editName !== profile.name ? validateUsername(editName, lobbyPlayers || [], profile.id) : null;
+  const error = (isTouched || editName !== profile.name ? validateUsername(editName, lobbyPlayers || [], profile.id) : null) || dbUsernameError;
 
   React.useEffect(() => {
     setEditName(profile.name);
@@ -421,10 +423,28 @@ export default function WelcomeScreen({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     setIsTouched(true);
+    setDbUsernameError(null);
     const validationError = validateUsername(editName, lobbyPlayers || [], profile.id);
     if (validationError) return;
+
+    if (editName.trim() && editName.trim() !== profile.name) {
+      setIsCheckingName(true);
+      try {
+        const exists = await checkUsernameExists(editName.trim(), profile.id);
+        if (exists) {
+          setDbUsernameError('Bu kullanıcı adı daha önce alınmıştır, lütfen başka bir tane seçin.');
+          setIsCheckingName(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Error checking unique username:', err);
+      } finally {
+        setIsCheckingName(false);
+      }
+    }
+
     onUpdateProfile(editName.trim(), selectedAvatar);
     setIsEditing(false);
     setIsTouched(false);
@@ -541,7 +561,9 @@ export default function WelcomeScreen({
           </div>
           <div className="flex justify-between items-center">
             <span>Oyun Modu:</span>
-            <span className="text-rose-400 font-bold">Canlı Düello</span>
+            <span className="text-rose-400 font-bold">
+              {selectedMatchWords === 3 ? '3 Turlu Yarış ⚡' : 'Tek Tur Düello ☝️'}
+            </span>
           </div>
           {/* Animated dot logs */}
           <div className="border-t border-white/5 pt-2 flex items-center gap-2 text-amber-500/70">
@@ -721,6 +743,36 @@ export default function WelcomeScreen({
                     </div>
                   </div>
                 )}
+
+                {selectedTab === 'pvp' && (
+                  <div className="space-y-1.5 text-left border-t border-white/5 pt-2 animate-fade-in">
+                    <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase flex items-center gap-1">
+                      <Swords size={10} className="text-amber-400 animate-pulse" /> DÜELLO TÜRÜ SEÇİMİ
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setSelectedMatchWords(1)}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 border active:scale-95 cursor-pointer ${
+                          selectedMatchWords === 1
+                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
+                            : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
+                        }`}
+                      >
+                        <span>☝️ Tek Tur Düello</span>
+                      </button>
+                      <button
+                        onClick={() => setSelectedMatchWords(3)}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 border active:scale-95 cursor-pointer ${
+                          selectedMatchWords === 3
+                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
+                            : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
+                        }`}
+                      >
+                        <span>⚡ 3 Turlu Yarış</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
             {/* Sleek Dark Info Panel */}
@@ -738,7 +790,8 @@ export default function WelcomeScreen({
               </div>
               <p className="text-[11px] text-gray-300 leading-snug font-sans">
                 {selectedTab === 'solo' && 'Kendi başınıza pratik yapıp kendinizi test edin! Süreli veya süresiz oynayarak kelime haznenizi genişletin ve yeni rekorlara koşun.'}
-                {selectedTab === 'pvp' && 'Canlı rakiplerle kıyasıya rekabet edin! Aynı gizli kelimeyi en az denemede ve en kısa sürede çözerek liderlik sıralamasında yükselin.'}
+                {selectedTab === 'pvp' && selectedMatchWords === 3 && 'Eşzamanlı Yarış ve Kelime Akışı! Rakibinizle aynı anda 3 farklı kelimeyi sırayla çözmek için yarışın. 3 kelimeyi sırayla ilk bitiren düelloyu kazanır!'}
+                {selectedTab === 'pvp' && selectedMatchWords !== 3 && 'Canlı rakiplerle kıyasıya rekabet edin! Aynı gizli kelimeyi en az denemede ve en kısa sürede çözerek liderlik sıralamasında yükselin.'}
               </p>
             </div>
 
@@ -905,6 +958,7 @@ export default function WelcomeScreen({
           onChange={(e) => {
             setEditName(e.target.value);
             setIsTouched(true);
+            setDbUsernameError(null);
           }}
           placeholder="Takma adınızı yazın..."
           className={`w-full bg-[#2E3748]/55 border ${error ? 'border-rose-500 focus:ring-rose-400/40' : 'border-white/5 focus:ring-amber-200/40'} rounded-xl px-4 py-2.5 text-sm font-bold text-[#FAF6E9] focus:outline-none focus:ring-2`}
@@ -929,10 +983,17 @@ export default function WelcomeScreen({
         </button>
         <button
           onClick={handleSaveProfile}
-          disabled={!editName.trim() || !!error}
-          className="flex-1 py-3 px-4 rounded-xl bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] text-xs font-black transition shadow-md"
+          disabled={!editName.trim() || !!error || isCheckingName}
+          className="flex-1 py-3 px-4 rounded-xl bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] text-xs font-black transition shadow-md flex items-center justify-center gap-1.5"
         >
-          Onayla
+          {isCheckingName ? (
+            <>
+              <div className="w-3.5 h-3.5 border-2 border-[#2E3748] border-t-transparent rounded-full animate-spin" />
+              <span>Kontrol ediliyor...</span>
+            </>
+          ) : (
+            <span>Onayla</span>
+          )}
         </button>
       </div>
     </div>

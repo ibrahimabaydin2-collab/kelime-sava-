@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Sparkles, Swords, User } from 'lucide-react';
 import { UserProfile, LobbyPlayer } from '../types.js';
 import { validateUsername } from '../utils/usernameValidation.js';
+import { checkUsernameExists } from '../lib/firebase.js';
 
 interface FirstTimeSetupProps {
   profile: UserProfile;
@@ -19,8 +20,10 @@ export default function FirstTimeSetup({ profile, lobbyPlayers = [], onComplete 
   const [username, setUsername] = useState<string>('');
   const [selectedAvatar, setSelectedAvatar] = useState<string>('🧠');
   const [isTouched, setIsTouched] = useState<boolean>(false);
+  const [dbError, setDbError] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState<boolean>(false);
 
-  const error = isTouched || username ? validateUsername(username, lobbyPlayers, profile.id) : null;
+  const error = (isTouched || username ? validateUsername(username, lobbyPlayers, profile.id) : null) || dbError;
 
   const handleCustomAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -62,11 +65,25 @@ export default function FirstTimeSetup({ profile, lobbyPlayers = [], onComplete 
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsTouched(true);
+    setDbError(null);
     const validationError = validateUsername(username, lobbyPlayers, profile.id);
     if (validationError) return;
+
+    setIsChecking(true);
+    try {
+      const exists = await checkUsernameExists(username, profile.id);
+      if (exists) {
+        setDbError('Bu kullanıcı adı daha önce alınmıştır, lütfen başka bir tane seçin.');
+        setIsChecking(false);
+        return;
+      }
+    } catch (err) {
+      console.error('Error checking unique username:', err);
+    }
+    setIsChecking(false);
     onComplete(username.trim(), selectedAvatar);
   };
 
@@ -110,6 +127,7 @@ export default function FirstTimeSetup({ profile, lobbyPlayers = [], onComplete 
               onChange={(e) => {
                 setUsername(e.target.value);
                 setIsTouched(true);
+                setDbError(null);
               }}
               placeholder="Kullanıcı adını belirle..."
               className={`w-full bg-[#3D4756]/40 border ${error ? 'border-rose-500 focus:ring-rose-400/40 focus:border-rose-400/40' : 'border-[#3E485A] focus:ring-amber-400/40 focus:border-amber-400/40'} rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
@@ -175,11 +193,11 @@ export default function FirstTimeSetup({ profile, lobbyPlayers = [], onComplete 
         {/* Submit button */}
         <button
           type="submit"
-          disabled={!username.trim() || !!error}
+          disabled={!username.trim() || !!error || isChecking}
           className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] active:translate-y-0.5 text-[#2E3748] font-black text-sm py-4 px-6 rounded-2xl shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] disabled:opacity-50 disabled:pointer-events-none transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
         >
           <Sparkles size={14} className="mr-2 text-amber-500 fill-amber-500" />
-          <span>Savaşa Katıl ➔</span>
+          <span>{isChecking ? 'Kontrol ediliyor...' : 'Savaşa Katıl ➔'}</span>
         </button>
       </form>
     </div>

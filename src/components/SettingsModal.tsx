@@ -32,7 +32,8 @@ import {
   linkGuestWithGoogle,
   PhoneAuthProvider,
   RecaptchaVerifier,
-  linkWithCredential
+  linkWithCredential,
+  checkUsernameExists
 } from '../lib/firebase.js';
 
 export interface AppSettings {
@@ -80,6 +81,8 @@ export default function SettingsModal({
   const [selectedAvatar, setSelectedAvatar] = useState<string>(profile.avatarUrl || '🧠');
   const [showAvatarPresets, setShowAvatarPresets] = useState<boolean>(false);
   const [isTouched, setIsTouched] = useState<boolean>(false);
+  const [dbUsernameError, setDbUsernameError] = useState<string | null>(null);
+  const [isCheckingName, setIsCheckingName] = useState<boolean>(false);
 
   // Account Security state
   const [secureEmail, setSecureEmail] = useState<string>('');
@@ -198,7 +201,7 @@ export default function SettingsModal({
     }
   };
 
-  const error = isTouched || editName !== profile.name ? validateUsername(editName, lobbyPlayers, profile.id) : null;
+  const error = (isTouched || editName !== profile.name ? validateUsername(editName, lobbyPlayers, profile.id) : null) || dbUsernameError;
 
   const AVATAR_PRESETS = [
     '⚔️', '🧠', '🐺', '🦁', '🧙‍♂️', '🦊', 
@@ -206,10 +209,27 @@ export default function SettingsModal({
     '🔥', '🐉', '🐼', '🛡️', '🏆', '🦉'
   ];
 
-  const handleSaveProfile = (): boolean => {
+  const handleSaveProfile = async (): Promise<boolean> => {
     setIsTouched(true);
+    setDbUsernameError(null);
     const validationError = validateUsername(editName, lobbyPlayers, profile.id);
     if (validationError) return false;
+
+    if (editName.trim() && editName.trim() !== profile.name) {
+      setIsCheckingName(true);
+      try {
+        const exists = await checkUsernameExists(editName.trim(), profile.id);
+        if (exists) {
+          setDbUsernameError('Bu kullanıcı adı daha önce alınmıştır, lütfen başka bir tane seçin.');
+          setIsCheckingName(false);
+          return false;
+        }
+      } catch (err) {
+        console.error('Error checking username uniqueness:', err);
+      } finally {
+        setIsCheckingName(false);
+      }
+    }
 
     if (editName.trim() && (editName.trim() !== profile.name || selectedAvatar !== profile.avatarUrl)) {
       onUpdateProfile(editName.trim(), selectedAvatar);
@@ -417,22 +437,24 @@ export default function SettingsModal({
                         onChange={(e) => {
                           setEditName(e.target.value);
                           setIsTouched(true);
+                          setDbUsernameError(null);
                         }}
                         placeholder="Kullanıcı adınızı yazın..."
                         className={`w-full sm:flex-1 bg-[#1E2640]/75 border ${error ? 'border-rose-500 focus:ring-rose-400/40' : 'border-[#2E3754] focus:ring-amber-200/40'} rounded-xl px-4 py-2 text-xs font-bold text-[#FAF6E9] placeholder-gray-500 focus:outline-none focus:ring-2 transition`}
                       />
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
                           setIsTouched(true);
-                          if (handleSaveProfile()) {
+                          const success = await handleSaveProfile();
+                          if (success) {
                             setIsTouched(false);
                           }
                         }}
-                        disabled={!editName.trim() || !!error || editName.trim() === profile.name}
+                        disabled={!editName.trim() || !!error || isCheckingName || editName.trim() === profile.name}
                         className="w-full sm:w-auto px-4 py-2 bg-[#FAF6E9] hover:bg-[#F3EFE0] disabled:opacity-50 text-[#2E3748] text-xs font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer shrink-0"
                       >
-                        Güncelle
+                        {isCheckingName ? 'Kontrol...' : 'Güncelle'}
                       </button>
                     </div>
                     {error && (
