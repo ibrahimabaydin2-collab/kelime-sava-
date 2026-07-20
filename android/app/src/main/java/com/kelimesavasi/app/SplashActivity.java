@@ -64,27 +64,13 @@ public class SplashActivity extends AppCompatActivity {
     private void checkUserSession() {
         try {
             if (tvLoadingStatus != null) {
-                tvLoadingStatus.setText("Oturum kontrol ediliyor...");
+                tvLoadingStatus.setText("Oyun yükleniyor...");
             }
-            FirebaseAuth auth = FirebaseAuth.getInstance();
-            if (auth.getCurrentUser() != null) {
-                if (tvLoadingStatus != null) {
-                    tvLoadingStatus.setText("Giriş başarılı! Oyun yükleniyor...");
-                }
-                // User is already logged in, skip login screen and launch MainActivity directly
-                Intent intent = new Intent(this, MainActivity.class);
-                startActivity(intent);
-            } else {
-                if (tvLoadingStatus != null) {
-                    tvLoadingStatus.setText("Giriş sayfasına yönlendiriliyorsunuz...");
-                }
-                // No active session, prompt user with the login/guest entrance screen
-                Intent intent = new Intent(this, LoginActivity.class);
-                startActivity(intent);
-            }
+            Intent intent = new Intent(this, MainActivity.class);
+            startActivity(intent);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to check user session, directing to LoginActivity as fallback", e);
-            Intent intent = new Intent(this, LoginActivity.class);
+            Log.e(TAG, "Failed to launch MainActivity, directing as fallback", e);
+            Intent intent = new Intent(this, MainActivity.class);
             startActivity(intent);
         }
         finish();

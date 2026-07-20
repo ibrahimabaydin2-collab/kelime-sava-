@@ -335,6 +335,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
       if (mode === 'guest') {
         // Save the manual username and preset profile to local storage first so that the onAuthStateChanged listener picks it up immediately
         try {
+          localStorage.setItem('kelimesavasi_signing_in', 'true');
           localStorage.setItem('kelimesavasi_is_registered', 'false');
           localStorage.setItem('saved_username', username.trim());
           const tempProfile = {
@@ -376,6 +377,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
       } else if (mode === 'register') {
         // Save the manual username and preset profile to local storage first so that the onAuthStateChanged listener picks it up immediately
         try {
+          localStorage.setItem('kelimesavasi_signing_in', 'true');
           localStorage.setItem('kelimesavasi_is_registered', 'true');
           localStorage.setItem('saved_username', username.trim());
           const tempProfile = {
@@ -448,6 +450,9 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
         }
       }
     } catch (err: any) {
+      try {
+        localStorage.removeItem('kelimesavasi_signing_in');
+      } catch (e) {}
       console.error('Auth error:', err);
       setFirebaseError(getFirebaseErrorMessage(err));
     } finally {

@@ -1089,6 +1089,17 @@ export default function App() {
             return;
           }
 
+          // Skip if a manual sign-in is in progress via AuthScreen to avoid race condition overwrites
+          if (safeLocalStorage.getItem('kelimesavasi_signing_in') === 'true') {
+            console.log('Skipping onAuthStateChanged sync because manual sign-in is in progress.');
+            if (active && !resolved) {
+              resolved = true;
+              setAuthLoading(false);
+              clearTimeout(timeoutId);
+            }
+            return;
+          }
+
           // Check if we have a pending restoration profile
           const pendingRestorationJson = safeLocalStorage.getItem('pending_restoration_profile');
           if (pendingRestorationJson) {
@@ -1219,7 +1230,7 @@ export default function App() {
                       name: finalName,
                       avatarUrl: finalAvatar,
                       deviceId: deviceId,
-                      nameSet: true
+                      nameSet: !!(finalName && !finalName.startsWith('Oyuncu_'))
                     });
                     setProfile(updatedProfile);
                     await saveUserProfileToFirestore(updatedProfile);
@@ -1256,7 +1267,7 @@ export default function App() {
                         name: finalName,
                         avatarUrl: finalAvatar,
                         deviceId: deviceId,
-                        nameSet: true
+                        nameSet: !!(finalName && !finalName.startsWith('Oyuncu_'))
                       });
                       saveUserProfileToFirestore(updatedProfile).catch(err => console.warn(err));
                       safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
@@ -1291,7 +1302,7 @@ export default function App() {
                       name: finalName,
                       avatarUrl: finalAvatar,
                       deviceId: deviceId,
-                      nameSet: true
+                      nameSet: !!(finalName && !finalName.startsWith('Oyuncu_'))
                     });
                     saveUserProfileToFirestore(updatedProfile).catch(err => console.warn(err));
                     safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
@@ -3426,6 +3437,7 @@ export default function App() {
         ) : !firebaseUser ? (
           <AuthScreen
             onAuthComplete={(updatedProfile, fUser) => {
+              safeLocalStorage.removeItem('kelimesavasi_signing_in');
               if (fUser && fUser.uid) {
                 justLoggedInUidRef.current = fUser.uid;
               }
