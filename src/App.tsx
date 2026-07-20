@@ -3019,11 +3019,43 @@ export default function App() {
   // Handle profile change
   const saveProfile = () => {
     if (nameInput.trim().length === 0) return;
-    setProfile((prev) => ({
-      ...prev,
-      name: nameInput.trim(),
-      avatarUrl: avatarInput
-    }));
+    const updatedName = nameInput.trim();
+    const updatedAvatar = avatarInput;
+    
+    setProfile((prev) => {
+      const updated = {
+        ...prev,
+        name: updatedName,
+        avatarUrl: updatedAvatar,
+        nameSet: true
+      };
+      
+      // Persist to local storage
+      try {
+        safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updated));
+        safeLocalStorage.setItem('saved_username', updatedName);
+      } catch (e) {
+        console.warn('Error saving profile to local storage:', e);
+      }
+      
+      // Persist to Firestore database
+      saveUserProfileToFirestore(updated).catch((err) => {
+        console.warn("Error saving profile to Firestore database:", err);
+      });
+      
+      // Inform websocket if connection is alive so matchmaking/challenges instantly reflect the new name!
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({
+          type: 'join',
+          id: updated.id,
+          name: updatedName,
+          avatarUrl: updatedAvatar
+        }));
+      }
+      
+      return updated;
+    });
+    
     setIsEditingName(false);
     showToast('Profiliniz başarıyla güncellendi.', 'success');
   };
