@@ -1164,25 +1164,36 @@ const setupWebSocket = (server: any) => {
                 }
 
                 if (match.matchWordsCount === 3) {
-                  // 3-Round Series Match Logic
-                  // Each player completes 3 words sequentially at their own pace.
-                  // A player is finished with their 3 words when they are on currentWordIndex === 2 and they have completed it.
-                  const playerFinished = completed && (currentWordIndex === 2);
+                  // Real-time 3-Round Series Match Logic (Best of 3 - First to 2 rounds won)
+                  if (completed && won) {
+                    if (!match.roundsWon) {
+                      match.roundsWon = {};
+                    }
+                    for (const pId of Object.keys(match.players)) {
+                      if (match.roundsWon[pId] === undefined) {
+                        match.roundsWon[pId] = 0;
+                      }
+                    }
 
-                  if (playerFinished) {
-                    const opponentId = Object.keys(match.players).find(id => id !== playerId);
-                    const opponent = opponentId ? match.players[opponentId] : null;
-                    const opponentFinished = opponent && (opponent.completed && (opponent as any).currentWordIndex === 2);
+                    // Increment this player's round wins
+                    match.roundsWon[playerId] = (match.roundsWon[playerId] || 0) + 1;
 
-                    if (opponentFinished) {
-                      // Both players finished all 3 words! End the match now!
-                      const pIds = Object.keys(match.players);
-                      const p1 = match.players[pIds[0]];
-                      const p2 = match.players[pIds[1]];
+                    const pIds = Object.keys(match.players);
+                    const opponentId = pIds.find(id => id !== playerId);
+                    const currentRound = match.currentRound || 1;
+
+                    const playerWinsMatch = (match.roundsWon[playerId] >= 2);
+                    const opponentWinsMatch = opponentId ? ((match.roundsWon[opponentId] || 0) >= 2) : false;
+                    const isLastRound = (currentRound === 3);
+
+                    if (playerWinsMatch || opponentWinsMatch || isLastRound) {
+                      // Series has ended! Compute winner based on rounds won
                       let winnerId = 'draw';
-                      if (p1.score > p2.score) {
+                      const r1 = match.roundsWon[pIds[0]] || 0;
+                      const r2 = match.roundsWon[pIds[1]] || 0;
+                      if (r1 > r2) {
                         winnerId = pIds[0];
-                      } else if (p2.score > p1.score) {
+                      } else if (r2 > r1) {
                         winnerId = pIds[1];
                       }
 
@@ -1194,7 +1205,7 @@ const setupWebSocket = (server: any) => {
                         type: 'match_end',
                         matchId,
                         winnerId,
-                        roundsWon: match.roundsWon || { [pIds[0]]: 0, [pIds[1]]: 0 },
+                        roundsWon: match.roundsWon,
                         players: match.players,
                         kelime_bulundu_zamani: (match as any).kelime_bulundu_zamani
                       });
@@ -1211,8 +1222,122 @@ const setupWebSocket = (server: any) => {
                       }
                       broadcastLobby();
                     } else {
-                      // Only this player finished. Opponent is still playing, so we wait.
-                      // The match remains in 'playing' status, and match_update was already sent to sync opponent UI.
+                      // Advance to next round!
+                      match.currentRound = currentRound + 1;
+                      const nextWord = getRandomWord(match.wordLength);
+                      match.targetWord = nextWord;
+
+                      // Reset player state for the new round
+                      for (const pId of Object.keys(match.players)) {
+                        const p = match.players[pId];
+                        p.attempts = [];
+                        p.currentAttempt = 0;
+                        p.completed = false;
+                        p.won = false;
+                        p.timeRemaining = 20;
+                        p.score = 0;
+                      }
+
+                      const nextRoundPayload = JSON.stringify({
+                        type: 'match_round_start',
+                        matchId,
+                        targetWord: nextWord,
+                        currentRound: match.currentRound,
+                        matchWordsCount: 3,
+                        roundsWon: match.roundsWon
+                      });
+
+                      for (const pId of Object.keys(match.players)) {
+                        const client = clients.get(pId);
+                        if (client && client.ws.readyState === WebSocket.OPEN) {
+                          client.ws.send(nextRoundPayload);
+                        }
+                      }
+                    }
+                  } else {
+                    // Check for Draw (both completed and neither won)
+                    const allCompleted = Object.values(match.players).every(p => p.completed);
+                    const anyWon = Object.values(match.players).some(p => p.won);
+
+                    if (allCompleted && !anyWon) {
+                      if (!match.roundsWon) {
+                        match.roundsWon = {};
+                      }
+                      for (const pId of Object.keys(match.players)) {
+                        if (match.roundsWon[pId] === undefined) {
+                          match.roundsWon[pId] = 0;
+                        }
+                      }
+
+                      const currentRound = match.currentRound || 1;
+
+                      if (currentRound === 3) {
+                        // End of series
+                        let winnerId = 'draw';
+                        const pIds = Object.keys(match.players);
+                        const r1 = match.roundsWon[pIds[0]] || 0;
+                        const r2 = match.roundsWon[pIds[1]] || 0;
+                        if (r1 > r2) {
+                          winnerId = pIds[0];
+                        } else if (r2 > r1) {
+                          winnerId = pIds[1];
+                        }
+
+                        match.status = 'ended';
+                        match.winnerId = winnerId;
+                        (match as any).kelime_bulundu_zamani = Date.now();
+
+                        const endPayload = JSON.stringify({
+                          type: 'match_end',
+                          matchId,
+                          winnerId,
+                          roundsWon: match.roundsWon,
+                          players: match.players,
+                          kelime_bulundu_zamani: (match as any).kelime_bulundu_zamani
+                        });
+
+                        for (const pId of Object.keys(match.players)) {
+                          const client = clients.get(pId);
+                          if (client) {
+                            client.status = 'idle';
+                            if (client.ws.readyState === WebSocket.OPEN) {
+                              client.ws.send(endPayload);
+                            }
+                          }
+                        }
+                        broadcastLobby();
+                      } else {
+                        // Advance to next round (draw round)
+                        match.currentRound = currentRound + 1;
+                        const nextWord = getRandomWord(match.wordLength);
+                        match.targetWord = nextWord;
+
+                        for (const pId of Object.keys(match.players)) {
+                          const p = match.players[pId];
+                          p.attempts = [];
+                          p.currentAttempt = 0;
+                          p.completed = false;
+                          p.won = false;
+                          p.timeRemaining = 20;
+                          p.score = 0;
+                        }
+
+                        const nextRoundPayload = JSON.stringify({
+                          type: 'match_round_start',
+                          matchId,
+                          targetWord: nextWord,
+                          currentRound: match.currentRound,
+                          matchWordsCount: 3,
+                          roundsWon: match.roundsWon
+                        });
+
+                        for (const pId of Object.keys(match.players)) {
+                          const client = clients.get(pId);
+                          if (client && client.ws.readyState === WebSocket.OPEN) {
+                            client.ws.send(nextRoundPayload);
+                          }
+                        }
+                      }
                     }
                   }
                 } else {

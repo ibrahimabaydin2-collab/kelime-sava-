@@ -433,10 +433,10 @@ export default function App() {
     
     // Default profile
     const randomId = `user_${Math.random().toString(36).substring(2, 11)}`;
-    const randomNum = Math.floor(100 + Math.random() * 900);
+    const savedUsername = safeLocalStorage.getItem('saved_username') || "";
     return ensureProfileFields({
       id: randomId,
-      name: `Oyuncu_${randomNum}`,
+      name: savedUsername,
       stats: INITIAL_STATS,
       badges: DEFAULT_BADGES,
       missions: DEFAULT_MISSIONS,
@@ -452,7 +452,7 @@ export default function App() {
       gold: 20,
       lastDailyLoginClaim: '',
       lastUpdated: new Date().toISOString(),
-      nameSet: false // Brand new users must select their nickname and avatar
+      nameSet: !!savedUsername
     });
   });
 
@@ -1163,17 +1163,15 @@ export default function App() {
               if (dbProfile) {
                 const savedUsername = safeLocalStorage.getItem('saved_username');
                 const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
-                let finalName = dbProfile.name;
-                let finalAvatar = dbProfile.avatarUrl;
+                let finalName = dbProfile.name || '';
+                let finalAvatar = dbProfile.avatarUrl || '🧠';
 
-                // Prioritize user's manual username from AuthScreen if the db profile has a default name
-                // or if they have explicitly typed a different nickname on the form.
-                if (savedUsername && (dbProfile.name.startsWith('Oyuncu_') || (savedUsername !== dbProfile.name && !savedUsername.startsWith('Oyuncu_')))) {
+                if (!finalName && savedUsername) {
                   finalName = savedUsername;
-                } else if (savedProfileStr) {
+                } else if (!finalName && savedProfileStr) {
                   try {
                     const parsed = JSON.parse(savedProfileStr);
-                    if (parsed && parsed.name && (dbProfile.name.startsWith('Oyuncu_') || (parsed.name !== dbProfile.name && !parsed.name.startsWith('Oyuncu_')))) {
+                    if (parsed && parsed.name) {
                       finalName = parsed.name;
                     }
                     if (parsed && parsed.avatarUrl) {
@@ -1187,7 +1185,7 @@ export default function App() {
                   name: finalName,
                   avatarUrl: finalAvatar,
                   deviceId: deviceId,
-                  nameSet: true
+                  nameSet: !!finalName
                 });
 
                 // If the profile does not have deviceId set, has a different deviceId, or the name/avatar has changed, update Firestore!
@@ -1213,15 +1211,15 @@ export default function App() {
                     console.log('Found existing profile associated with deviceId. Auto-recovering profile...', existingProfile);
                     const savedUsername = safeLocalStorage.getItem('saved_username');
                     const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
-                    let finalName = existingProfile.name;
-                    let finalAvatar = existingProfile.avatarUrl;
+                    let finalName = existingProfile.name || '';
+                    let finalAvatar = existingProfile.avatarUrl || '🧠';
                     
-                    if (savedUsername && (existingProfile.name.startsWith('Oyuncu_') || (savedUsername !== existingProfile.name && !savedUsername.startsWith('Oyuncu_')))) {
+                    if (!finalName && savedUsername) {
                       finalName = savedUsername;
-                    } else if (savedProfileStr) {
+                    } else if (!finalName && savedProfileStr) {
                       try {
                         const parsed = JSON.parse(savedProfileStr);
-                        if (parsed && parsed.name && (existingProfile.name.startsWith('Oyuncu_') || (parsed.name !== existingProfile.name && !parsed.name.startsWith('Oyuncu_')))) {
+                        if (parsed && parsed.name) {
                           finalName = parsed.name;
                         }
                         if (parsed && parsed.avatarUrl) finalAvatar = parsed.avatarUrl;
@@ -1233,7 +1231,7 @@ export default function App() {
                       name: finalName,
                       avatarUrl: finalAvatar,
                       deviceId: deviceId,
-                      nameSet: !!(finalName && !finalName.startsWith('Oyuncu_'))
+                      nameSet: !!finalName
                     });
                     setProfile(updatedProfile);
                     await saveUserProfileToFirestore(updatedProfile);
@@ -1252,12 +1250,10 @@ export default function App() {
                     const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
                     
                     setProfile((prevProfile) => {
-                      let finalName = savedUsername || prevProfile.name;
+                      let finalName = savedUsername || prevProfile.name || '';
                       let finalAvatar = prevProfile.avatarUrl || '🧠';
                       
-                      if (savedUsername && !savedUsername.startsWith('Oyuncu_')) {
-                        finalName = savedUsername;
-                      } else if (savedProfileStr) {
+                      if (!finalName && savedProfileStr) {
                         try {
                           const parsed = JSON.parse(savedProfileStr);
                           if (parsed && parsed.name) finalName = parsed.name;
@@ -1270,7 +1266,7 @@ export default function App() {
                         name: finalName,
                         avatarUrl: finalAvatar,
                         deviceId: deviceId,
-                        nameSet: !!(finalName && !finalName.startsWith('Oyuncu_'))
+                        nameSet: !!finalName
                       });
                       saveUserProfileToFirestore(updatedProfile).catch(err => console.warn(err));
                       safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
@@ -1287,12 +1283,10 @@ export default function App() {
                   const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
                   
                   setProfile((prevProfile) => {
-                    let finalName = savedUsername || prevProfile.name;
+                    let finalName = savedUsername || prevProfile.name || '';
                     let finalAvatar = prevProfile.avatarUrl || '🧠';
                     
-                    if (savedUsername && !savedUsername.startsWith('Oyuncu_')) {
-                      finalName = savedUsername;
-                    } else if (savedProfileStr) {
+                    if (!finalName && savedProfileStr) {
                       try {
                         const parsed = JSON.parse(savedProfileStr);
                         if (parsed && parsed.name) finalName = parsed.name;
@@ -1305,7 +1299,7 @@ export default function App() {
                       name: finalName,
                       avatarUrl: finalAvatar,
                       deviceId: deviceId,
-                      nameSet: !!(finalName && !finalName.startsWith('Oyuncu_'))
+                      nameSet: !!finalName
                     });
                     saveUserProfileToFirestore(updatedProfile).catch(err => console.warn(err));
                     safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
@@ -2189,33 +2183,10 @@ export default function App() {
           }
           if (activeMatch) {
             if (activeMatch.matchWordsCount === 3) {
-              if (currentWordIndex < 2) {
-                const nextIndex = currentWordIndex + 1;
-                const nextWord = targetWords ? targetWords[nextIndex] : null;
-                showToast(`Süre bitti! Sonraki kelimeye geçiliyor... ⏩`, 'info');
-                playDefeatSound(settings.soundEnabled);
-
-                setTimeout(() => {
-                  setCurrentWordIndex(nextIndex);
-                  setAttempts([]);
-                  setCurrentAttempt('');
-                  setRevealedHints({});
-                  setLetterStatuses({});
-                  setSecondsLeft(20);
-                  if (nextWord) {
-                    setTargetWord(nextWord);
-                  }
-                  syncMatchState([], 0, false, false, cumulativeScore, null, nextIndex);
-                }, 0);
-                return 20;
-              } else {
-                showToast(`Tahmin süreniz bitti! Rakibin de bitirmesi bekleniyor...`, 'info');
-                playDefeatSound(settings.soundEnabled);
-                setTimeout(() => {
-                  syncMatchState(attempts, attempts.length, true, false, cumulativeScore, null, 2);
-                }, 0);
-                return 0;
-              }
+              showToast(`Süre bitti! Diğer oyuncunun tamamlaması bekleniyor...`, 'info');
+              playDefeatSound(settings.soundEnabled);
+              syncMatchState(attempts, attempts.length, true, false, 0);
+              return 0;
             } else {
               showToast(`Süre bitti! Rakibin tamamlaması bekleniyor...`, 'error');
               syncMatchState(attempts, attempts.length, true, false, 0);
@@ -2465,15 +2436,11 @@ export default function App() {
 
   // Submit Guessed Word
   const submitGuess = async () => {
-    const isAnyPlayerSolved = activeMatch && activeMatch.matchWordsCount !== 3 
-      ? Object.values(activeMatch.players).some((p: any) => p.won) 
+    const isSelfCompleted = activeMatch 
+      ? (activeMatch.players[profile.id]?.completed || gameStatus === 'won' || gameStatus === 'lost')
       : false;
-    
-    const isSelfCompletedAllRounds = activeMatch && activeMatch.matchWordsCount === 3 
-      ? (currentWordIndex >= 2 && (activeMatch.players[profile.id]?.completed || gameStatus === 'won'))
-      : (activeMatch?.players[profile.id]?.completed || false);
 
-    const localCompleted = isSelfCompletedAllRounds || activeMatch?.status === 'ended' || isAnyPlayerSolved;
+    const localCompleted = isSelfCompleted || activeMatch?.status === 'ended';
     if (localCompleted || gameStatus !== 'playing') {
       return;
     }
@@ -2583,162 +2550,29 @@ export default function App() {
       }
 
       if (activeMatch) {
-        if (activeMatch.matchWordsCount === 3) {
-          if (hasWon) {
-            if (currentWordIndex < 2) {
-              const nextIndex = currentWordIndex + 1;
-              const nextWord = targetWords ? targetWords[nextIndex] : null;
-              showToast(`Tebrikler! ${currentWordIndex + 1}. kelimeyi çözdünüz! Sonraki kelimeye geçiliyor... 🚀`, 'success');
-              playEnterSound(settings.soundEnabled);
-
-              setCurrentWordIndex(nextIndex);
-              setAttempts([]);
-              setCurrentAttempt('');
-              setRevealedHints({});
-              setLetterStatuses({});
-              setSecondsLeft(20);
-              if (nextWord) {
-                setTargetWord(nextWord);
-              }
-              const newCumulative = cumulativeScore + scoreAwarded;
-              setCumulativeScore(newCumulative);
-
-              syncMatchState([], 0, false, false, newCumulative, null, nextIndex);
-            } else {
-              // 3rd and final word solved! Complete win.
-              showToast(`TEBRİKLER! Tüm kelimeleri tamamlayarak Savaşı Kazandın! 🏆`, 'success');
-              playEnterSound(settings.soundEnabled);
-
-              const totalScore = cumulativeScore + scoreAwarded;
-              setCumulativeScore(totalScore);
-
-              const opponentEntry = Object.entries(activeMatch.players).find(([pId]) => pId !== profile.id);
-              const loserId = opponentEntry ? opponentEntry[0] : 'rakip_id';
-              const loserName = opponentEntry ? (opponentEntry[1] as any).name : 'Rakip';
-              const loserScore = opponentEntry ? ((opponentEntry[1] as any).score || 0) : 0;
-
-              syncMatchState(updatedAttempts, updatedAttempts.length, true, true, totalScore, Date.now(), 2);
-
-              if (timerRef.current) {
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-              }
-              setGameStatus('idle');
-              isMatchEndedRef.current = true;
-
-              if (socketRef.current) {
-                try {
-                  socketRef.current.close();
-                } catch (e) {
-                  console.error("Error closing socket:", e);
-                }
-                socketRef.current = null;
-              }
-
-              if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
-                try {
-                  (window as any).AndroidBridge.loadAdBackground();
-                  if ((window as any).AndroidBridge.redirectToResultActivity) {
-                    (window as any).AndroidBridge.redirectToResultActivity(
-                      profile.id,
-                      profile.name,
-                      totalScore,
-                      loserId,
-                      loserName,
-                      loserScore,
-                      activeMatch.targetWord || targetWord || '',
-                      true
-                    );
-                  }
-                } catch (e) {
-                  console.error("Error calling native AndroidBridge:", e);
-                }
-              }
-            }
-          } else if (updatedAttempts.length >= 6) {
-            if (currentWordIndex < 2) {
-              const nextIndex = currentWordIndex + 1;
-              const nextWord = targetWords ? targetWords[nextIndex] : null;
-              showToast(`Tahmin hakkınız tükendi. Doğru kelime: ${targetWord}. Sonraki kelimeye geçiliyor... ⏩`, 'info');
-              playDefeatSound(settings.soundEnabled);
-
-              setCurrentWordIndex(nextIndex);
-              setAttempts([]);
-              setCurrentAttempt('');
-              setRevealedHints({});
-              setLetterStatuses({});
-              setSecondsLeft(20);
-              if (nextWord) {
-                setTargetWord(nextWord);
-              }
-
-              syncMatchState([], 0, false, false, cumulativeScore, null, nextIndex);
-            } else {
-              showToast(`Tahmin haklarınız bitti! Rakibin de bitirmesi bekleniyor... Doğru kelime: ${targetWord}`, 'info');
-              playDefeatSound(settings.soundEnabled);
-
-              syncMatchState(updatedAttempts, updatedAttempts.length, true, false, cumulativeScore, null, 2);
-            }
-          } else {
-            playEnterSound(settings.soundEnabled);
-            syncMatchState(updatedAttempts, updatedAttempts.length, false, false, cumulativeScore);
+        if (hasWon) {
+          showToast(`Tebrikler! Kelimeyi doğru bildiniz! 🎉`, 'success');
+          playEnterSound(settings.soundEnabled);
+          
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
           }
+          setGameStatus('idle'); // Wait for server state sync (match_round_start or match_end)
+          syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded, Date.now());
+        } else if (updatedAttempts.length >= 6) {
+          showToast(`6 tahmin hakkınız tükendi! Diğer oyuncunun tamamlaması bekleniyor... Doğru kelime: ${targetWord}`, 'info');
+          playDefeatSound(settings.soundEnabled);
+          
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          setGameStatus('idle'); // Wait for server state sync (match_round_start or match_end)
+          syncMatchState(updatedAttempts, updatedAttempts.length, true, false, 0);
         } else {
-          // Normal Single Round Duel
-          if (hasWon) {
-            showToast(`TEBRİKLER! Savaşı Kazandın!`, 'success');
-            playEnterSound(settings.soundEnabled);
-            
-            const opponentEntry = Object.entries(activeMatch.players).find(([pId]) => pId !== profile.id);
-            const loserId = opponentEntry ? opponentEntry[0] : 'rakip_id';
-            const loserName = opponentEntry ? (opponentEntry[1] as any).name : 'Rakip';
-            const loserScore = opponentEntry ? ((opponentEntry[1] as any).score || 0) : 0;
-            
-            syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded, Date.now());
-
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-              timerRef.current = null;
-            }
-            setGameStatus('idle');
-            isMatchEndedRef.current = true;
-            
-            if (socketRef.current) {
-              try {
-                socketRef.current.close();
-              } catch (e) {
-                console.error("Error closing socket:", e);
-              }
-              socketRef.current = null;
-            }
-
-            if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
-              try {
-                (window as any).AndroidBridge.loadAdBackground();
-                if ((window as any).AndroidBridge.redirectToResultActivity) {
-                  (window as any).AndroidBridge.redirectToResultActivity(
-                    profile.id,
-                    profile.name,
-                    scoreAwarded,
-                    loserId,
-                    loserName,
-                    loserScore,
-                    activeMatch.targetWord || targetWord || '',
-                    true
-                  );
-                }
-              } catch (e) {
-                console.error("Error calling native AndroidBridge:", e);
-              }
-            }
-          } else if (updatedAttempts.length >= 6) {
-            showToast(`6 tahmin hakkınız tükendi! Rakibin de tamamlaması bekleniyor... Doğru kelime: ${targetWord}`, 'info');
-            playDefeatSound(settings.soundEnabled);
-            syncMatchState(updatedAttempts, updatedAttempts.length, true, false, 0);
-          } else {
-            playEnterSound(settings.soundEnabled);
-            syncMatchState(updatedAttempts, updatedAttempts.length, false, false, 0);
-          }
+          playEnterSound(settings.soundEnabled);
+          syncMatchState(updatedAttempts, updatedAttempts.length, false, false, 0);
         }
       } else {
         if (hasWon) {
@@ -3458,7 +3292,7 @@ export default function App() {
   };
 
   const opponent = activeMatch ? Object.values(activeMatch.players).find(p => (p as any).name !== profile.name) as any : null;
-  const isMatchEnded = !!(activeMatch && (activeMatch.status === 'ended' || (activeMatch.matchWordsCount !== 3 && Object.values(activeMatch.players).some((p: any) => p.won))));
+  const isMatchEnded = !!(activeMatch && activeMatch.status === 'ended');
 
   // Triggers when 1v1 match ends (isMatchEnded turns true) or when user exits a match, loading AdMob asynchronously in the background and freeing layout calculations
   useEffect(() => {
@@ -3790,24 +3624,16 @@ export default function App() {
                   <h4 className="font-bold text-xs text-gray-800 dark:text-white">Kelime Savaşı Sürüyor!</h4>
                   {activeMatch.matchWordsCount && (
                     <span className="text-[9px] font-black font-mono bg-emerald-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-                      {activeMatch.matchWordsCount === 3 ? '⚡ 3 TURLU YARIŞ' : `Tur ${activeMatch.currentRound}/${activeMatch.matchWordsCount}`}
+                      {activeMatch.matchWordsCount === 3 ? `⚡ Tur ${activeMatch.currentRound || 1}/3` : `Tur ${activeMatch.currentRound}/${activeMatch.matchWordsCount}`}
                     </span>
                   )}
                 </div>
-                {activeMatch.matchWordsCount === 3 ? (
+                {activeMatch.roundsWon && (
                   <div className="flex gap-2.5 mt-0.5 text-[10px] font-bold font-mono">
-                    <span className="text-emerald-600 dark:text-emerald-400">SENİN İLERLEMEN: Kelime {currentWordIndex + 1}/3</span>
+                    <span className="text-emerald-600 dark:text-emerald-400">SEN: {activeMatch.roundsWon[profile.id] || 0}</span>
                     <span className="text-gray-400">|</span>
-                    <span className="text-amber-500">RAKİBİN İLERLEMESİ: Kelime {(opponent?.currentWordIndex || 0) + 1}/3</span>
+                    <span className="text-amber-500">RAKİP: {activeMatch.roundsWon[opponent?.id || ''] || 0}</span>
                   </div>
-                ) : (
-                  activeMatch.roundsWon && (
-                    <div className="flex gap-2.5 mt-0.5 text-[10px] font-bold font-mono">
-                      <span className="text-emerald-600 dark:text-emerald-400">SEN: {activeMatch.roundsWon[profile.id] || 0}</span>
-                      <span className="text-gray-400">|</span>
-                      <span className="text-amber-500">RAKİP: {activeMatch.roundsWon[opponent?.id || ''] || 0}</span>
-                    </div>
-                  )
                 )}
               </div>
             </div>
