@@ -25,7 +25,7 @@ import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
 import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser, fetchUserProfileByDeviceId, deleteUserProfile, signInAsGuest, clearMatchmakingState } from './lib/firebase.js';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge, NetworkLogEntry } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play, Home } from 'lucide-react';
-import { getRandomWord, isWordInCuratedList, getDailyWordAndLength, COMMON_TURKISH_WORDS } from './data/wordlist.js';
+import { getRandomWord, isWordInCuratedList, getDailyWordAndLength, COMMON_TURKISH_WORDS, CLEANED_TURKISH_WORDS } from './data/wordlist.js';
 import { turkishUpper, turkishLower, validateTurkishLinguistics } from './utils/turkish.js';
 import { getApiUrl, getWsUrl, validateWordClientSide } from './utils/api.js';
 import { calculateDynamicScore, verifyScoringAccuracy, getLevelForScore } from './utils/scoring.js';
@@ -525,6 +525,7 @@ export default function App() {
   const [wordDefinition, setWordDefinition] = useState<string>('');
   const [letterStatuses, setLetterStatuses] = useState<{ [key: string]: 'green' | 'orange' | 'grey' }>({});
   const [revealedHints, setRevealedHints] = useState<{ [index: number]: string }>({});
+  const [hintCount, setHintCount] = useState<number>(0);
   const [activeWordSuggestion, setActiveWordSuggestion] = useState<string | null>(null);
 
   // Welcome Screen & Dictionary Mode State
@@ -566,7 +567,7 @@ export default function App() {
 
   // 💡 WORD SUGGESTION GENERATION (Wordle helper matching current green/orange constraints)
   const generateWordSuggestion = (): string | null => {
-    const wordList = COMMON_TURKISH_WORDS[wordLength];
+    const wordList = CLEANED_TURKISH_WORDS[wordLength];
     if (!wordList || wordList.length === 0) return null;
 
     // 1. Gather constraints
@@ -600,6 +601,21 @@ export default function App() {
     });
 
     const targetLower = targetWord.toLowerCase();
+
+    // Helper to verify a candidate word is linguistically valid and strictly exists in COMMON_TURKISH_WORDS and CLEANED_TURKISH_WORDS pools
+    const isLinguisticallyValid = (w: string): boolean => {
+      const lower = turkishLower(w).trim();
+      const cleanedPool = CLEANED_TURKISH_WORDS[wordLength] || [];
+      const commonPool = COMMON_TURKISH_WORDS[wordLength] || [];
+
+      const inCleaned = cleanedPool.some(x => turkishLower(x).trim() === lower);
+      const inCommon = commonPool.some(x => turkishLower(x).trim() === lower);
+
+      if (!inCleaned || !inCommon) return false;
+
+      const upper = turkishUpper(w);
+      return validateTurkishLinguistics(upper, wordLength).valid;
+    };
 
     // 2. Filter words
     const matchingWords = wordList.filter(w => {
@@ -635,15 +651,16 @@ export default function App() {
         }
       }
 
-      return true;
+      // Ensure the word is linguistically valid
+      return isLinguisticallyValid(word);
     });
 
     if (matchingWords.length > 0) {
       const idx = Math.floor(Math.random() * matchingWords.length);
-      return matchingWords[idx];
+      return turkishUpper(matchingWords[idx]);
     }
 
-    // Fallback: if no perfect match, find words that match just the green letters
+    // Fallback: if no perfect match, find words that match just the green letters and are linguistically valid
     const simpleMatching = wordList.filter(w => {
       const word = w.toLowerCase();
       if (word.length !== wordLength) return false;
@@ -653,18 +670,18 @@ export default function App() {
           return false;
         }
       }
-      return true;
+      return isLinguisticallyValid(word);
     });
 
     if (simpleMatching.length > 0) {
       const idx = Math.floor(Math.random() * simpleMatching.length);
-      return simpleMatching[idx];
+      return turkishUpper(simpleMatching[idx]);
     }
 
-    // Secondary fallback: just pick a random word of same length that isn't the target word
-    const allowed = wordList.filter(w => w.toLowerCase() !== targetLower);
+    // Secondary fallback: just pick a random word of same length that isn't the target word and is linguistically valid
+    const allowed = wordList.filter(w => w.toLowerCase() !== targetLower && isLinguisticallyValid(w));
     if (allowed.length > 0) {
-      return allowed[Math.floor(Math.random() * allowed.length)];
+      return turkishUpper(allowed[Math.floor(Math.random() * allowed.length)]);
     }
 
     return null;
@@ -714,6 +731,7 @@ export default function App() {
         const randomIdx = unrevealedIndices[Math.floor(Math.random() * unrevealedIndices.length)];
         const charToReveal = targetWordUpper[randomIdx];
         setRevealedHints(prev => ({ ...prev, [randomIdx]: charToReveal }));
+        setHintCount(prev => prev + 1);
         showToast("Doğru harf konumu fısıldandı! 🤫", "success");
         playClickSound(settings.soundEnabled);
       }
@@ -735,6 +753,7 @@ export default function App() {
       if (success) {
         const randomKey = unusedAlphabetKeys[Math.floor(Math.random() * unusedAlphabetKeys.length)];
         setLetterStatuses(prev => ({ ...prev, [randomKey]: 'grey' }));
+        setHintCount(prev => prev + 1);
         showToast(`Klavyeden kullanılmayan '${randomKey}' harfi silindi! 🧹`, "success");
         playClickSound(settings.soundEnabled);
       }
@@ -1046,6 +1065,8 @@ export default function App() {
         // Clear previous session states to avoid residual game leaks
         setAttempts([]);
         setCurrentAttempt('');
+        setRevealedHints({});
+        setActiveWordSuggestion(null);
         setGameStatus('idle');
         setIsValidating(false);
 
@@ -1473,6 +1494,8 @@ export default function App() {
               setTargetWord(sharedWord);
               setAttempts(reconAttempts || []);
               setCurrentAttempt('');
+              setRevealedHints({});
+              setActiveWordSuggestion(null);
               setGameStatus('playing');
               setSecondsLeft(timeRemaining !== undefined ? timeRemaining : 20);
               setWordDefinition('');
@@ -1543,6 +1566,8 @@ export default function App() {
               setTargetWord(sharedWord);
               setAttempts([]);
               setCurrentAttempt('');
+              setRevealedHints({});
+              setActiveWordSuggestion(null);
               setGameStatus('playing');
               setSecondsLeft(20);
               setWordDefinition('');
@@ -1593,6 +1618,8 @@ export default function App() {
               setTargetWord(sharedWord);
               setAttempts([]);
               setCurrentAttempt('');
+              setRevealedHints({});
+              setActiveWordSuggestion(null);
               setGameStatus('playing');
               setSecondsLeft(20);
               setWordDefinition('');
@@ -1654,6 +1681,8 @@ export default function App() {
               setTargetWord(newWord);
               setAttempts([]);
               setCurrentAttempt('');
+              setRevealedHints({});
+              setActiveWordSuggestion(null);
               setGameStatus('playing');
               setSecondsLeft(20);
               setWordDefinition('');
@@ -1906,6 +1935,7 @@ export default function App() {
     setAttempts([]);
     setCurrentAttempt('');
     setRevealedHints({});
+    setHintCount(0);
     setActiveWordSuggestion(null);
     
     // 2. Ekrandaki harf kutularının içindeki text'leri temizler ve CSS renk sınıflarını (yeşil/sarı/gri) kaldırır
@@ -1954,6 +1984,8 @@ export default function App() {
       setGameStatus('idle');
       setAttempts([]);
       setCurrentAttempt('');
+      setRevealedHints({});
+      setActiveWordSuggestion(null);
       setSecondsLeft(20);
       setShowCongratsModal(false);
     }
@@ -1975,6 +2007,8 @@ export default function App() {
     setMatchmakingStatus('idle');
     setAttempts([]);
     setCurrentAttempt('');
+    setRevealedHints({});
+    setActiveWordSuggestion(null);
     setSecondsLeft(20);
     setShowCongratsModal(false);
     setShowLobbyModal(false);
@@ -2993,6 +3027,8 @@ export default function App() {
       setGameStatus('idle');
       setAttempts([]);
       setCurrentAttempt('');
+      setRevealedHints({});
+      setActiveWordSuggestion(null);
       
       if (profile && profile.id) {
         clearMatchmakingState(profile.id).catch((err) => {
@@ -3067,6 +3103,8 @@ export default function App() {
       
       setWordLength(dailyInfo.length);
       setTargetWord(dailyInfo.word);
+      setRevealedHints({});
+      setActiveWordSuggestion(null);
       setSecondsLeft(20);
       setWordDefinition('');
       setLetterStatuses({});

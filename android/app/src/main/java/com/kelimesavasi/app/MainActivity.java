@@ -277,7 +277,6 @@ public class MainActivity extends BridgeActivity {
         if (mWebView != null) {
             try {
                 mWebView.onPause();
-                mWebView.pauseTimers();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -292,7 +291,6 @@ public class MainActivity extends BridgeActivity {
         if (mWebView != null) {
             try {
                 mWebView.onPause();
-                mWebView.pauseTimers();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -364,6 +362,15 @@ public class MainActivity extends BridgeActivity {
                             mIsAdLoading = false;
                             
                             mRewardedAd.setFullScreenContentCallback(new com.google.android.gms.ads.FullScreenContentCallback() {
+                                @Override
+                                public void onAdShowedFullScreenContent() {
+                                    mHandler.post(() -> {
+                                        if (mWebView != null) {
+                                            mWebView.evaluateJavascript("if (window.onAndroidAdShowed) { window.onAndroidAdShowed(); }", null);
+                                        }
+                                    });
+                                }
+
                                 @Override
                                 public void onAdDismissedFullScreenContent() {
                                     mRewardedAd = null;

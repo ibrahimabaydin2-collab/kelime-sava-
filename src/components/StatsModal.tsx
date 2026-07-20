@@ -18,8 +18,19 @@ import {
   Search,
   Flame,
   Target,
-  Compass
+  Compass,
+  Download
 } from 'lucide-react';
+import { 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  Cell, 
+  CartesianGrid 
+} from 'recharts';
 import { UserProfile, Badge, DailyMission } from '../types';
 import { getBaseUrl } from '../utils/api.js';
 
@@ -82,6 +93,16 @@ export default function StatsModal({
   // Completed missions count
   const completedMissionsCount = profile.missions.filter(m => m.completed).length;
 
+  // Mapping word length stats to chart format
+  const wordLengthData = [
+    { name: '3 Harf', 'Başarı': profile.wordLengthStats?.['3'] || 0 },
+    { name: '4 Harf', 'Başarı': profile.wordLengthStats?.['4'] || 0 },
+    { name: '5 Harf', 'Başarı': profile.wordLengthStats?.['5'] || 0 },
+    { name: '6 Harf', 'Başarı': profile.wordLengthStats?.['6'] || 0 },
+    { name: '7 Harf', 'Başarı': profile.wordLengthStats?.['7'] || 0 },
+    { name: '8 Harf', 'Başarı': profile.wordLengthStats?.['8'] || 0 },
+  ];
+
   const handleShare = () => {
     const baseUrl = getBaseUrl();
     const shareLink = baseUrl ? baseUrl : (window.location.origin || window.location.href);
@@ -97,6 +118,63 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
     navigator.clipboard.writeText(shareText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleExportStats = () => {
+    try {
+      const statsToExport = {
+        oyuncu_adi: profile.name,
+        oyuncu_id: profile.id,
+        toplam_skor: profile.dailyScore,
+        altin: profile.gold || 0,
+        istatistikler: {
+          oynanan_oyun: profile.stats.gamesPlayed,
+          kazanilan_oyun: profile.stats.gamesWon,
+          kazanma_orani: `${winRate}%`,
+          mevcut_seri: profile.stats.currentStreak,
+          en_iyi_seri: profile.stats.maxStreak,
+          deneme_dagilimi: {
+            "1. Deneme": profile.stats.winDistribution[0] || 0,
+            "2. Deneme": profile.stats.winDistribution[1] || 0,
+            "3. Deneme": profile.stats.winDistribution[2] || 0,
+            "4. Deneme": profile.stats.winDistribution[3] || 0,
+            "5. Deneme": profile.stats.winDistribution[4] || 0,
+            "6. Deneme": profile.stats.winDistribution[5] || 0,
+          }
+        },
+        kelime_uzunluk_basarisi: {
+          "3 Harfli": profile.wordLengthStats?.['3'] || 0,
+          "4 Harfli": profile.wordLengthStats?.['4'] || 0,
+          "5 Harfli": profile.wordLengthStats?.['5'] || 0,
+          "6 Harfli": profile.wordLengthStats?.['6'] || 0,
+          "7 Harfli": profile.wordLengthStats?.['7'] || 0,
+          "8 Harfli": profile.wordLengthStats?.['8'] || 0,
+        },
+        gorevler: profile.missions.map(m => ({
+          gorev: m.title,
+          aciklama: m.description,
+          hedef: m.target,
+          ilerleme: m.current,
+          tamamlandi: m.completed
+        })),
+        rozetler: profile.badges.map(b => ({
+          rozet: b.title,
+          aciklama: b.description,
+          kazanildi: b.unlockedAt ? new Date(b.unlockedAt).toLocaleDateString('tr-TR') : 'Henüz kazanılmadı'
+        })),
+        disa_aktarma_tarihi: new Date().toLocaleString('tr-TR')
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(statsToExport, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `${profile.name.replace(/\s+/g, '_')}_kelime_savasi_istatistikleri.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (err) {
+      console.error("Failed to export statistics", err);
+    }
   };
 
   return (
@@ -210,23 +288,88 @@ Sen de bana meydan oku! 🚀 ${shareLink}`;
                 </div>
               </div>
 
-              {/* Social Share & Reset */}
-              <div className="flex flex-col sm:flex-row gap-2 pt-4">
+              {/* Word Length Success Bar Chart */}
+              <div className="bg-[#3D4756]/15 p-4 rounded-2xl border border-white/5">
+                <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 font-mono flex items-center justify-between">
+                  <span>Kelime Uzunluğu Başarısı</span>
+                  <span className="text-[10px] text-amber-400 font-normal normal-case">Doğru Kelime Sayısı</span>
+                </h3>
+                <div className="h-40 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={wordLengthData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#3E485A" opacity={0.2} vertical={false} />
+                      <XAxis 
+                        dataKey="name" 
+                        stroke="#9CA3AF" 
+                        fontSize={10} 
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis 
+                        stroke="#9CA3AF" 
+                        fontSize={10} 
+                        tickLine={false}
+                        axisLine={false}
+                        allowDecimals={false}
+                      />
+                      <Tooltip
+                        contentStyle={{ 
+                          backgroundColor: '#1E293B', 
+                          border: '1px solid rgba(255,255,255,0.1)', 
+                          borderRadius: '8px' 
+                        }}
+                        labelStyle={{ color: '#F3F4F6', fontWeight: 'bold', fontSize: '11px' }}
+                        itemStyle={{ color: '#FBBF24', fontSize: '11px' }}
+                        cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+                      />
+                      <Bar dataKey="Başarı" radius={[4, 4, 0, 0]}>
+                        {wordLengthData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={
+                              index === 0 ? '#FBBF24' : // Amber
+                              index === 1 ? '#F59E0B' : // Dark Amber
+                              index === 2 ? '#D97706' : // Darker Amber
+                              index === 3 ? '#B45309' : // Orange-amber
+                              index === 4 ? '#92400E' : // Orange-brown
+                              '#78350F'                 // Deep amber
+                            } 
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Social Share, Export & Reset */}
+              <div className="flex flex-col gap-2 pt-4">
                 <button
                   onClick={handleShare}
-                  className="flex-1 bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] font-black py-3 px-4 rounded-xl shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] border border-[#EBE6D5] flex items-center justify-center gap-2 transition duration-150 cursor-pointer"
+                  className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] font-black py-3 px-4 rounded-xl shadow-[0_4px_0_#D9D4C3,0_6px_10px_rgba(0,0,0,0.15)] border border-[#EBE6D5] flex items-center justify-center gap-2 transition duration-150 cursor-pointer text-sm"
                 >
                   {copied ? <Check size={18} /> : <Share2 size={18} />}
                   {copied ? 'Kopyalandı!' : 'Skorunu Paylaş'}
                 </button>
-                {onResetStats && (
+                
+                <div className="flex items-center justify-between gap-2 mt-1">
                   <button
-                    onClick={onResetStats}
-                    className="py-3 px-4 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 font-bold border border-transparent transition cursor-pointer"
+                    onClick={handleExportStats}
+                    className="flex-1 py-2 px-3 rounded-xl text-xs bg-[#3D4756]/45 hover:bg-[#3D4756]/70 text-[#FAF6E9] border border-[#3E485A]/40 transition flex items-center justify-center gap-1.5 cursor-pointer font-bold"
                   >
-                    Verileri Sıfırla
+                    <Download size={14} className="text-amber-400" />
+                    İstatistikleri Dışa Aktar
                   </button>
-                )}
+
+                  {onResetStats && (
+                    <button
+                      onClick={onResetStats}
+                      className="py-2 px-3 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 font-bold border border-transparent transition cursor-pointer"
+                    >
+                      Verileri Sıfırla
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
