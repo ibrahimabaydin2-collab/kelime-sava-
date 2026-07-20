@@ -1601,36 +1601,25 @@ const setupWebSocket = (server: any) => {
             console.log(`Player joined matchmaking queue: ${selfClient.name} (${playerId}) for ${wordLength} letters, ${requestedWordsCount} words`);
             matchmakingQueue.set(playerId, { wordLength, matchWordsCount: requestedWordsCount });
 
-            // Look for another player in the queue
+            // Look for another player in the queue with the EXACT same matchWordsCount
             let opponentId = '';
             for (const [id, info] of matchmakingQueue.entries()) {
               if (id !== playerId) {
-                // Find opponent with same wordLength and same matchWordsCount first
-                if (info.wordLength === wordLength && info.matchWordsCount === requestedWordsCount) {
+                if (info.matchWordsCount === requestedWordsCount && info.wordLength === wordLength) {
                   opponentId = id;
                   break;
                 }
               }
             }
 
-            // Fallback 1: match with same length
+            // Fallback: match with same matchWordsCount, even if wordLength is different
             if (!opponentId) {
               for (const [id, info] of matchmakingQueue.entries()) {
                 if (id !== playerId) {
-                  if (info.wordLength === wordLength) {
+                  if (info.matchWordsCount === requestedWordsCount) {
                     opponentId = id;
                     break;
                   }
-                }
-              }
-            }
-
-            // Fallback 2: match with anyone in queue
-            if (!opponentId) {
-              for (const [id] of matchmakingQueue.entries()) {
-                if (id !== playerId) {
-                  opponentId = id;
-                  break;
                 }
               }
             }

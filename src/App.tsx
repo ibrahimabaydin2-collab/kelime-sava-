@@ -2158,7 +2158,7 @@ export default function App() {
   // Countdown timer logic
   useEffect(() => {
     // Pause timer if app is not active (backgrounded)
-    if (!isAppActive || gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch) || activeMatch) {
+    if (!isAppActive || gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch)) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -2182,6 +2182,7 @@ export default function App() {
             timerRef.current = null;
           }
           if (activeMatch) {
+            setGameStatus('idle'); // Freeze input and state while waiting for opponent or round sync
             if (activeMatch.matchWordsCount === 3) {
               showToast(`Süre bitti! Diğer oyuncunun tamamlaması bekleniyor...`, 'info');
               playDefeatSound(settings.soundEnabled);
