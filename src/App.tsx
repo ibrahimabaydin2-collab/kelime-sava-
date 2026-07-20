@@ -611,11 +611,7 @@ export default function App() {
     // Helper to verify a candidate word is linguistically valid and strictly exists in COMMON_TURKISH_WORDS and CLEANED_TURKISH_WORDS pools
     const isLinguisticallyValid = (w: string): boolean => {
       const lower = turkishLower(w).trim();
-
-      if (!cleanedSet.has(lower) || !commonSet.has(lower)) return false;
-
-      const upper = turkishUpper(w);
-      return validateTurkishLinguistics(upper, wordLength).valid;
+      return cleanedSet.has(lower) && commonSet.has(lower);
     };
 
     // 2. Filter words
@@ -694,6 +690,8 @@ export default function App() {
       showToast("Yetersiz Altın! Reklam izleyerek altın kazanabilirsiniz.", "error");
       return;
     }
+    // Asynchronous non-blocking UI thread release
+    await new Promise(resolve => setTimeout(resolve, 10));
     const suggestion = generateWordSuggestion();
     if (suggestion) {
       const success = await deductGold(1);
@@ -713,6 +711,9 @@ export default function App() {
       showToast("Yetersiz Altın! Reklam izleyerek altın kazanabilirsiniz.", "error");
       return;
     }
+
+    // Asynchronous non-blocking UI thread release
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     // Let's find unrevealed indices in targetWord
     const unrevealedIndices: number[] = [];

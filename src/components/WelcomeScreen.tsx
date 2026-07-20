@@ -248,42 +248,64 @@ export default function WelcomeScreen({
     }
   };
 
+  const onRewardRef = useRef(onWatchRewardedAdReward);
+  useEffect(() => {
+    onRewardRef.current = onWatchRewardedAdReward;
+  }, [onWatchRewardedAdReward]);
+
+  const clearAdRequestFlags = () => {
+    adRequestActiveRef.current = false;
+    if (typeof window !== 'undefined') {
+      (window as any).userExplicitAdRequested = false;
+    }
+    try {
+      sessionStorage.removeItem('user_explicit_ad_requested');
+    } catch (e) {}
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as any).onAndroidAdRewarded = () => {
-        adRequestActiveRef.current = false;
+        clearAdRequestFlags();
         setIsWatchingAd(false);
         setIsAdLoading(false);
-        onWatchRewardedAdReward?.();
+        onRewardRef.current?.();
         setShowAdSuccess(true);
       };
 
       (window as any).onAndroidAdDismissed = () => {
-        adRequestActiveRef.current = false;
+        clearAdRequestFlags();
         setIsWatchingAd(false);
         setIsAdLoading(false);
       };
 
       (window as any).onAndroidAdFailedToShow = (err: string) => {
-        adRequestActiveRef.current = false;
+        clearAdRequestFlags();
         setIsWatchingAd(false);
         setIsAdLoading(false);
         alert("Reklam gösterilemedi: " + err);
       };
 
       (window as any).onAndroidAdFailedToLoad = (err: string) => {
-        adRequestActiveRef.current = false;
+        clearAdRequestFlags();
         setIsAdLoading(false);
         alert("Reklam yüklenemedi: " + err);
       };
 
       (window as any).onAndroidAdLoaded = () => {
-        // Only trigger showRewardedAd if the user explicitly requested it!
-        if (!adRequestActiveRef.current) {
+        const hasExplicitRequest = adRequestActiveRef.current || 
+          (typeof window !== 'undefined' && (window as any).userExplicitAdRequested === true) ||
+          (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('user_explicit_ad_requested') === 'true');
+
+        if (!hasExplicitRequest) {
           console.log("onAndroidAdLoaded triggered, but no active user request. Skipping auto-show.");
+          clearAdRequestFlags();
+          setIsAdLoading(false);
           return;
         }
-        adRequestActiveRef.current = false; // Reset the flag
+
+        // Reset all flags first to prevent any back-to-back triggers!
+        clearAdRequestFlags();
         setIsAdLoading(false);
         try {
           if ((window as any).AndroidBridge && (window as any).AndroidBridge.showRewardedAd) {
@@ -304,16 +326,21 @@ export default function WelcomeScreen({
         delete (window as any).onAndroidAdLoaded;
       }
     };
-  }, [onWatchRewardedAdReward]);
+  }, []);
 
   const startRewardedAdWatch = () => {
+    if (isAdLoading || isWatchingAd) return; // Prevent double-clicking
     if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
       adRequestActiveRef.current = true; // Set active request flag
+      (window as any).userExplicitAdRequested = true;
+      try {
+        sessionStorage.setItem('user_explicit_ad_requested', 'true');
+      } catch (e) {}
       setIsAdLoading(true);
       try {
         if ((window as any).AndroidBridge.isRewardedAdLoaded && (window as any).AndroidBridge.isRewardedAdLoaded()) {
           if ((window as any).AndroidBridge.showRewardedAd) {
-            adRequestActiveRef.current = false; // Will be shown immediately, reset the flag
+            clearAdRequestFlags(); // Will be shown immediately, reset the flag
             (window as any).AndroidBridge.showRewardedAd();
           }
         } else {
@@ -324,8 +351,12 @@ export default function WelcomeScreen({
           setTimeout(() => {
             setIsAdLoading(curr => {
               if (curr) {
-                if (adRequestActiveRef.current && (window as any).AndroidBridge && (window as any).AndroidBridge.showRewardedAd) {
-                  adRequestActiveRef.current = false; // Reset flag before showing
+                const hasExplicitRequest = adRequestActiveRef.current || 
+                  (typeof window !== 'undefined' && (window as any).userExplicitAdRequested === true) ||
+                  (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('user_explicit_ad_requested') === 'true');
+
+                if (hasExplicitRequest && (window as any).AndroidBridge && (window as any).AndroidBridge.showRewardedAd) {
+                  clearAdRequestFlags(); // Reset flag before showing
                   (window as any).AndroidBridge.showRewardedAd();
                 }
               }
@@ -1070,14 +1101,23 @@ export default function WelcomeScreen({
           {/* Rewarded Ad Button */}
           <button
             onClick={startRewardedAdWatch}
-            className="w-full py-3 px-4 rounded-xl font-extrabold text-xs flex items-center justify-between transition-all duration-150 active:scale-95 bg-gradient-to-r from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 border-amber-200 text-amber-850 shadow-sm cursor-pointer uppercase tracking-wider"
+            disabled={isAdLoading || isWatchingAd}
+            className={`w-full py-3 px-4 rounded-xl font-extrabold text-xs flex items-center justify-between transition-all duration-150 active:scale-95 shadow-sm uppercase tracking-wider ${
+              isAdLoading || isWatchingAd
+                ? "bg-gray-100 border-gray-200 text-gray-450 cursor-not-allowed opacity-75"
+                : "bg-gradient-to-r from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 border-amber-200 text-amber-850 cursor-pointer"
+            }`}
             title="Reklam izleyerek 10 altın kazan"
           >
             <div className="flex items-center gap-2">
-              <span>📺</span>
+              <span>{isAdLoading ? "⏳" : "📺"}</span>
               <div className="text-left">
-                <span className="block font-black text-[10px] leading-tight text-amber-900/80">REKLAM İZLE</span>
-                <span className="block text-[8px] font-mono text-gray-500 leading-none mt-0.5">SINIRSIZ HAK</span>
+                <span className="block font-black text-[10px] leading-tight text-amber-900/80">
+                  {isAdLoading ? "REKLAM HAZIRLANIYOR..." : isWatchingAd ? "REKLAM OYNATILIYOR..." : "REKLAM İZLE"}
+                </span>
+                <span className="block text-[8px] font-mono text-gray-500 leading-none mt-0.5">
+                  {isAdLoading ? "LÜTFEN BEKLEYİN" : "SINIRSIZ HAK"}
+                </span>
               </div>
             </div>
             <span className="font-mono text-xs font-black text-amber-600">+10🪙</span>
