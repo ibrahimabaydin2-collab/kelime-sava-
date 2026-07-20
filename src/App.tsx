@@ -2180,12 +2180,43 @@ export default function App() {
             timerRef.current = null;
           }
           if (activeMatch) {
-            showToast(`Süre bitti! Rakibin tamamlaması bekleniyor...`, 'error');
-            syncMatchState(attempts, attempts.length, true, false, 0);
+            if (activeMatch.matchWordsCount === 3) {
+              if (currentWordIndex < 2) {
+                const nextIndex = currentWordIndex + 1;
+                const nextWord = targetWords ? targetWords[nextIndex] : null;
+                showToast(`Süre bitti! Sonraki kelimeye geçiliyor... ⏩`, 'info');
+                playDefeatSound(settings.soundEnabled);
+
+                setTimeout(() => {
+                  setCurrentWordIndex(nextIndex);
+                  setAttempts([]);
+                  setCurrentAttempt('');
+                  setRevealedHints({});
+                  setLetterStatuses({});
+                  setSecondsLeft(20);
+                  if (nextWord) {
+                    setTargetWord(nextWord);
+                  }
+                  syncMatchState([], 0, false, false, cumulativeScore, null, nextIndex);
+                }, 0);
+                return 20;
+              } else {
+                showToast(`Tahmin süreniz bitti! Rakibin de bitirmesi bekleniyor...`, 'info');
+                playDefeatSound(settings.soundEnabled);
+                setTimeout(() => {
+                  syncMatchState(attempts, attempts.length, true, false, cumulativeScore, null, 2);
+                }, 0);
+                return 0;
+              }
+            } else {
+              showToast(`Süre bitti! Rakibin tamamlaması bekleniyor...`, 'error');
+              syncMatchState(attempts, attempts.length, true, false, 0);
+              return 0;
+            }
           } else {
             handleGameLoss('Süre Sınırı Aşıldı');
+            return 0;
           }
-          return 0;
         }
         const nextSec = prev - 1;
         if (nextSec <= 5 && nextSec >= 1) {
@@ -2203,7 +2234,7 @@ export default function App() {
         timerRef.current = null;
       }
     };
-  }, [isAppActive, gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch, isDailyPuzzle, targetWord]); // Resets interval on attempt submission or validation change or exit or gameMode change
+  }, [isAppActive, gameStatus, attempts.length, isValidating, hasEnteredGame, gameMode, activeMatch, isDailyPuzzle, targetWord, currentWordIndex, targetWords, cumulativeScore]); // Resets interval on attempt submission or validation change or exit or gameMode change
 
   // Fetch direct definition for the target word with multi-layered client-side fallbacks
   const fetchTargetWordDefinition = async (wordToFetch: string) => {
