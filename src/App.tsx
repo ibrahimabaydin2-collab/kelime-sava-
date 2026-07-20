@@ -1145,9 +1145,42 @@ export default function App() {
               if (!active) return;
 
               if (dbProfile) {
-                const finalProfile = ensureProfileFields(dbProfile);
-                // If the profile does not have deviceId set, or has a different deviceId, bind it!
-                if (!finalProfile.deviceId || finalProfile.deviceId !== deviceId) {
+                const savedUsername = safeLocalStorage.getItem('saved_username');
+                const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
+                let finalName = dbProfile.name;
+                let finalAvatar = dbProfile.avatarUrl;
+
+                // Prioritize user's manual username from AuthScreen if the db profile has a default name
+                // or if they have explicitly typed a different nickname on the form.
+                if (savedUsername && (dbProfile.name.startsWith('Oyuncu_') || (savedUsername !== dbProfile.name && !savedUsername.startsWith('Oyuncu_')))) {
+                  finalName = savedUsername;
+                } else if (savedProfileStr) {
+                  try {
+                    const parsed = JSON.parse(savedProfileStr);
+                    if (parsed && parsed.name && (dbProfile.name.startsWith('Oyuncu_') || (parsed.name !== dbProfile.name && !parsed.name.startsWith('Oyuncu_')))) {
+                      finalName = parsed.name;
+                    }
+                    if (parsed && parsed.avatarUrl) {
+                      finalAvatar = parsed.avatarUrl;
+                    }
+                  } catch (e) {}
+                }
+
+                const finalProfile = ensureProfileFields({
+                  ...dbProfile,
+                  name: finalName,
+                  avatarUrl: finalAvatar,
+                  deviceId: deviceId,
+                  nameSet: true
+                });
+
+                // If the profile does not have deviceId set, has a different deviceId, or the name/avatar has changed, update Firestore!
+                if (
+                  !finalProfile.deviceId ||
+                  finalProfile.deviceId !== deviceId ||
+                  finalProfile.name !== dbProfile.name ||
+                  finalProfile.avatarUrl !== dbProfile.avatarUrl
+                ) {
                   finalProfile.deviceId = deviceId;
                   await saveUserProfileToFirestore(finalProfile);
                 }
@@ -1166,12 +1199,15 @@ export default function App() {
                     const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
                     let finalName = existingProfile.name;
                     let finalAvatar = existingProfile.avatarUrl;
-                    if (savedUsername) {
+                    
+                    if (savedUsername && (existingProfile.name.startsWith('Oyuncu_') || (savedUsername !== existingProfile.name && !savedUsername.startsWith('Oyuncu_')))) {
                       finalName = savedUsername;
                     } else if (savedProfileStr) {
                       try {
                         const parsed = JSON.parse(savedProfileStr);
-                        if (parsed && parsed.name) finalName = parsed.name;
+                        if (parsed && parsed.name && (existingProfile.name.startsWith('Oyuncu_') || (parsed.name !== existingProfile.name && !parsed.name.startsWith('Oyuncu_')))) {
+                          finalName = parsed.name;
+                        }
                         if (parsed && parsed.avatarUrl) finalAvatar = parsed.avatarUrl;
                       } catch (e) {}
                     }
@@ -1200,7 +1236,10 @@ export default function App() {
                     const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
                     let finalName = savedUsername || profile.name;
                     let finalAvatar = profile.avatarUrl || '🧠';
-                    if (savedProfileStr) {
+                    
+                    if (savedUsername && !savedUsername.startsWith('Oyuncu_')) {
+                      finalName = savedUsername;
+                    } else if (savedProfileStr) {
                       try {
                         const parsed = JSON.parse(savedProfileStr);
                         if (parsed && parsed.name) finalName = parsed.name;
@@ -1229,7 +1268,10 @@ export default function App() {
                   const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
                   let finalName = savedUsername || profile.name;
                   let finalAvatar = profile.avatarUrl || '🧠';
-                  if (savedProfileStr) {
+                  
+                  if (savedUsername && !savedUsername.startsWith('Oyuncu_')) {
+                    finalName = savedUsername;
+                  } else if (savedProfileStr) {
                     try {
                       const parsed = JSON.parse(savedProfileStr);
                       if (parsed && parsed.name) finalName = parsed.name;
