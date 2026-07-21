@@ -105,16 +105,19 @@ export function getDailyWordAndLength(): { word: string; length: number; dateStr
     // Iterate through the popular list deterministically to find a word that is definitely in the dictionary
     for (let i = 0; i < list.length; i++) {
       const candidate = list[(startIndex + i) % list.length];
-      const lowerCandidate = candidate.toLocaleLowerCase('tr-TR').trim();
-      if (dictionary.includes(lowerCandidate)) {
-        selectedWord = candidate.toLocaleUpperCase('tr-TR').trim();
-        break;
+      const trimmedCandidate = candidate.replace(/\r/g, '').replace(/\n/g, '').trim();
+      if (trimmedCandidate.length === length) {
+        const lowerCandidate = trimmedCandidate.toLocaleLowerCase('tr-TR');
+        if (dictionary.includes(lowerCandidate) || dictionary.includes(trimmedCandidate)) {
+          selectedWord = trimmedCandidate.toLocaleUpperCase('tr-TR');
+          break;
+        }
       }
     }
   }
 
   // Absolute fallback if no popular word is validated against the dictionary
-  if (!selectedWord) {
+  if (!selectedWord || selectedWord.length !== length) {
     const fallbackWords: { [key: number]: string } = {
       3: 'ARA',
       4: 'ALAN',
@@ -178,3 +181,22 @@ Object.keys(EXTRA_TURKISH_WORDS).forEach((keyStr) => {
     }
   });
 });
+
+// Strict sanitization of all word lists to ensure words are filed under the correct length keys
+for (let len = 3; len <= 8; len++) {
+  if (COMMON_TURKISH_WORDS[len]) {
+    COMMON_TURKISH_WORDS[len] = COMMON_TURKISH_WORDS[len].filter(
+      (word) => word.replace(/\r/g, '').replace(/\n/g, '').trim().length === len
+    );
+  }
+  if (CLEANED_TURKISH_WORDS[len]) {
+    CLEANED_TURKISH_WORDS[len] = CLEANED_TURKISH_WORDS[len].filter(
+      (word) => word.replace(/\r/g, '').replace(/\n/g, '').trim().length === len
+    );
+  }
+  if (populerKelimeler[len]) {
+    populerKelimeler[len] = populerKelimeler[len].filter(
+      (word) => word.replace(/\r/g, '').replace(/\n/g, '').trim().length === len
+    );
+  }
+}

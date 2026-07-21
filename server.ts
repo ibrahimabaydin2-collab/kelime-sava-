@@ -1164,7 +1164,7 @@ const setupWebSocket = (server: any) => {
                 }
 
                 // Standard 1-Round Duel Win/Draw Conditions
-                if (completed && won) {
+                if (won) {
                   if (!match.roundsWon) {
                     match.roundsWon = {};
                   }

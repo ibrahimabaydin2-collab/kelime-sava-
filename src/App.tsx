@@ -1252,8 +1252,8 @@ export default function App() {
                     const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
                     
                     setProfile((prevProfile) => {
-                      let finalName = savedUsername || prevProfile.name || '';
-                      let finalAvatar = prevProfile.avatarUrl || '🧠';
+                      let finalName = savedUsername || (prevProfile && prevProfile.name) || '';
+                      let finalAvatar = (prevProfile && prevProfile.avatarUrl) || '🧠';
                       
                       if (!finalName && savedProfileStr) {
                         try {
@@ -1263,13 +1263,13 @@ export default function App() {
                         } catch (e) {}
                       }
                       const updatedProfile = ensureProfileFields({
-                        ...prevProfile,
+                        ...(prevProfile || {}),
                         id: user.uid,
                         name: finalName,
                         avatarUrl: finalAvatar,
                         deviceId: deviceId,
                         nameSet: !!finalName
-                      });
+                      } as UserProfile);
                       saveUserProfileToFirestore(updatedProfile).catch(err => console.warn(err));
                       safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
                       if (updatedProfile.name) {
@@ -1285,8 +1285,8 @@ export default function App() {
                   const savedProfileStr = safeLocalStorage.getItem('kelimesavasi_profile');
                   
                   setProfile((prevProfile) => {
-                    let finalName = savedUsername || prevProfile.name || '';
-                    let finalAvatar = prevProfile.avatarUrl || '🧠';
+                    let finalName = savedUsername || (prevProfile && prevProfile.name) || '';
+                    let finalAvatar = (prevProfile && prevProfile.avatarUrl) || '🧠';
                     
                     if (!finalName && savedProfileStr) {
                       try {
@@ -1296,13 +1296,13 @@ export default function App() {
                       } catch (e) {}
                     }
                     const updatedProfile = ensureProfileFields({
-                      ...prevProfile,
+                      ...(prevProfile || {}),
                       id: user.uid,
                       name: finalName,
                       avatarUrl: finalAvatar,
                       deviceId: deviceId,
                       nameSet: !!finalName
-                    });
+                    } as UserProfile);
                     saveUserProfileToFirestore(updatedProfile).catch(err => console.warn(err));
                     safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
                     if (updatedProfile.name) {
@@ -1830,6 +1830,14 @@ export default function App() {
             case 'match_end': {
               const { winnerId, players: finalPlayers, roundsWon: rw } = data;
               setIsMatchmakingLocked(false); // Unconditionally allow immediate re-entry
+
+              // Force clear any timers immediately
+              if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+              }
+              isMatchEndedRef.current = true;
+              setGameStatus('idle');
 
               setActiveMatch((prev) => {
                 if (!prev) return null;
