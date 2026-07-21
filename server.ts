@@ -6,7 +6,7 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import { WebSocketServer, WebSocket } from 'ws';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, runTransaction } from 'firebase/firestore';
 import { db } from './src/lib/firebase.js';
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength } from './src/data/wordlist.js';
 import { turkishUpper, turkishLower } from './src/utils/turkish.js';
@@ -1183,10 +1183,29 @@ const setupWebSocket = (server: any) => {
                   match.winnerId = playerId;
                   (match as any).kelime_bulundu_zamani = kelime_bulundu_zamani || Date.now();
 
-                  // Update Firestore defensively to trigger opponents instantly
+                  // Update Firestore defensively via transaction to trigger opponents instantly and avoid overwriting a previous winner
                   const matchRef = doc(db, 'matches', matchId);
-                  setDoc(matchRef, { isGameOver: true, winner: playerId }, { merge: true }).catch((err) => {
-                    console.error('Server failed to update Firestore match winner:', err);
+                  runTransaction(db, async (transaction) => {
+                    const matchDoc = await transaction.get(matchRef);
+                    if (matchDoc.exists()) {
+                      const data = matchDoc.data();
+                      if (data.isGameOver || data.winner) {
+                        return { success: false, winner: data.winner };
+                      }
+                    }
+                    transaction.set(matchRef, { isGameOver: true, winner: playerId, status: 'ended' }, { merge: true });
+                    return { success: true, winner: playerId };
+                  }).then((result) => {
+                    if (result && !result.success) {
+                      console.log(`Server transaction: opponent/another player already won matches/${matchId}: ${result.winner}`);
+                    } else {
+                      console.log(`Server transaction: successfully claimed win for ${playerId} on matches/${matchId}`);
+                    }
+                  }).catch((err) => {
+                    console.error('Server failed to update Firestore match winner via transaction, falling back:', err);
+                    setDoc(matchRef, { isGameOver: true, winner: playerId, status: 'ended' }, { merge: true }).catch((fberr) => {
+                      console.error('Server failed to update Firestore match winner via standard fallback:', fberr);
+                    });
                   });
 
                   const endPayload = JSON.stringify({

@@ -23,7 +23,7 @@ import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import AuthScreen from './components/AuthScreen.js';
 import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
 import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser, fetchUserProfileByDeviceId, deleteUserProfile, signInAsGuest, clearMatchmakingState, db } from './lib/firebase.js';
-import { doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge, NetworkLogEntry } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play, Home } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength, COMMON_TURKISH_WORDS, CLEANED_TURKISH_WORDS } from './data/wordlist.js';
@@ -2680,10 +2680,35 @@ export default function App() {
           }
           setGameStatus('idle'); // Wait for server state sync (match_round_start or match_end)
 
-          // Update Firestore immediately. This triggers both players' listeners instantly.
+          // Update Firestore atomic transaction. This guarantees only the absolute first to finish wins and triggers both instantly.
           const matchRef = doc(db, 'matches', activeMatch.id);
-          setDoc(matchRef, { isGameOver: true, winner: profile.id }, { merge: true }).catch((err) => {
-            console.error('Failed to update Firestore match winner:', err);
+          runTransaction(db, async (transaction) => {
+            const matchDoc = await transaction.get(matchRef);
+            if (matchDoc.exists()) {
+              const data = matchDoc.data();
+              if (data.isGameOver || data.winner) {
+                // Someone else already won! Do not overwrite!
+                return { success: false, winner: data.winner };
+              }
+            }
+            // We are the first! Mark game as over, save our ID as the winner, set status as ended
+            transaction.set(matchRef, { isGameOver: true, winner: profile.id, status: 'ended' }, { merge: true });
+            return { success: true, winner: profile.id };
+          }).then((result) => {
+            if (result && !result.success) {
+              console.log(`Race condition lost. Winner is actually: ${result.winner}`);
+              // Fallback: we lost the race condition, so route us to defeat instantly
+              handleInstantMatchEnd(result.winner || 'opponent');
+            } else {
+              console.log('Successfully claimed victory via atomic transaction!');
+              handleInstantMatchEnd(profile.id);
+            }
+          }).catch((err) => {
+            console.error('Failed to update Firestore match winner via transaction, falling back:', err);
+            // Fallback to standard setDoc
+            setDoc(matchRef, { isGameOver: true, winner: profile.id, status: 'ended' }, { merge: true }).then(() => {
+              handleInstantMatchEnd(profile.id);
+            });
           });
 
           syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded, Date.now());
