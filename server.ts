@@ -1163,212 +1163,73 @@ const setupWebSocket = (server: any) => {
                   }
                 }
 
-                if (match.matchWordsCount === 3) {
-                  // Real-time 3-Round Series Match Logic (Best of 3 - First to 2 rounds won)
-                  if (completed && won) {
-                    if (!match.roundsWon) {
-                      match.roundsWon = {};
+                // Standard 1-Round Duel Win/Draw Conditions
+                if (completed && won) {
+                  if (!match.roundsWon) {
+                    match.roundsWon = {};
+                  }
+                  
+                  // Initialize scores for all players in match if not present
+                  for (const pId of Object.keys(match.players)) {
+                    if (match.roundsWon[pId] === undefined) {
+                      match.roundsWon[pId] = 0;
                     }
-                    for (const pId of Object.keys(match.players)) {
-                      if (match.roundsWon[pId] === undefined) {
-                        match.roundsWon[pId] = 0;
-                      }
-                    }
+                  }
 
-                    // Increment this player's round wins
-                    match.roundsWon[playerId] = (match.roundsWon[playerId] || 0) + 1;
+                  match.roundsWon[playerId] = (match.roundsWon[playerId] || 0) + 1;
+                  match.status = 'ended';
+                  match.winnerId = playerId;
+                  (match as any).kelime_bulundu_zamani = kelime_bulundu_zamani || Date.now();
 
-                    const pIds = Object.keys(match.players);
-                    const opponentId = pIds.find(id => id !== playerId);
-                    const currentRound = match.currentRound || 1;
+                  const endPayload = JSON.stringify({
+                    type: 'match_end',
+                    matchId,
+                    winnerId: playerId,
+                    roundsWon: match.roundsWon,
+                    players: match.players,
+                    kelime_bulundu_zamani: (match as any).kelime_bulundu_zamani
+                  });
 
-                    const playerWinsMatch = (match.roundsWon[playerId] >= 2);
-                    const opponentWinsMatch = opponentId ? ((match.roundsWon[opponentId] || 0) >= 2) : false;
-                    const isLastRound = (currentRound === 3);
-
-                    if (playerWinsMatch || opponentWinsMatch || isLastRound) {
-                      // Series has ended! Compute winner based on rounds won
-                      let winnerId = 'draw';
-                      const r1 = match.roundsWon[pIds[0]] || 0;
-                      const r2 = match.roundsWon[pIds[1]] || 0;
-                      if (r1 > r2) {
-                        winnerId = pIds[0];
-                      } else if (r2 > r1) {
-                        winnerId = pIds[1];
-                      }
-
-                      match.status = 'ended';
-                      match.winnerId = winnerId;
-                      (match as any).kelime_bulundu_zamani = Date.now();
-
-                      const endPayload = JSON.stringify({
-                        type: 'match_end',
-                        matchId,
-                        winnerId,
-                        roundsWon: match.roundsWon,
-                        players: match.players,
-                        kelime_bulundu_zamani: (match as any).kelime_bulundu_zamani
-                      });
-
-                      // Notify both players and reset statuses to idle
-                      for (const pId of Object.keys(match.players)) {
-                        const client = clients.get(pId);
-                        if (client) {
-                          client.status = 'idle';
-                          if (client.ws.readyState === WebSocket.OPEN) {
-                            client.ws.send(endPayload);
-                          }
-                        }
-                      }
-                      broadcastLobby();
-                    } else {
-                      // Advance to next round!
-                      match.currentRound = currentRound + 1;
-                      const nextWord = getRandomWord(match.wordLength);
-                      match.targetWord = nextWord;
-
-                      // Reset player state for the new round
-                      for (const pId of Object.keys(match.players)) {
-                        const p = match.players[pId];
-                        p.attempts = [];
-                        p.currentAttempt = 0;
-                        p.completed = false;
-                        p.won = false;
-                        p.timeRemaining = 20;
-                        p.score = 0;
-                      }
-
-                      const nextRoundPayload = JSON.stringify({
-                        type: 'match_round_start',
-                        matchId,
-                        targetWord: nextWord,
-                        currentRound: match.currentRound,
-                        matchWordsCount: 3,
-                        roundsWon: match.roundsWon
-                      });
-
-                      for (const pId of Object.keys(match.players)) {
-                        const client = clients.get(pId);
-                        if (client && client.ws.readyState === WebSocket.OPEN) {
-                          client.ws.send(nextRoundPayload);
-                        }
-                      }
-                    }
-                  } else {
-                    // Check for Draw (both completed and neither won)
-                    const allCompleted = Object.values(match.players).every(p => p.completed);
-                    const anyWon = Object.values(match.players).some(p => p.won);
-
-                    if (allCompleted && !anyWon) {
-                      if (!match.roundsWon) {
-                        match.roundsWon = {};
-                      }
-                      for (const pId of Object.keys(match.players)) {
-                        if (match.roundsWon[pId] === undefined) {
-                          match.roundsWon[pId] = 0;
-                        }
-                      }
-
-                      const currentRound = match.currentRound || 1;
-
-                      if (currentRound === 3) {
-                        // End of series
-                        let winnerId = 'draw';
-                        const pIds = Object.keys(match.players);
-                        const r1 = match.roundsWon[pIds[0]] || 0;
-                        const r2 = match.roundsWon[pIds[1]] || 0;
-                        if (r1 > r2) {
-                          winnerId = pIds[0];
-                        } else if (r2 > r1) {
-                          winnerId = pIds[1];
-                        }
-
-                        match.status = 'ended';
-                        match.winnerId = winnerId;
-                        (match as any).kelime_bulundu_zamani = Date.now();
-
-                        const endPayload = JSON.stringify({
-                          type: 'match_end',
-                          matchId,
-                          winnerId,
-                          roundsWon: match.roundsWon,
-                          players: match.players,
-                          kelime_bulundu_zamani: (match as any).kelime_bulundu_zamani
-                        });
-
-                        for (const pId of Object.keys(match.players)) {
-                          const client = clients.get(pId);
-                          if (client) {
-                            client.status = 'idle';
-                            if (client.ws.readyState === WebSocket.OPEN) {
-                              client.ws.send(endPayload);
-                            }
-                          }
-                        }
-                        broadcastLobby();
-                      } else {
-                        // Advance to next round (draw round)
-                        match.currentRound = currentRound + 1;
-                        const nextWord = getRandomWord(match.wordLength);
-                        match.targetWord = nextWord;
-
-                        for (const pId of Object.keys(match.players)) {
-                          const p = match.players[pId];
-                          p.attempts = [];
-                          p.currentAttempt = 0;
-                          p.completed = false;
-                          p.won = false;
-                          p.timeRemaining = 20;
-                          p.score = 0;
-                        }
-
-                        const nextRoundPayload = JSON.stringify({
-                          type: 'match_round_start',
-                          matchId,
-                          targetWord: nextWord,
-                          currentRound: match.currentRound,
-                          matchWordsCount: 3,
-                          roundsWon: match.roundsWon
-                        });
-
-                        for (const pId of Object.keys(match.players)) {
-                          const client = clients.get(pId);
-                          if (client && client.ws.readyState === WebSocket.OPEN) {
-                            client.ws.send(nextRoundPayload);
-                          }
-                        }
+                  // Notify both players and reset statuses to idle
+                  for (const pId of Object.keys(match.players)) {
+                    const client = clients.get(pId);
+                    if (client) {
+                      client.status = 'idle';
+                      if (client.ws.readyState === WebSocket.OPEN) {
+                        client.ws.send(endPayload);
                       }
                     }
                   }
+
+                  broadcastLobby();
                 } else {
-                  // Standard 1-Round Duel Win/Draw Conditions
-                  if (completed && won) {
+                  // Her iki oyuncu da 6 tahmin hakkını tamamlamış ve kimse kazanamamışsa yeni bir kelime ile oyunu devam ettir.
+                  const allCompleted = Object.values(match.players).every(p => p.completed);
+                  const anyWon = Object.values(match.players).some(p => p.won);
+
+                  if (allCompleted && !anyWon) {
                     if (!match.roundsWon) {
                       match.roundsWon = {};
                     }
-                    
-                    // Initialize scores for all players in match if not present
                     for (const pId of Object.keys(match.players)) {
                       if (match.roundsWon[pId] === undefined) {
                         match.roundsWon[pId] = 0;
                       }
                     }
 
-                    match.roundsWon[playerId] = (match.roundsWon[playerId] || 0) + 1;
                     match.status = 'ended';
-                    match.winnerId = playerId;
-                    (match as any).kelime_bulundu_zamani = kelime_bulundu_zamani || Date.now();
+                    match.winnerId = 'draw';
 
                     const endPayload = JSON.stringify({
                       type: 'match_end',
                       matchId,
-                      winnerId: playerId,
+                      winnerId: 'draw',
                       roundsWon: match.roundsWon,
                       players: match.players,
-                      kelime_bulundu_zamani: (match as any).kelime_bulundu_zamani
+                      kelime_bulundu_zamani: null
                     });
 
-                    // Notify both players and reset statuses to idle
+                    // Her iki oyuncuya da bildir ve durumlarını boşta yap
                     for (const pId of Object.keys(match.players)) {
                       const client = clients.get(pId);
                       if (client) {
@@ -1380,46 +1241,6 @@ const setupWebSocket = (server: any) => {
                     }
 
                     broadcastLobby();
-                  } else {
-                    // Her iki oyuncu da 6 tahmin hakkını tamamlamış ve kimse kazanamamışsa yeni bir kelime ile oyunu devam ettir.
-                    const allCompleted = Object.values(match.players).every(p => p.completed);
-                    const anyWon = Object.values(match.players).some(p => p.won);
-
-                    if (allCompleted && !anyWon) {
-                      if (!match.roundsWon) {
-                        match.roundsWon = {};
-                      }
-                      for (const pId of Object.keys(match.players)) {
-                        if (match.roundsWon[pId] === undefined) {
-                          match.roundsWon[pId] = 0;
-                        }
-                      }
-
-                      match.status = 'ended';
-                      match.winnerId = 'draw';
-
-                      const endPayload = JSON.stringify({
-                        type: 'match_end',
-                        matchId,
-                        winnerId: 'draw',
-                        roundsWon: match.roundsWon,
-                        players: match.players,
-                        kelime_bulundu_zamani: null
-                      });
-
-                      // Her iki oyuncuya da bildir ve durumlarını boşta yap
-                      for (const pId of Object.keys(match.players)) {
-                        const client = clients.get(pId);
-                        if (client) {
-                          client.status = 'idle';
-                          if (client.ws.readyState === WebSocket.OPEN) {
-                            client.ws.send(endPayload);
-                          }
-                        }
-                      }
-
-                      broadcastLobby();
-                    }
                   }
                 }
               }
@@ -1597,29 +1418,27 @@ const setupWebSocket = (server: any) => {
             selfClient.status = 'idle';
             matchmakingQueue.delete(playerId);
 
-            const requestedWordsCount = matchWordsCount || 1;
-            console.log(`Player joined matchmaking queue: ${selfClient.name} (${playerId}) for ${wordLength} letters, ${requestedWordsCount} words`);
+            const requestedWordsCount = 1;
+            console.log(`Player joined matchmaking queue: ${selfClient.name} (${playerId}) for ${wordLength} letters`);
             matchmakingQueue.set(playerId, { wordLength, matchWordsCount: requestedWordsCount });
 
-            // Look for another player in the queue with the EXACT same matchWordsCount
+            // Look for another player in the queue with the EXACT same wordLength
             let opponentId = '';
             for (const [id, info] of matchmakingQueue.entries()) {
               if (id !== playerId) {
-                if (info.matchWordsCount === requestedWordsCount && info.wordLength === wordLength) {
+                if (info.wordLength === wordLength) {
                   opponentId = id;
                   break;
                 }
               }
             }
 
-            // Fallback: match with same matchWordsCount, even if wordLength is different
+            // Fallback: match with first available player
             if (!opponentId) {
               for (const [id, info] of matchmakingQueue.entries()) {
                 if (id !== playerId) {
-                  if (info.matchWordsCount === requestedWordsCount) {
-                    opponentId = id;
-                    break;
-                  }
+                  opponentId = id;
+                  break;
                 }
               }
             }
@@ -1639,22 +1458,10 @@ const setupWebSocket = (server: any) => {
 
                 // Use the player's requested wordLength or fallback
                 const finalWordLength = wordLength || opponentInfo.wordLength || 5;
-                const finalMatchWordsCount = requestedWordsCount || opponentInfo.matchWordsCount || 1;
+                const finalMatchWordsCount = 1;
                 
                 let targetWord = getRandomWord(finalWordLength);
                 let targetWords: string[] = [targetWord];
-                if (finalMatchWordsCount === 3) {
-                  let w2 = getRandomWord(finalWordLength);
-                  while (w2 === targetWord) {
-                    w2 = getRandomWord(finalWordLength);
-                  }
-                  let w3 = getRandomWord(finalWordLength);
-                  while (w3 === targetWord || w3 === w2) {
-                    w3 = getRandomWord(finalWordLength);
-                  }
-                  targetWords.push(w2);
-                  targetWords.push(w3);
-                }
                 const matchId = `match_${Date.now()}`;
 
                 matches.set(matchId, {
