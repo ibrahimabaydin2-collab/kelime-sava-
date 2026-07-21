@@ -1687,7 +1687,15 @@ export default function App() {
 
               // Initialize/Merge Firestore match document defensively to guarantee reliable snapshot triggers
               const fMatchRef = doc(db, 'matches', matchId);
-              setDoc(fMatchRef, { id: matchId, isGameOver: false, winner: '' }, { merge: true }).catch((err) => {
+              setDoc(fMatchRef, { 
+                id: matchId, 
+                isGameOver: false, 
+                winner: '', 
+                winnerId: '', 
+                finishedBy: '', 
+                status: 'playing', 
+                gameState: 'playing' 
+              }, { merge: true }).catch((err) => {
                 console.warn('Defensive match initialization in Firestore failed:', err);
               });
 
@@ -2180,7 +2188,7 @@ export default function App() {
 
   // Real-time Firestore subscription to match state for instantaneous duel ending
   useEffect(() => {
-    if (activeMatch && activeMatch.id && activeMatch.status === 'playing') {
+    if (activeMatch && activeMatch.id) {
       if (matchUnsubscribeRef.current) {
         matchUnsubscribeRef.current();
         matchUnsubscribeRef.current = null;
@@ -2192,9 +2200,14 @@ export default function App() {
       matchUnsubscribeRef.current = onSnapshot(matchRef, (snapshot) => {
         if (snapshot.exists()) {
           const matchData = snapshot.data();
-          if (matchData.isGameOver && matchData.winner) {
-            console.log(`Instant match end condition met from Firestore. Winner is: ${matchData.winner}`);
-            handleInstantMatchEndRef.current(matchData.winner);
+          const isFinished = matchData.isGameOver === true || 
+                             matchData.status === 'finished' || 
+                             matchData.gameState === 'finished';
+          const winnerId = matchData.winner || matchData.winnerId || matchData.finishedBy;
+
+          if (isFinished && winnerId) {
+            console.log(`Instant match end condition met from Firestore. Winner is: ${winnerId}`);
+            handleInstantMatchEndRef.current(winnerId);
           }
         }
       }, (error) => {
@@ -2208,7 +2221,7 @@ export default function App() {
         matchUnsubscribeRef.current = null;
       }
     };
-  }, [activeMatch?.id, activeMatch?.status]);
+  }, [activeMatch?.id]);
 
   const handleLeaveMatchToMenu = useCallback(async () => {
     console.log('Centralized cleanup: returning to main menu');
@@ -2630,10 +2643,14 @@ export default function App() {
           const matchDoc = await getDoc(matchRef);
           if (matchDoc.exists()) {
             const matchData = matchDoc.data();
-            if (matchData.isGameOver || matchData.winner) {
-              console.log(`Pre-evaluation check: Match was already won by ${matchData.winner}. Halting guess.`);
+            const isFinished = matchData.isGameOver === true || 
+                               matchData.status === 'finished' || 
+                               matchData.gameState === 'finished';
+            const winnerId = matchData.winner || matchData.winnerId || matchData.finishedBy;
+            if (isFinished && winnerId) {
+              console.log(`Pre-evaluation check: Match was already won by ${winnerId}. Halting guess.`);
               setIsValidating(false);
-              handleInstantMatchEnd(matchData.winner);
+              handleInstantMatchEnd(winnerId);
               return;
             }
           }
@@ -2705,13 +2722,26 @@ export default function App() {
             const matchDoc = await transaction.get(matchRef);
             if (matchDoc.exists()) {
               const data = matchDoc.data();
-              if (data.isGameOver || data.winner) {
+              const alreadyEnded = data.isGameOver === true || 
+                                    data.winner || 
+                                    data.winnerId || 
+                                    data.finishedBy || 
+                                    data.status === 'finished' || 
+                                    data.gameState === 'finished';
+              if (alreadyEnded) {
                 // Someone else already won! Do not overwrite!
-                return { success: false, winner: data.winner };
+                return { success: false, winner: data.winner || data.winnerId || data.finishedBy || 'opponent' };
               }
             }
-            // We are the first! Mark game as over, save our ID as the winner, set status as ended
-            transaction.set(matchRef, { isGameOver: true, winner: profile.id, status: 'ended' }, { merge: true });
+            // We are the first! Mark game as over, save our ID as the winner, set status as finished
+            transaction.set(matchRef, { 
+              isGameOver: true, 
+              winner: profile.id, 
+              winnerId: profile.id, 
+              finishedBy: profile.id, 
+              status: 'finished', 
+              gameState: 'finished' 
+            }, { merge: true });
             return { success: true, winner: profile.id };
           }).then((result) => {
             if (result && !result.success) {
@@ -2725,7 +2755,14 @@ export default function App() {
           }).catch((err) => {
             console.error('Failed to update Firestore match winner via transaction, falling back:', err);
             // Fallback to standard setDoc
-            setDoc(matchRef, { isGameOver: true, winner: profile.id, status: 'ended' }, { merge: true }).then(() => {
+            setDoc(matchRef, { 
+              isGameOver: true, 
+              winner: profile.id, 
+              winnerId: profile.id, 
+              finishedBy: profile.id, 
+              status: 'finished', 
+              gameState: 'finished' 
+            }, { merge: true }).then(() => {
               handleInstantMatchEnd(profile.id);
             });
           });
