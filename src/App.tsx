@@ -22,7 +22,8 @@ import GoldWallet from './components/GoldWallet.js';
 import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import AuthScreen from './components/AuthScreen.js';
 import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
-import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser, fetchUserProfileByDeviceId, deleteUserProfile, signInAsGuest, clearMatchmakingState } from './lib/firebase.js';
+import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser, fetchUserProfileByDeviceId, deleteUserProfile, signInAsGuest, clearMatchmakingState, db } from './lib/firebase.js';
+import { doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge, NetworkLogEntry } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play, Home } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength, COMMON_TURKISH_WORDS, CLEANED_TURKISH_WORDS } from './data/wordlist.js';
@@ -1033,6 +1034,7 @@ export default function App() {
   const socketRef = useRef<WebSocket | null>(null);
   const wasOnlineRef = useRef<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const matchUnsubscribeRef = useRef<(() => void) | null>(null);
   const pendingMatchmakingRef = useRef<number | null>(null);
   const justLoggedInUidRef = useRef<string | null>(null);
 
@@ -2100,8 +2102,113 @@ export default function App() {
     }
   }, [wordLength, gameMode, hasEnteredGame, activeMatch]);
 
+  // Instant/synchronous duel completion handler based on Firestore real-time snapshot
+  const handleInstantMatchEnd = useCallback((winnerId: string) => {
+    // Unconditionally allow immediate matchmaking re-entry
+    setIsMatchmakingLocked(false);
+
+    // Force clear any active timers/intervals immediately to prevent ticking, flashing, or layout changes
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    // Lock keypress / input listener
+    isMatchEndedRef.current = true;
+    setGameStatus('idle');
+
+    setActiveMatch((prev) => {
+      if (!prev || prev.status === 'ended') return prev;
+      
+      const updatedPlayers = { ...prev.players };
+      // Synchronize the final states of players
+      Object.keys(updatedPlayers).forEach((pId) => {
+        updatedPlayers[pId] = {
+          ...updatedPlayers[pId],
+          completed: true,
+          won: pId === winnerId
+        };
+      });
+
+      return {
+        ...prev,
+        status: 'ended',
+        winnerId,
+        players: updatedPlayers
+      };
+    });
+
+    if (targetWord) {
+      fetchTargetWordDefinition(targetWord);
+    }
+
+    if (winnerId === profile.id) {
+      showToast('TEBRİKLER! Savaşı Kazandın! 🏆', 'success');
+      unlockBadge('gladiator');
+      updateDailyScore(200);
+      triggerVictoryCelebration(settings.soundEnabled);
+    } else {
+      showToast('Maçı rakibin kazandı. Daha hızlı olmalısın! ⚔️', 'error');
+      playDefeatSound(settings.soundEnabled);
+    }
+
+    // Clean up matchmaking state in Firestore in the background
+    if (profile && profile.id) {
+      clearMatchmakingState(profile.id).catch((err) => {
+        console.warn('Database cleanup failed in handleInstantMatchEnd:', err);
+      });
+    }
+
+    // Clean up our Firestore snapshot listener
+    if (matchUnsubscribeRef.current) {
+      matchUnsubscribeRef.current();
+      matchUnsubscribeRef.current = null;
+    }
+  }, [profile.id, targetWord, settings.soundEnabled]);
+
+  // Real-time Firestore subscription to match state for instantaneous duel ending
+  useEffect(() => {
+    if (activeMatch && activeMatch.id && activeMatch.status === 'playing') {
+      if (matchUnsubscribeRef.current) {
+        matchUnsubscribeRef.current();
+        matchUnsubscribeRef.current = null;
+      }
+
+      const matchRef = doc(db, 'matches', activeMatch.id);
+
+      // Create/merge the match document defensively on Firestore
+      setDoc(matchRef, { id: activeMatch.id, isGameOver: false, winner: '' }, { merge: true }).catch((err) => {
+        console.warn('Defensive match initialization in Firestore failed:', err);
+      });
+
+      console.log(`Subscribing to real-time Firestore listener for match document: matches/${activeMatch.id}`);
+      matchUnsubscribeRef.current = onSnapshot(matchRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const matchData = snapshot.data();
+          if (matchData.isGameOver && matchData.winner) {
+            console.log(`Instant match end condition met from Firestore. Winner is: ${matchData.winner}`);
+            handleInstantMatchEnd(matchData.winner);
+          }
+        }
+      }, (error) => {
+        console.error(`Firestore snapshot subscription failed for matches/${activeMatch.id}:`, error);
+      });
+    }
+
+    return () => {
+      if (matchUnsubscribeRef.current) {
+        matchUnsubscribeRef.current();
+        matchUnsubscribeRef.current = null;
+      }
+    };
+  }, [activeMatch?.id, activeMatch?.status, handleInstantMatchEnd]);
+
   const handleLeaveMatchToMenu = useCallback(async () => {
     console.log('Centralized cleanup: returning to main menu');
+    if (matchUnsubscribeRef.current) {
+      matchUnsubscribeRef.current();
+      matchUnsubscribeRef.current = null;
+    }
     setHasEnteredGame(false);
     setIsDailyPuzzle(false);
     setActiveMatch(null);
@@ -2565,6 +2672,13 @@ export default function App() {
             timerRef.current = null;
           }
           setGameStatus('idle'); // Wait for server state sync (match_round_start or match_end)
+
+          // Update Firestore immediately. This triggers both players' listeners instantly.
+          const matchRef = doc(db, 'matches', activeMatch.id);
+          setDoc(matchRef, { isGameOver: true, winner: profile.id }, { merge: true }).catch((err) => {
+            console.error('Failed to update Firestore match winner:', err);
+          });
+
           syncMatchState(updatedAttempts, updatedAttempts.length, true, true, scoreAwarded, Date.now());
         } else if (updatedAttempts.length >= 6) {
           showToast(`6 tahmin hakkınız tükendi! Diğer oyuncunun tamamlaması bekleniyor... Doğru kelime: ${targetWord}`, 'info');

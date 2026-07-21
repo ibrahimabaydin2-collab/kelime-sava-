@@ -76,6 +76,17 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["dateStr", "attempts", "solved", "failed"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "An online multiplayer 1v1 match / duel",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "isGameOver": { "type": "boolean" },
+        "winner": { "type": "string" }
+      },
+      "required": ["id", "isGameOver"]
     }
   },
   "firestore": {
@@ -98,6 +109,10 @@
     "/daily_puzzles/{docId}": {
       "schema": "DailyPuzzleState",
       "description": "Daily puzzle persistence for exploit prevention"
+    },
+    "/matches/{matchId}": {
+      "schema": "Match",
+      "description": "Online 1v1 duel states for instantaneous finish synchronization"
     }
   }
 }

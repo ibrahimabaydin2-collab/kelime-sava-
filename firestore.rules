@@ -22,5 +22,9 @@ service cloud.firestore {
     match /daily_puzzles/{docId} {
       allow read, write: if true;
     }
+
+    match /matches/{matchId} {
+      allow read, write: if true;
+    }
   }
 }
