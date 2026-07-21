@@ -2161,8 +2161,8 @@ export default function App() {
 
   // Countdown timer logic
   useEffect(() => {
-    // Pause timer if app is not active (backgrounded)
-    if (!isAppActive || gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch)) {
+    // Pause timer if app is not active (backgrounded) or if it is a live match
+    if (!isAppActive || gameStatus !== 'playing' || isValidating || !hasEnteredGame || isDailyPuzzle || (gameMode === 'untimed' && !activeMatch) || activeMatch) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -3728,7 +3728,12 @@ export default function App() {
                   <GoldWallet gold={profile.gold !== undefined ? profile.gold : 20} />
 
                   <div className="flex items-center gap-2">
-                    {gameMode === 'timed' && !activeMatch && !isDailyPuzzle ? (
+                    {activeMatch ? (
+                      <div className="text-xs font-extrabold font-mono px-2 py-0.5 rounded-lg border bg-amber-500/15 border-amber-500/30 text-amber-400 flex items-center gap-1">
+                        <Swords size={12} className="animate-pulse text-amber-400" />
+                        <span>CANLI DÜELLO</span>
+                      </div>
+                    ) : gameMode === 'timed' && !isDailyPuzzle ? (
                       <>
                         <Hourglass size={16} className={`animate-spin ${secondsLeft <= 5 ? 'text-rose-500' : 'text-emerald-500'}`} />
                         <div className={`text-sm font-bold font-mono px-2 py-0.5 rounded-lg border ${
