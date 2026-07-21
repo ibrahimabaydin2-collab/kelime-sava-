@@ -1183,6 +1183,12 @@ const setupWebSocket = (server: any) => {
                   match.winnerId = playerId;
                   (match as any).kelime_bulundu_zamani = kelime_bulundu_zamani || Date.now();
 
+                  // Update Firestore defensively to trigger opponents instantly
+                  const matchRef = doc(db, 'matches', matchId);
+                  setDoc(matchRef, { isGameOver: true, winner: playerId }, { merge: true }).catch((err) => {
+                    console.error('Server failed to update Firestore match winner:', err);
+                  });
+
                   const endPayload = JSON.stringify({
                     type: 'match_end',
                     matchId,
@@ -1221,6 +1227,12 @@ const setupWebSocket = (server: any) => {
 
                     match.status = 'ended';
                     match.winnerId = 'draw';
+
+                    // Update Firestore defensively on draw to trigger opponents instantly
+                    const matchRef = doc(db, 'matches', matchId);
+                    setDoc(matchRef, { isGameOver: true, winner: 'draw' }, { merge: true }).catch((err) => {
+                      console.error('Server failed to update Firestore match draw:', err);
+                    });
 
                     const endPayload = JSON.stringify({
                       type: 'match_end',
@@ -1399,6 +1411,12 @@ const setupWebSocket = (server: any) => {
                   }
                   const oppClient = clients.get(opponentId);
                   if (oppClient) oppClient.status = 'idle';
+
+                  // Update Firestore defensively on opponent flee/leave
+                  const matchRef = doc(db, 'matches', matchId);
+                  setDoc(matchRef, { isGameOver: true, winner: opponentId }, { merge: true }).catch((err) => {
+                    console.error('Server failed to update Firestore on opponent leave:', err);
+                  });
                 }
               }
             }

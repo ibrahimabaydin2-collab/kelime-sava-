@@ -1684,6 +1684,13 @@ export default function App() {
                 },
                 status: 'playing'
               });
+
+              // Initialize/Merge Firestore match document defensively to guarantee reliable snapshot triggers
+              const fMatchRef = doc(db, 'matches', matchId);
+              setDoc(fMatchRef, { id: matchId, isGameOver: false, winner: '' }, { merge: true }).catch((err) => {
+                console.warn('Defensive match initialization in Firestore failed:', err);
+              });
+
               break;
             }
 
@@ -2166,6 +2173,11 @@ export default function App() {
     }
   }, [profile.id, targetWord, settings.soundEnabled]);
 
+  const handleInstantMatchEndRef = useRef(handleInstantMatchEnd);
+  useEffect(() => {
+    handleInstantMatchEndRef.current = handleInstantMatchEnd;
+  }, [handleInstantMatchEnd]);
+
   // Real-time Firestore subscription to match state for instantaneous duel ending
   useEffect(() => {
     if (activeMatch && activeMatch.id && activeMatch.status === 'playing') {
@@ -2176,18 +2188,13 @@ export default function App() {
 
       const matchRef = doc(db, 'matches', activeMatch.id);
 
-      // Create/merge the match document defensively on Firestore
-      setDoc(matchRef, { id: activeMatch.id, isGameOver: false, winner: '' }, { merge: true }).catch((err) => {
-        console.warn('Defensive match initialization in Firestore failed:', err);
-      });
-
       console.log(`Subscribing to real-time Firestore listener for match document: matches/${activeMatch.id}`);
       matchUnsubscribeRef.current = onSnapshot(matchRef, (snapshot) => {
         if (snapshot.exists()) {
           const matchData = snapshot.data();
           if (matchData.isGameOver && matchData.winner) {
             console.log(`Instant match end condition met from Firestore. Winner is: ${matchData.winner}`);
-            handleInstantMatchEnd(matchData.winner);
+            handleInstantMatchEndRef.current(matchData.winner);
           }
         }
       }, (error) => {
@@ -2201,7 +2208,7 @@ export default function App() {
         matchUnsubscribeRef.current = null;
       }
     };
-  }, [activeMatch?.id, activeMatch?.status, handleInstantMatchEnd]);
+  }, [activeMatch?.id, activeMatch?.status]);
 
   const handleLeaveMatchToMenu = useCallback(async () => {
     console.log('Centralized cleanup: returning to main menu');
