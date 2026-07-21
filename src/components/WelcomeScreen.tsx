@@ -6,7 +6,7 @@ import {
   Sun, Moon, Sliders, BarChart2, X, ArrowLeft, UserPlus, UserMinus, Clock, Puzzle,
   Bot
 } from 'lucide-react';
-import { UserProfile, LobbyPlayer, Challenge } from '../types.js';
+import { UserProfile } from '../types.js';
 import { getBaseUrl } from '../utils/api.js';
 import { validateUsername } from '../utils/usernameValidation.js';
 import { getDailyWordAndLength } from '../data/wordlist.js';
@@ -24,11 +24,8 @@ interface WelcomeScreenProps {
   wordLength: number;
   onChangeWordLength: (length: number) => void;
   onStartSoloGame: () => void;
-  onStartMatchmaking: (matchWordsCount?: number) => void;
-  onOpenLobby: () => void;
   onOpenSettings: () => void;
   onOpenMissions?: () => void;
-  matchmakingStatus: 'idle' | 'queued';
   isOnline: boolean;
   
   // New Header integration props
@@ -37,20 +34,16 @@ interface WelcomeScreenProps {
   onToggleDarkMode?: () => void;
   
   // Dynamic Integrated Dashboard Props
-  lobbyPlayers?: LobbyPlayer[];
-  activeChallenges?: Challenge[];
-  onChallenge?: (player: LobbyPlayer, wordLength: number) => void;
-  onAcceptChallenge?: (challengeId: string) => void;
-  onDeclineChallenge?: (challengeId: string) => void;
   onReconnect?: () => void;
   onStartDailyPuzzle?: () => void;
   isDailyPuzzleCompletedToday?: boolean;
   onUpdateFriends?: (friends: string[]) => void;
-  isMatchmakingLocked?: boolean;
   onAddGold?: (amount: number) => Promise<void>;
   onDeductGold?: (amount: number) => Promise<boolean>;
   onClaimDailyReward?: () => Promise<void>;
   onWatchRewardedAdReward?: () => Promise<void>;
+  onStartMatchmaking?: (wordsCount?: number) => void;
+  matchmakingStatus?: 'idle' | 'queued';
 }
 
 export default function WelcomeScreen({
@@ -63,43 +56,34 @@ export default function WelcomeScreen({
   wordLength,
   onChangeWordLength,
   onStartSoloGame,
-  onStartMatchmaking,
-  onOpenLobby,
   onOpenSettings,
   onOpenMissions,
-  matchmakingStatus,
   isOnline,
   onReconnect,
   onOpenStats,
   darkMode,
   onToggleDarkMode,
-  lobbyPlayers = [],
-  activeChallenges = [],
-  onChallenge,
-  onAcceptChallenge,
-  onDeclineChallenge,
   onStartDailyPuzzle,
   isDailyPuzzleCompletedToday = false,
   onUpdateFriends,
-  isMatchmakingLocked = false,
   onAddGold,
   onDeductGold,
   onClaimDailyReward,
-  onWatchRewardedAdReward
+  onWatchRewardedAdReward,
+  onStartMatchmaking,
+  matchmakingStatus = 'idle'
 }: WelcomeScreenProps) {
   const [showHowToPlay, setShowHowToPlay] = useState<boolean>(false);
   const [showMissions, setShowMissions] = useState<boolean>(false);
   const [showRulesModal, setShowRulesModal] = useState<boolean>(false);
   const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
-  const [selectedMatchWords, setSelectedMatchWords] = useState<number>(1);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const isDailyClaimed = profile.lastDailyLoginClaim === todayStr;
   
   // Game setup states
   const [showGameSetup, setShowGameSetup] = useState<boolean>(false);
-  const [selectedTab, setSelectedTab] = useState<'solo' | 'pvp'>('solo');
 
   // Real-time bidirectional friends and requests from Firestore
   const [confirmedFriends, setConfirmedFriends] = useState<{ id: string; name: string; avatarUrl?: string }[]>([]);
@@ -124,7 +108,7 @@ export default function WelcomeScreen({
   // Daily Puzzle reset countdown timer state
   const [timeLeftToReset, setTimeLeftToReset] = useState<string>('');
   
-  // Live Clock and Turkish Date states for the mock status bar to match image_7.png
+  // Live Clock and Turkish Date states for the mock status bar
   const [liveTime, setLiveTime] = useState<string>('');
   const [liveDate, setLiveDate] = useState<string>('');
 
@@ -406,8 +390,7 @@ export default function WelcomeScreen({
   const [isTouched, setIsTouched] = useState<boolean>(false);
   const [dbUsernameError, setDbUsernameError] = useState<string | null>(null);
   const [isCheckingName, setIsCheckingName] = useState<boolean>(false);
-
-  const error = (isTouched || editName !== profile.name ? validateUsername(editName, lobbyPlayers || [], profile.id) : null) || dbUsernameError;
+  const error = (isTouched || editName !== profile.name ? validateUsername(editName, [], profile.id) : null) || dbUsernameError;
 
   React.useEffect(() => {
     setEditName(profile.name);
@@ -426,7 +409,7 @@ export default function WelcomeScreen({
   const handleSaveProfile = async () => {
     setIsTouched(true);
     setDbUsernameError(null);
-    const validationError = validateUsername(editName, lobbyPlayers || [], profile.id);
+    const validationError = validateUsername(editName, [], profile.id);
     if (validationError) return;
 
     if (editName.trim() && editName.trim() !== profile.name) {
@@ -503,86 +486,19 @@ export default function WelcomeScreen({
     };
   };
 
-  // Filter other online players
-  const otherPlayers = lobbyPlayers.filter(p => p.id !== profile.id);
-
   // Get all friends with status
   const friendsWithStatus = confirmedFriends.map(friend => {
-    const onlineInfo = lobbyPlayers.find(lp => lp.id === friend.id);
     return {
       ...friend,
-      isOnline: !!onlineInfo,
-      status: onlineInfo?.status || 'offline',
-      avatarUrl: onlineInfo?.avatarUrl || friend.avatarUrl
+      isOnline: false,
+      status: 'offline',
+      avatarUrl: friend.avatarUrl
     };
-  }).sort((a, b) => {
-    if (a.isOnline && !b.isOnline) return -1;
-    if (!a.isOnline && b.isOnline) return 1;
-    return a.name.localeCompare(b.name, 'tr-TR');
-  });
+  }).sort((a, b) => a.name.localeCompare(b.name, 'tr-TR'));
 
   const winRate = profile.stats && profile.stats.gamesPlayed > 0 
     ? Math.round((profile.stats.gamesWon / profile.stats.gamesPlayed) * 100) 
     : 0;
-
-  if (matchmakingStatus === 'queued') {
-    return (
-      <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2.5rem] border border-[#3E485A]/30 p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between items-center text-center gap-6 min-h-[50vh] transition-all duration-200 text-white animate-scale-up" id="matchmaking-searching-view">
-        {/* Decorative ambient glowing background rings */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-72 bg-amber-500/15 rounded-full blur-3xl pointer-events-none animate-pulse" />
-        
-        {/* Animated sword fight icon */}
-        <div className="relative mt-8">
-          <div className="w-24 h-24 bg-gradient-to-br from-amber-500 to-rose-500 rounded-full flex items-center justify-center border-4 border-amber-400 shadow-lg relative animate-pulse">
-            <Swords size={48} className="text-white stroke-[2.5] animate-bounce" />
-          </div>
-          {/* Pulsing ring animation */}
-          <div className="absolute inset-0 w-24 h-24 border-4 border-amber-400/50 rounded-full animate-ping pointer-events-none" />
-        </div>
-
-        <div className="space-y-2 max-w-xs relative z-10">
-          <h2 className="text-xl font-black tracking-wider text-amber-300 uppercase font-sans animate-pulse">Rakipler Aranıyor...</h2>
-          <p className="text-xs text-gray-300 font-medium leading-relaxed">
-            Savaş meydanında seninle kapışacak bir rakip aranıyor. Lütfen ayrılma!
-          </p>
-        </div>
-
-        {/* Live Search Stats / Visualizer */}
-        <div className="w-full max-w-xs bg-black/40 border border-white/5 rounded-2xl p-4 space-y-2.5 relative z-10 font-mono text-[10px] text-gray-400">
-          <div className="flex justify-between items-center">
-            <span>Seçilen Harf Sayısı:</span>
-            <span className="text-amber-400 font-bold">{wordLength} Harf</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span>Sözlük Modu:</span>
-            <span className="text-emerald-400 font-bold">
-              {dictionaryMode === 'tdk_online' ? 'TDK Onaylı' : 'Serbest'}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span>Oyun Modu:</span>
-            <span className="text-rose-400 font-bold">Tek Tur Düello ☝️</span>
-          </div>
-          {/* Animated dot logs */}
-          <div className="border-t border-white/5 pt-2 flex items-center gap-2 text-amber-500/70">
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-            </span>
-            <span className="animate-pulse">Sıraya girildi, eşleşme bekleniyor...</span>
-          </div>
-        </div>
-
-        {/* Cancel Button */}
-        <button
-          onClick={() => onStartMatchmaking(selectedMatchWords)}
-          className="w-full max-w-xs bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-xs py-3 px-4 rounded-xl shadow-lg transition-all uppercase tracking-widest cursor-pointer border border-rose-500 mb-4 z-10"
-        >
-          Aramayı İptal Et
-        </button>
-      </div>
-    );
-  }
 
   if (showGameSetup) {
     return (
@@ -591,13 +507,6 @@ export default function WelcomeScreen({
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-52 h-52 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
         
-        {/* Glowing 4-point star accent in bottom right */}
-        <div className="absolute bottom-6 right-8 text-amber-100/20 animate-pulse select-none pointer-events-none">
-          <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0c.5 6.5 5.5 11.5 12 12-.5 6.5-5.5 11.5-12 12-.5-6.5-5.5-11.5-12-12 .5-6.5 5.5-11.5 12-12z" />
-          </svg>
-        </div>
-
         {/* Header section with back button and centered title */}
         <div className="w-full flex flex-col md:grid md:grid-cols-5 items-center gap-2 border-b border-[#3E485A]/40 pb-2.5 relative z-10" id="setup-header-section">
           <div className="md:col-span-1 w-full flex justify-start">
@@ -629,36 +538,7 @@ export default function WelcomeScreen({
         <div className="space-y-3 relative z-10 flex-1 flex flex-col justify-between min-h-0" id="action-settings-card">
           <div className="space-y-3 flex-1 flex flex-col justify-between min-h-0" id="game-setup-wizard">
             
-            {/* Giant Premium Mode Cards */}
-            <div className="grid grid-cols-2 gap-2">
-              {/* Solo Card */}
-              <button
-                onClick={() => setSelectedTab('solo')}
-                className={`py-2.5 px-2 rounded-[1.2rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer active:scale-95 hover:scale-[1.02] ${
-                  selectedTab === 'solo'
-                    ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] font-black shadow-[0_5px_10px_rgba(250,246,233,0.15)] ring-2 ring-emerald-400/35'
-                    : 'bg-[#3D4756]/40 text-[#FAF6E9]/80 border-white/5 hover:bg-[#3D4756]/70'
-                }`}
-              >
-                <Puzzle className={`w-5 h-5 ${selectedTab === 'solo' ? 'text-emerald-600' : 'text-emerald-400'}`} />
-                <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider leading-none">SOLO PRATİK</span>
-              </button>
-
-              {/* PvP Card */}
-              <button
-                onClick={() => setSelectedTab('pvp')}
-                className={`py-2.5 px-2 rounded-[1.2rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer active:scale-95 hover:scale-[1.02] ${
-                  selectedTab === 'pvp'
-                    ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] font-black shadow-[0_5px_10px_rgba(250,246,233,0.15)] ring-2 ring-amber-400/20'
-                    : 'bg-[#3D4756]/40 text-[#FAF6E9]/80 border-white/5 hover:bg-[#3D4756]/70'
-                }`}
-              >
-                <Swords className={`w-5 h-5 ${selectedTab === 'pvp' ? 'text-amber-600' : 'text-amber-400'}`} />
-                <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider leading-none">CANLI DÜELLO</span>
-              </button>
-            </div>
-
-            {/* Parameter Controls specific to selected mode with enlarged fonts and cream highlights */}
+            {/* Parameter Controls with enlarged fonts and cream highlights */}
             <div className="space-y-3 bg-[#3D4756]/30 p-4 sm:p-4.5 rounded-[1.5rem] border border-white/5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Word Length Selector */}
@@ -711,103 +591,81 @@ export default function WelcomeScreen({
                   </div>
                 </div>
 
-                {/* Mode-specific secondary settings */}
-                {selectedTab === 'solo' && (
-                  <div className="space-y-1.5 text-left border-t border-white/5 pt-2">
-                    <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase flex items-center gap-1">
-                      <Zap size={10} className="text-amber-400 animate-pulse fill-amber-400/20" /> SÜRE VE ZAMAN KURALI
-                    </span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => onChangeGameMode('timed')}
-                        className={`py-1.5 px-3 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 border active:scale-95 cursor-pointer ${
-                          gameMode === 'timed'
-                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
-                            : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
-                        }`}
-                      >
-                        <span>⏱️ Süreli (20 sn)</span>
-                      </button>
-                      <button
-                        onClick={() => onChangeGameMode('untimed')}
-                        className={`py-1.5 px-3 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 border active:scale-95 cursor-pointer ${
-                          gameMode === 'untimed'
-                            ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
-                            : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
-                        }`}
-                      >
-                        <span>♾️ Süresiz</span>
-                      </button>
-                    </div>
+                {/* Secondary settings */}
+                <div className="space-y-1.5 text-left border-t border-white/5 pt-2">
+                  <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase flex items-center gap-1">
+                    <Zap size={10} className="text-amber-400 animate-pulse fill-amber-400/20" /> SÜRE VE ZAMAN KURALI
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => onChangeGameMode('timed')}
+                      className={`py-1.5 px-3 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 border active:scale-95 cursor-pointer ${
+                        gameMode === 'timed'
+                          ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
+                          : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
+                      }`}
+                    >
+                      <span>⏱️ Süreli (20 sn)</span>
+                    </button>
+                    <button
+                      onClick={() => onChangeGameMode('untimed')}
+                      className={`py-1.5 px-3 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 border active:scale-95 cursor-pointer ${
+                        gameMode === 'untimed'
+                          ? 'bg-[#FAF6E9] border-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
+                          : 'bg-black/20 text-[#FAF6E9]/75 border-white/5 hover:bg-white/5'
+                      }`}
+                    >
+                      <span>♾️ Süresiz</span>
+                    </button>
                   </div>
-                )}
+                </div>
 
-              </div>
+            </div>
 
             {/* Sleek Dark Info Panel */}
             <div className="bg-black/35 border border-white/5 rounded-2xl p-3 text-left space-y-0.5 relative overflow-hidden" id="mode-info-panel">
               <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
-                {selectedTab === 'solo' && <Zap size={30} />}
-                {selectedTab === 'pvp' && <Swords size={30} />}
+                <Zap size={30} />
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                 <span className="text-[9px] font-black text-amber-300 uppercase tracking-widest font-mono">
-                  {selectedTab === 'solo' && 'SOLO PRATİK MODU AÇIKLAMASI'}
-                  {selectedTab === 'pvp' && 'CANLI DÜELLO MODU AÇIKLAMASI'}
+                  SOLO PRATİK MODU AÇIKLAMASI
                 </span>
               </div>
               <p className="text-[11px] text-gray-300 leading-snug font-sans">
-                {selectedTab === 'solo' && 'Kendi başınıza pratik yapıp kendinizi test edin! Süreli veya süresiz oynayarak kelime haznenizi genişletin ve yeni rekorlara koşun.'}
-                {selectedTab === 'pvp' && 'Canlı rakiplerle kıyasıya rekabet edin! Aynı gizli kelimeyi en az denemede ve en kısa sürede çözerek liderlik sıralamasında yükselin.'}
+                Kendi başınıza pratik yapıp kendinizi test edin! Süreli veya süresiz oynayarak kelime haznenizi genişletin ve yeni rekorlara koşun.
               </p>
             </div>
 
-            {/* Full Width Dynamic Launch Button with Puzzle Icon */}
-            {selectedTab === 'solo' && (
+            {/* Dual Action Launch Buttons: Canlı Düello & Solo Oyun */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+              {onStartMatchmaking && (
+                <button
+                  onClick={() => {
+                    setShowGameSetup(false);
+                    onStartMatchmaking();
+                  }}
+                  className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] text-slate-900 font-black text-xs py-2.5 px-3 rounded-xl shadow-[0_3px_0_#D97706,0_5px_10px_rgba(245,158,11,0.25)] transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-amber-200/40"
+                  id="start-duel-setup-btn"
+                >
+                  <Swords size={14} className="text-slate-900 mr-1.5 stroke-[2.5]" />
+                  <span>Canlı Düello (1 Altın)</span>
+                </button>
+              )}
+
               <button
                 onClick={() => {
                   onStartSoloGame();
                   setShowGameSetup(false);
                 }}
-                className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] text-[#2E3748] font-black text-xs sm:text-sm py-2.5 px-4 rounded-xl shadow-[0_3px_0_#D9D4C3,0_5px_10px_rgba(0,0,0,0.15)] transition-all flex items-center justify-center uppercase tracking-widest cursor-pointer border border-[#EBE6D5] mb-0"
+                className={`w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] text-[#2E3748] font-black text-xs py-2.5 px-3 rounded-xl shadow-[0_3px_0_#D9D4C3,0_5px_10px_rgba(0,0,0,0.15)] transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5] ${!onStartMatchmaking ? 'sm:col-span-2' : ''}`}
                 id="start-solo-btn"
               >
-                <Puzzle size={14} className="text-emerald-600 mr-2 stroke-[2.5] fill-emerald-600/15" />
-                <span>Solo Oyununu Başlat</span>
+                <Puzzle size={14} className="text-emerald-600 mr-1.5 stroke-[2.5] fill-emerald-600/15" />
+                <span>Solo Oyunu Başlat</span>
               </button>
-            )}
-
-            {selectedTab === 'pvp' && (
-              <button
-                onClick={() => {
-                  onStartMatchmaking(selectedMatchWords);
-                  if (isOnline && !isMatchmakingLocked) {
-                    setShowGameSetup(false);
-                  }
-                }}
-                disabled={(matchmakingStatus as string) === 'queued' || !isOnline || isMatchmakingLocked}
-                className={`w-full font-black text-xs sm:text-sm py-2.5 px-4 rounded-xl active:scale-[0.98] transition-all flex items-center justify-center uppercase tracking-widest cursor-pointer border-2 mb-0 ${
-                  !isOnline
-                    ? 'bg-black/20 text-gray-500 border-white/5 cursor-not-allowed opacity-60'
-                    : isMatchmakingLocked
-                    ? 'bg-slate-700/50 text-slate-400 border-slate-600/30 cursor-not-allowed opacity-70'
-                    : (matchmakingStatus as string) === 'queued'
-                    ? 'bg-amber-500 text-slate-950 border-amber-400 animate-pulse'
-                    : 'bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border-[#EBE6D5] shadow-[0_3px_0_#D9D4C3,0_5px_10px_rgba(0,0,0,0.15)]'
-                }`}
-                id="start-pvp-btn"
-              >
-                <Swords size={14} className={`mr-2 stroke-[2.5] ${(matchmakingStatus as string) === 'queued' ? 'animate-bounce' : 'text-[#2E3748]'}`} />
-                <span>
-                  {isMatchmakingLocked
-                    ? 'Eşleşme Kilitli (Bekleyin...)'
-                    : (matchmakingStatus as string) === 'queued'
-                    ? 'Aranıyor...'
-                    : 'Canlı Düelloyu Başlat'}
-                </span>
-              </button>
-            )}
+            </div>
 
           </div>
         </div>
@@ -1156,76 +1014,32 @@ export default function WelcomeScreen({
         </div>
       </div>
 
-      {/* Direct Challenge Notification */}
-      {activeChallenges.length > 0 && (
-        <div className="bg-amber-500/10 border border-dashed border-amber-500/30 p-2 rounded-xl space-y-1 animate-pulse text-left relative overflow-hidden z-10">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-amber-400 font-mono flex items-center gap-1">
-              <Zap size={10} className="text-amber-500 fill-current animate-bounce" />
-              DÜELLO DAVETİ VAR!
-            </span>
-          </div>
-          <div className="flex items-center justify-between bg-slate-800/80 p-2 rounded-lg border border-amber-500/20">
-            <div className="text-left max-w-[150px] truncate">
-              <span className="font-black text-xs text-[#FAF6E9] block leading-tight">{activeChallenges[0].challenger.name}</span>
-              <span className="text-[8.5px] text-gray-400 block mt-0.5">{activeChallenges[0].wordLength} Harfli</span>
-            </div>
-            <div className="flex gap-1">
-              <button
-                onClick={() => onDeclineChallenge?.(activeChallenges[0].id)}
-                className="px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-gray-300 text-[8.5px] font-bold rounded transition"
-              >
-                Red
-              </button>
-              <button
-                onClick={() => onAcceptChallenge?.(activeChallenges[0].id)}
-                className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-[8.5px] font-black rounded transition shadow-sm"
-              >
-                Kabul
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* CARD 1: Main Play Action Button - 3D retro styled gold button */}
+      {/* CARD 1: Main Play Action Button - Triggers game setup modal */}
       <div className="w-full flex flex-col gap-1.5 relative z-10" id="main-play-section">
         <button
           onClick={() => {
             setShowGameSetup(true);
-            setSelectedTab('solo');
           }}
-          className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] active:translate-y-0.5 text-slate-900 py-3.5 px-6 rounded-2xl shadow-[0_4px_0_#D97706,0_8px_20px_rgba(245,158,11,0.35)] transition-all flex items-center justify-center uppercase tracking-widest cursor-pointer relative overflow-hidden border border-amber-200/40"
+          className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] text-slate-900 py-3.5 px-4 sm:px-5 rounded-2xl shadow-[0_4px_0_#D97706,0_8px_20px_rgba(245,158,11,0.35)] transition-all flex items-center justify-between uppercase tracking-wider cursor-pointer relative overflow-hidden border border-amber-200/40"
+          id="main-start-game-btn"
         >
-          <span className="font-extrabold tracking-[0.05em] text-slate-900 text-xs sm:text-sm pr-2">OYUNA BAŞLA</span>
-          <div className="w-6 h-6 rounded-full bg-slate-900/10 flex items-center justify-center shrink-0">
-            <Swords size={12} className="text-slate-900 stroke-[3]" />
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-950/15 flex items-center justify-center shrink-0 border border-slate-900/10">
+              <Swords size={22} className="text-slate-950 stroke-[2.5]" />
+            </div>
+            <div className="text-left leading-tight">
+              <div className="flex items-center gap-1.5">
+                <span className="font-black text-slate-950 text-sm sm:text-base tracking-wide">OYUNA BAŞLA</span>
+                <span className="text-[8px] font-black bg-slate-950 text-amber-300 px-1.5 py-0.5 rounded-full uppercase tracking-widest font-mono">1v1 & SOLO ⚡</span>
+              </div>
+              <span className="block text-[9.5px] font-bold text-slate-900/80 font-sans normal-case mt-0.5">Canlı 1v1 Düello veya Solo Pratik Seçin</span>
+            </div>
+          </div>
+          <div className="px-3 py-1.5 bg-slate-950 text-amber-300 text-[10px] font-black rounded-xl uppercase tracking-widest shadow-sm flex items-center gap-1">
+            <span>Başla</span>
+            <Play size={10} className="fill-current" />
           </div>
         </button>
-
-        {/* Matchmaking Queue Status */}
-        {((matchmakingStatus as string) === 'queued') && (
-          <div className="bg-amber-500/10 border border-amber-500/30 p-2 rounded-lg flex items-center justify-between animate-fade-in mt-1">
-            <div className="text-left">
-              <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1.5 font-mono uppercase tracking-wide">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                </span>
-                Eşleşme Aranıyor...
-              </span>
-              <span className="text-[9px] text-gray-400 block mt-0.5">
-                {wordLength} Harf
-              </span>
-            </div>
-            <button
-              onClick={() => onStartMatchmaking(selectedMatchWords)}
-              className="px-2 py-0.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[8.5px] uppercase tracking-wider rounded transition shadow animate-pulse"
-            >
-              Çık
-            </button>
-          </div>
-        )}
       </div>
 
       {/* CARD 3: Günün Bulmacası (Daily Puzzle) Card */}
@@ -1312,9 +1126,6 @@ export default function WelcomeScreen({
         >
           <Users size={20} className="text-[#2E3748] stroke-[2.5]" />
           <span className="text-[9px] font-black uppercase tracking-wider">ARKADAŞ</span>
-          {confirmedFriends.some(f => lobbyPlayers.some(lp => lp.id === f.id)) && (
-            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse border-2 border-[#FAF6E9]" />
-          )}
         </button>
 
         {/* Button 3: AYARLAR */}
@@ -1512,7 +1323,7 @@ export default function WelcomeScreen({
                   Arkadaşlık Merkezi
                 </h3>
                 <p className="text-[10px] text-amber-100/50 font-mono font-bold uppercase mt-0.5">
-                  LOBİDEKİ OYUNCULAR ({lobbyPlayers.length})
+                  ARKADAŞ LİSTESİ
                 </p>
               </div>
               <button
@@ -1546,40 +1357,6 @@ export default function WelcomeScreen({
                 Oyuncu Bul
               </button>
             </div>
-
-            {/* Active Invitations/Challenges Received inside Friends list */}
-            {activeChallenges.length > 0 && (
-              <div className="space-y-1.5 bg-amber-500/10 p-3 rounded-xl border border-dashed border-amber-500/30 animate-pulse text-left">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                  <Zap size={10} className="fill-amber-500/20 animate-pulse" />
-                  Meydan Okuma Daveti Var!
-                </span>
-                <div className="space-y-1">
-                  {activeChallenges.map((chal) => (
-                    <div key={chal.id} className="bg-slate-850/80 border border-amber-500/25 p-2.5 rounded-lg flex items-center justify-between gap-1.5 shadow-sm">
-                      <div className="text-left">
-                        <span className="font-bold text-[11px] text-[#FAF6E9] block leading-tight">{chal.challenger.name}</span>
-                        <span className="text-[9px] text-gray-450 block">{chal.wordLength} Harfli Maç</span>
-                      </div>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => onDeclineChallenge?.(chal.id)}
-                          className="px-2.5 py-1 bg-[#3D4756] hover:bg-[#3D4756]/80 text-gray-300 text-[10px] font-bold rounded-lg transition cursor-pointer"
-                        >
-                          Reddet
-                        </button>
-                        <button
-                          onClick={() => onAcceptChallenge?.(chal.id)}
-                          className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-black rounded-lg transition shadow-sm cursor-pointer"
-                        >
-                          Kabul Et
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Search input for adding friends tab */}
             {friendsTab === 'find' && (
@@ -1704,26 +1481,6 @@ export default function WelcomeScreen({
                             </div>
 
                             <div className="flex items-center gap-1.5">
-                              {friend.isOnline && (
-                                <button
-                                  disabled={friend.status !== 'idle'}
-                                  onClick={() => {
-                                    const originalPlayer = lobbyPlayers.find(p => p.id === friend.id);
-                                    if (originalPlayer) {
-                                      onChallenge?.(originalPlayer, wordLength);
-                                      setShowFriendsModal(false);
-                                    }
-                                  }}
-                                  className={`text-[9.5px] px-2.5 py-1 rounded-lg font-black uppercase transition duration-150 flex items-center gap-1 cursor-pointer ${
-                                    friend.status === 'idle'
-                                      ? 'bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] shadow-sm'
-                                      : 'bg-[#3D4756]/20 text-gray-500 cursor-not-allowed'
-                                  }`}
-                                >
-                                  <Swords size={10} />
-                                  <span>Meydan Oku</span>
-                                </button>
-                              )}
                               <button
                                 onClick={() => removeFriend(friend.id)}
                                 className="p-1.5 rounded-lg text-rose-400/80 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"

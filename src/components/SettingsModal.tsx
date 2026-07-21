@@ -22,7 +22,7 @@ import {
   Sparkles,
   Wifi
 } from 'lucide-react';
-import { UserProfile, LobbyPlayer, NetworkLogEntry } from '../types.js';
+import { UserProfile, NetworkLogEntry } from '../types.js';
 import { validateUsername, validatePassword } from '../utils/usernameValidation.js';
 import PrivacyPolicyModal from './PrivacyPolicyModal.js';
 import { 
@@ -56,7 +56,6 @@ interface SettingsModalProps {
   onToggleDarkMode?: () => void;
   onOpenStats?: () => void;
   profile: UserProfile;
-  lobbyPlayers?: LobbyPlayer[];
   onUpdateProfile: (name: string, avatarUrl?: string) => void;
   networkLogs?: NetworkLogEntry[];
   onReconnect?: () => void;
@@ -72,7 +71,6 @@ export default function SettingsModal({
   onToggleDarkMode,
   onOpenStats,
   profile,
-  lobbyPlayers = [],
   onUpdateProfile,
   networkLogs = [],
   onReconnect
@@ -259,7 +257,7 @@ export default function SettingsModal({
     }
   };
 
-  const error = (isTouched || editName !== profile.name ? validateUsername(editName, lobbyPlayers, profile.id) : null) || dbUsernameError;
+  const error = (isTouched || editName !== profile.name ? validateUsername(editName, [], profile.id) : null) || dbUsernameError;
 
   const AVATAR_PRESETS = [
     '⚔️', '🧠', '🐺', '🦁', '🧙‍♂️', '🦊', 
@@ -270,7 +268,7 @@ export default function SettingsModal({
   const handleSaveProfile = async (): Promise<boolean> => {
     setIsTouched(true);
     setDbUsernameError(null);
-    const validationError = validateUsername(editName, lobbyPlayers, profile.id);
+    const validationError = validateUsername(editName, [], profile.id);
     if (validationError) return false;
 
     if (editName.trim() && editName.trim() !== profile.name) {

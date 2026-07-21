@@ -46,48 +46,8 @@ export interface GameAttempt {
   feedback: ('green' | 'orange' | 'grey')[];
 }
 
-export interface Challenge {
-  id: string;
-  challenger: { id: string; name: string };
-  challenged: { id: string; name: string };
-  wordLength: number;
-  status: 'pending' | 'accepted' | 'declined' | 'completed';
-  gameId?: string;
-}
-
-export interface LobbyPlayer {
-  id: string;
-  name: string;
-  avatarUrl?: string;
-  status: 'idle' | 'challenging' | 'playing';
-}
-
-export interface RealtimeMatch {
-  id: string;
-  wordLength: number;
-  targetWord: string;
-  matchWordsCount?: number;
-  currentRound?: number;
-  roundsWon?: { [id: string]: number };
-  players: {
-    [id: string]: {
-      name: string;
-      avatarUrl?: string;
-      attempts: GameAttempt[];
-      currentAttempt: number;
-      completed: boolean;
-      timeRemaining: number; // For the current turn
-      score: number;
-      won: boolean;
-    };
-  };
-  status: 'playing' | 'ended';
-  winnerId?: string | 'draw';
-}
-
 export interface NetworkLogEntry {
   timestamp: string;
   type: 'info' | 'error' | 'success' | 'sent' | 'received';
   message: string;
 }
-

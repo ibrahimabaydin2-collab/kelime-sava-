@@ -23,10 +23,10 @@ export default defineConfig(() => {
           secure: false,
         },
         '/ws': {
-          target: 'ws://localhost:3000',
+          target: 'https://kelime-sava.onrender.com',
           ws: true,
           changeOrigin: true,
-          secure: false,
+          secure: true,
         },
       },
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { Sparkles, Swords, User } from 'lucide-react';
-import { UserProfile, LobbyPlayer } from '../types.js';
+import { UserProfile } from '../types.js';
 import { validateUsername } from '../utils/usernameValidation.js';
 import { checkUsernameExists } from '../lib/firebase.js';
 
 interface FirstTimeSetupProps {
   profile: UserProfile;
-  lobbyPlayers?: LobbyPlayer[];
   onComplete: (name: string, avatarUrl: string) => void;
 }
 
@@ -16,14 +15,14 @@ const AVATAR_PRESETS = [
   '🔥', '🐉', '🐼', '🛡️', '🏆', '🦉'
 ];
 
-export default function FirstTimeSetup({ profile, lobbyPlayers = [], onComplete }: FirstTimeSetupProps) {
+export default function FirstTimeSetup({ profile, onComplete }: FirstTimeSetupProps) {
   const [username, setUsername] = useState<string>('');
   const [selectedAvatar, setSelectedAvatar] = useState<string>('🧠');
   const [isTouched, setIsTouched] = useState<boolean>(false);
   const [dbError, setDbError] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState<boolean>(false);
 
-  const error = (isTouched || username ? validateUsername(username, lobbyPlayers, profile.id) : null) || dbError;
+  const error = (isTouched || username ? validateUsername(username, [], profile.id) : null) || dbError;
 
   const handleCustomAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -69,7 +68,7 @@ export default function FirstTimeSetup({ profile, lobbyPlayers = [], onComplete 
     e.preventDefault();
     setIsTouched(true);
     setDbError(null);
-    const validationError = validateUsername(username, lobbyPlayers, profile.id);
+    const validationError = validateUsername(username, [], profile.id);
     if (validationError) return;
 
     setIsChecking(true);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, Swords, User, Mail, Lock, ShieldAlert, LogIn, AlertCircle, Smartphone, ArrowLeft } from 'lucide-react';
-import { UserProfile, LobbyPlayer } from '../types.js';
+import { UserProfile } from '../types.js';
 import { validateUsername, validatePassword } from '../utils/usernameValidation.js';
 import PrivacyPolicyModal from './PrivacyPolicyModal.js';
 import { 
@@ -19,7 +19,6 @@ import {
 
 interface AuthScreenProps {
   onAuthComplete: (profile: UserProfile, firebaseUser: any) => void;
-  lobbyPlayers?: LobbyPlayer[];
 }
 
 const AVATAR_PRESETS = [
@@ -30,7 +29,7 @@ const AVATAR_PRESETS = [
 
 type AuthMode = 'guest' | 'login' | 'register' | 'phone';
 
-export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthScreenProps) {
+export default function AuthScreen({ onAuthComplete }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>('guest');
   const [isPrivacyOpen, setIsPrivacyOpen] = useState<boolean>(false);
   
@@ -62,7 +61,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
 
   // Validations
   const usernameError = isTouched && (mode === 'guest' || mode === 'register') 
-    ? validateUsername(username, lobbyPlayers) 
+    ? validateUsername(username, []) 
     : null;
     
   const passwordError = isTouched && (mode === 'register') 
@@ -322,7 +321,7 @@ export default function AuthScreen({ onAuthComplete, lobbyPlayers = [] }: AuthSc
 
     // Validate based on mode
     if (mode === 'guest' || mode === 'register') {
-      const uErr = validateUsername(username, lobbyPlayers);
+      const uErr = validateUsername(username, []);
       if (uErr) return;
     }
     if (mode === 'register') {

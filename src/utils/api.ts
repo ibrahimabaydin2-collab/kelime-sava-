@@ -282,8 +282,9 @@ export function getWsUrl(): string {
       const noProtocol = base.replace(/^https?:\/\//, '');
       wsUrl = `wss://${noProtocol}/ws`;
     } else if (isCloudRun) {
-      // Remote servers (e.g. Cloud Run) ALWAYS require secure WebSockets (wss://)
-      wsUrl = `wss://${host || hostname}/ws`;
+      // Point directly to live Render server WebSocket endpoint to prevent local proxy ECONNRESET
+      const noProtocol = DEPLOYED_APP_URL.replace(/^https?:\/\//, '');
+      wsUrl = `wss://${noProtocol}/ws`;
     }
     
     if (!wsUrl && !isHybrid) {
