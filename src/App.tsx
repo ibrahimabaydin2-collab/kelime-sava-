@@ -1026,6 +1026,15 @@ export default function App() {
   const [activeChallenges, setActiveChallenges] = useState<Challenge[]>([]);
   const [activeMatch, setActiveMatch] = useState<RealtimeMatch | null>(null);
   const [seriesScore, setSeriesScore] = useState<{ player: number; opponent: number }>({ player: 0, opponent: 0 });
+  const [roundsHistory, setRoundsHistory] = useState<Array<{
+    round: number;
+    word: string;
+    winnerName: string;
+    playerAttempts: number;
+    opponentAttempts: number;
+    playerWon: boolean;
+    opponentWon: boolean;
+  }>>([]);
 
   // Synchronize seriesScore state with activeMatch roundsWon
   useEffect(() => {
@@ -1638,6 +1647,7 @@ export default function App() {
               showToast(`Maç Başladı! Rakip: ${opponentName}`, 'success');
               
               // Transition to match state
+              setRoundsHistory([]);
               setWordLength(len);
               setTargetWord(sharedWord);
               setAttempts([]);
@@ -1703,6 +1713,52 @@ export default function App() {
               const { matchId, targetWord: sharedWord, currentRound: round, matchWordsCount: total, roundsWon: rw } = data;
               showToast(`Tur ${round}/${total} Başladı! Yeni kelimeyi bul!`, 'success');
               
+              // Save previous round results before updating activeMatch
+              if (activeMatch) {
+                const prevRound = activeMatch.currentRound || 1;
+                const word = activeMatch.targetWord;
+                const pId = profile.id;
+                const oId = Object.keys(activeMatch.players).find(id => id !== pId) || '';
+                const pData = activeMatch.players[pId];
+                const oData = activeMatch.players[oId];
+
+                const pWon = pData ? pData.won : false;
+                const oWon = oData ? oData.won : false;
+                const pAttempts = pData ? pData.attempts.length : 0;
+                const oAttempts = oData ? oData.attempts.length : 0;
+
+                let rWinner = 'Beraberlik';
+                if (pWon && !oWon) {
+                  rWinner = 'Sen';
+                } else if (oWon && !pWon) {
+                  rWinner = 'Rakip';
+                } else if (pWon && oWon) {
+                  if (pAttempts < oAttempts) {
+                    rWinner = 'Sen';
+                  } else if (oAttempts < pAttempts) {
+                    rWinner = 'Rakip';
+                  } else {
+                    rWinner = 'Beraberlik';
+                  }
+                }
+
+                setRoundsHistory((prev) => {
+                  if (prev.some(r => r.round === prevRound)) return prev;
+                  return [
+                    ...prev,
+                    {
+                      round: prevRound,
+                      word,
+                      winnerName: rWinner,
+                      playerAttempts: pAttempts,
+                      opponentAttempts: oAttempts,
+                      playerWon: pWon,
+                      opponentWon: oWon
+                    }
+                  ];
+                });
+              }
+
               setTargetWord(sharedWord);
               setAttempts([]);
               setCurrentAttempt('');
@@ -1843,6 +1899,56 @@ export default function App() {
             case 'match_end': {
               const { winnerId, players: finalPlayers, roundsWon: rw } = data;
               setIsMatchmakingLocked(false); // Unconditionally allow immediate re-entry
+
+              // Save the final round's results to scoreboard history before ending
+              if (activeMatch) {
+                const prevRound = activeMatch.currentRound || 1;
+                const word = activeMatch.targetWord;
+                const pId = profile.id;
+                const oId = Object.keys(activeMatch.players).find(id => id !== pId) || '';
+                
+                // Use finalPlayers from server payload if available, else fallback to activeMatch.players
+                const playersSource = finalPlayers || activeMatch.players;
+                const pData = playersSource[pId];
+                const oData = playersSource[oId];
+
+                const pWon = pData ? pData.won : false;
+                const oWon = oData ? oData.won : false;
+                const pAttempts = pData ? pData.attempts.length : 0;
+                const oAttempts = oData ? oData.attempts.length : 0;
+
+                let rWinner = 'Beraberlik';
+                if (pWon && !oWon) {
+                  rWinner = 'Sen';
+                } else if (oWon && !pWon) {
+                  rWinner = 'Rakip';
+                } else if (pWon && oWon) {
+                  if (pAttempts < oAttempts) {
+                    rWinner = 'Sen';
+                  } else if (oAttempts < pAttempts) {
+                    rWinner = 'Rakip';
+                  } else {
+                    rWinner = 'Beraberlik';
+                  }
+                }
+
+                setRoundsHistory((prev) => {
+                  if (prev.some(r => r.round === prevRound)) return prev;
+                  return [
+                    ...prev,
+                    {
+                      round: prevRound,
+                      word,
+                      winnerName: rWinner,
+                      playerAttempts: pAttempts,
+                      opponentAttempts: oAttempts,
+                      playerWon: pWon,
+                      opponentWon: oWon
+                    }
+                  ];
+                });
+              }
+
               setActiveMatch((prev) => {
                 if (!prev) return null;
                 return {
@@ -3735,25 +3841,72 @@ export default function App() {
           {isMatchEnded && (
             <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
               {!isAndroidApp ? (
-                <div className="space-y-4 max-w-sm w-full animate-scale-up">
-                  <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/20 mx-auto">
-                    <Trophy size={32} className="text-amber-400" />
+                <div className="space-y-4 max-w-md w-full animate-scale-up overflow-y-auto max-h-[95%] pr-1">
+                  <div className="w-14 h-14 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/20 mx-auto">
+                    <Trophy size={28} className="text-amber-400" />
                   </div>
-                  <h2 className="text-xl font-black text-white tracking-wide uppercase">DÜELLO TAMAMLANDI!</h2>
-                  <div className="bg-black/45 border border-white/10 p-4 rounded-2xl space-y-3">
-                    <p className="text-[10px] text-gray-400 font-black uppercase font-mono tracking-widest">SERİ SKORU</p>
-                    <div className="flex justify-center items-center gap-4 text-lg font-black text-white">
+                  <h2 className="text-lg font-black text-white tracking-wide uppercase">DÜELLO TAMAMLANDI!</h2>
+                  
+                  {/* Seri Skoru Card */}
+                  <div className="bg-black/45 border border-white/10 p-4 rounded-2xl space-y-2.5">
+                    <p className="text-[9px] text-gray-400 font-black uppercase font-mono tracking-widest">SERİ SKORU</p>
+                    <div className="flex justify-center items-center gap-4 text-base font-black text-white">
                       <span className="text-emerald-400">SEN: {seriesScore.player}</span>
-                      <span className="text-gray-500 font-mono">VS</span>
+                      <span className="text-gray-500 font-mono text-sm">VS</span>
                       <span className="text-amber-400">RAKİP: {seriesScore.opponent}</span>
                     </div>
-                    <div className="text-xs font-bold text-emerald-400 mt-2 font-mono uppercase bg-emerald-500/10 border border-emerald-500/20 py-1 rounded-lg">
+                    <div className="text-xs font-bold text-emerald-400 mt-1 font-mono uppercase bg-emerald-500/10 border border-emerald-500/20 py-1 rounded-lg">
                       {seriesScore.player > seriesScore.opponent ? '🏆 ZAFER! SERİYİ KAZANDINIZ' : seriesScore.player < seriesScore.opponent ? '💥 RAKİBİNİZ KAZANDI' : 'Berabere bitti!'}
                     </div>
                   </div>
+
+                  {/* Detailed Scoreboard */}
+                  {roundsHistory.length > 0 && (
+                    <div className="bg-black/60 border border-white/10 rounded-2xl p-4 text-left space-y-3">
+                      <p className="text-[9px] text-gray-400 font-black uppercase font-mono tracking-widest text-center">DETAYLI TUR ÖZETİ</p>
+                      <div className="divide-y divide-white/5 space-y-2.5">
+                        {roundsHistory.map((entry) => (
+                          <div key={entry.round} className="pt-2.5 first:pt-0 flex items-center justify-between text-xs">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-mono text-[9px] font-black bg-white/10 text-white px-1 py-0.5 rounded-sm">
+                                  {entry.round}/3
+                                </span>
+                                <span className="font-bold text-white tracking-wider uppercase font-mono text-xs">
+                                  {entry.word}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-gray-400 flex items-center gap-1.5 flex-wrap">
+                                <span>Tahminler:</span>
+                                <span className={entry.playerWon ? 'text-emerald-400 font-medium' : 'text-gray-500'}>
+                                  Sen: {entry.playerWon ? `${entry.playerAttempts} hamle` : '❌'}
+                                </span>
+                                <span className="text-gray-600">|</span>
+                                <span className={entry.opponentWon ? 'text-amber-400 font-medium' : 'text-gray-500'}>
+                                  Rakip: {entry.opponentWon ? `${entry.opponentAttempts} hamle` : '❌'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 ml-2">
+                              <span className={`inline-block text-[9px] font-black uppercase font-mono px-2 py-0.5 rounded-md ${
+                                entry.winnerName === 'Sen' 
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                  : entry.winnerName === 'Rakip'
+                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                  : 'bg-white/5 text-gray-400 border border-white/5'
+                              }`}>
+                                {entry.winnerName === 'Sen' ? 'KAZANDIN' : entry.winnerName === 'Rakip' ? 'KAYBETTİN' : 'BERABERE'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     onClick={handleLeaveMatchToMenu}
-                    className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border border-[#EBE6D5] font-black py-3 px-5 rounded-xl text-xs uppercase tracking-wider active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+                    className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border border-[#EBE6D5] font-black py-2.5 px-5 rounded-xl text-xs uppercase tracking-wider active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
                   >
                     <span>Lobiye Dön</span>
                   </button>
