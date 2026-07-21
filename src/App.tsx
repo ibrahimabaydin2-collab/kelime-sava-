@@ -2187,16 +2187,9 @@ export default function App() {
           }
           if (activeMatch) {
             setGameStatus('idle'); // Freeze input and state while waiting for opponent or round sync
-            if (activeMatch.matchWordsCount === 3) {
-              showToast(`Süre bitti! Diğer oyuncunun tamamlaması bekleniyor...`, 'info');
-              playDefeatSound(settings.soundEnabled);
-              syncMatchState(attempts, attempts.length, true, false, 0);
-              return 0;
-            } else {
-              showToast(`Süre bitti! Rakibin tamamlaması bekleniyor...`, 'error');
-              syncMatchState(attempts, attempts.length, true, false, 0);
-              return 0;
-            }
+            showToast(`Süre bitti! Rakibin tamamlaması bekleniyor...`, 'error');
+            syncMatchState(attempts, attempts.length, true, false, 0);
+            return 0;
           } else {
             handleGameLoss('Süre Sınırı Aşıldı');
             return 0;
@@ -2936,8 +2929,7 @@ export default function App() {
 
   // Handle Character keys typed on physical or virtual keyboard
   const onChar = (char: string) => {
-    const isAnyPlayerSolved = activeMatch ? Object.values(activeMatch.players).some((p: any) => p.won) : false;
-    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended' || isAnyPlayerSolved;
+    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended';
     if (gameStatus !== 'playing' || isValidating || localCompleted) return;
     const normalized = turkishUpper(char);
     if (currentAttempt.length < wordLength && /^[A-ZÇĞİÖŞÜ]$/i.test(normalized)) {
@@ -2948,8 +2940,7 @@ export default function App() {
 
   // Handle Backspace
   const onDelete = () => {
-    const isAnyPlayerSolved = activeMatch ? Object.values(activeMatch.players).some((p: any) => p.won) : false;
-    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended' || isAnyPlayerSolved;
+    const localCompleted = activeMatch?.players[profile.id]?.completed || activeMatch?.status === 'ended';
     if (gameStatus !== 'playing' || isValidating || localCompleted) return;
     if (currentAttempt.length > 0) {
       playDeleteSound(settings.soundEnabled);
@@ -3661,7 +3652,7 @@ export default function App() {
                   <h4 className="font-bold text-xs text-gray-800 dark:text-white">Kelime Savaşı Sürüyor!</h4>
                   {activeMatch.matchWordsCount && (
                     <span className="text-[9px] font-black font-mono bg-emerald-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-                      {activeMatch.matchWordsCount === 3 ? `⚡ Tur ${activeMatch.currentRound || 1}/3` : `Tur ${activeMatch.currentRound}/${activeMatch.matchWordsCount}`}
+                      Canlı Düello ⚡
                     </span>
                   )}
                 </div>
@@ -3779,39 +3770,16 @@ export default function App() {
             <div className="flex-1 min-h-[0.25rem] sm:min-h-[0.5rem]" />
           )}
 
-          {/* Letter Grid or Waiting Card */}
+          {/* Letter Grid */}
           {!isMatchEnded && (
-            activeMatch && activeMatch.matchWordsCount === 3 && gameStatus === 'idle' ? (
-              <div className="w-full max-w-sm sm:max-w-md mx-auto bg-slate-900/80 border border-emerald-500/30 rounded-3xl p-6 text-center shadow-xl animate-scale-up my-4 flex flex-col items-center gap-4" id="match-waiting-card">
-                <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20 animate-pulse">
-                  <Hourglass size={28} className="text-emerald-400 animate-spin" style={{ animationDuration: '3s' }} />
-                </div>
-                <h3 className="text-base font-black text-emerald-400 uppercase tracking-widest font-mono">Tebrikler!</h3>
-                <p className="text-xs text-gray-300 leading-relaxed max-w-xs">
-                  Tüm kelimeleri tamamladınız! Rakibinizin de 3. kelimeyi bitirmesi bekleniyor... ⏳
-                </p>
-                <div className="w-full bg-black/30 rounded-xl p-3 border border-white/5 space-y-1">
-                  <span className="text-[10px] font-black font-mono text-gray-400 uppercase tracking-wider block">Mevcut Durum</span>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-300">Senin İlerlemen:</span>
-                    <span className="text-emerald-400 font-bold font-mono">3 / 3 Tamamlandı</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-300">Rakibin İlerlemesi:</span>
-                    <span className="text-amber-400 font-bold font-mono">{(opponent?.currentWordIndex || 0) + 1} / 3 Kelimede</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <GameBoard
-                attempts={attempts}
-                currentAttempt={currentAttempt}
-                wordLength={wordLength}
-                boardTheme={settings.boardTheme}
-                isGameOver={gameStatus !== 'playing'}
-                revealedHints={revealedHints}
-              />
-            )
+            <GameBoard
+              attempts={attempts}
+              currentAttempt={currentAttempt}
+              wordLength={wordLength}
+              boardTheme={settings.boardTheme}
+              isGameOver={gameStatus !== 'playing'}
+              revealedHints={revealedHints}
+            />
           )}
 
           {/* 💡 ACTIVE WORD SUGGESTION DRAWER */}
@@ -4126,19 +4094,10 @@ export default function App() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 font-mono font-bold">
-                        {activeMatch.matchWordsCount === 3 ? (
-                          <>
-                            <span className="text-gray-400">Toplam Skor:</span>
-                            <span className="text-amber-400">{playerState.score || 0} Puan</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-gray-400">Deneme:</span>
-                            <span className={playerState.won ? 'text-emerald-400' : 'text-rose-400'}>
-                              {playerState.won ? `${playerState.attempts.length} / 6` : 'BİLEMEDİ'}
-                            </span>
-                          </>
-                        )}
+                        <span className="text-gray-400">Deneme:</span>
+                        <span className={playerState.won ? 'text-emerald-400' : 'text-rose-400'}>
+                          {playerState.won ? `${playerState.attempts.length} / 6` : 'BİLEMEDİ'}
+                        </span>
                       </div>
                     </div>
                   );
