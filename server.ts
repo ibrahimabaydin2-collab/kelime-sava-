@@ -1139,27 +1139,29 @@ const setupWebSocket = (server: any) => {
                   (player as any).kelime_bulundu_zamani = kelime_bulundu_zamani || Date.now();
                 }
 
-                // Sync update with opponent
-                const opponentId = Object.keys(match.players).find(id => id !== playerId);
-                if (opponentId) {
-                  const opponent = clients.get(opponentId);
-                  if (opponent && opponent.ws.readyState === WebSocket.OPEN) {
-                    opponent.ws.send(JSON.stringify({
-                      type: 'match_update',
-                      matchId,
-                      playerUpdate: {
-                        id: playerId,
-                        attempts,
-                        currentAttempt,
-                        completed,
-                        won,
-                        score,
-                        timeRemaining,
-                        currentWordIndex,
-                        kelime_bulundu_zamani: won ? (kelime_bulundu_zamani || Date.now()) : null
-                      },
-                      roundsWon: match.roundsWon || { [playerId]: 0, [opponentId]: 0 }
-                    }));
+                // Sync update with opponent if they haven't won yet
+                if (!won) {
+                  const opponentId = Object.keys(match.players).find(id => id !== playerId);
+                  if (opponentId) {
+                    const opponent = clients.get(opponentId);
+                    if (opponent && opponent.ws.readyState === WebSocket.OPEN) {
+                      opponent.ws.send(JSON.stringify({
+                        type: 'match_update',
+                        matchId,
+                        playerUpdate: {
+                          id: playerId,
+                          attempts,
+                          currentAttempt,
+                          completed,
+                          won,
+                          score,
+                          timeRemaining,
+                          currentWordIndex,
+                          kelime_bulundu_zamani: null
+                        },
+                        roundsWon: match.roundsWon || { [playerId]: 0, [opponentId]: 0 }
+                      }));
+                    }
                   }
                 }
 
