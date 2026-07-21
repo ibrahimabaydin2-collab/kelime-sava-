@@ -2179,6 +2179,91 @@ export default function App() {
       matchUnsubscribeRef.current();
       matchUnsubscribeRef.current = null;
     }
+
+    // Direct synchronous native redirection code to prevent duplicate/delayed loops
+    const matchObj = activeMatchRef.current;
+    if (matchObj && !hasRedirectedRef.current) {
+      hasRedirectedRef.current = true;
+
+      const playersList = Object.entries(matchObj.players);
+      let finalWinnerId = winnerId;
+      let winnerName = 'Bilinmeyen Oyuncu';
+      let winnerScore = 0;
+      let loserId = '';
+      let loserName = 'Bilinmeyen Oyuncu';
+      let loserScore = 0;
+
+      const winnerEntry = playersList.find(([pId, _]) => pId === finalWinnerId) || playersList.find(([_, pState]: [string, any]) => pState.won);
+      const bothCompleted = playersList.length === 2 && playersList.every(([_, pState]: [string, any]) => pState.completed);
+      const neitherWon = playersList.every(([_, pState]: [string, any]) => !pState.won);
+
+      if (matchObj.winnerId === 'draw' || finalWinnerId === 'draw' || (bothCompleted && neitherWon)) {
+        finalWinnerId = 'draw';
+        winnerName = 'Berabere';
+        winnerScore = 0;
+        loserId = 'draw';
+        loserName = 'Berabere';
+        loserScore = 0;
+      } else if (winnerEntry) {
+        finalWinnerId = winnerEntry[0];
+        winnerName = (winnerEntry[1] as any).name || 'Oyuncu';
+        winnerScore = (winnerEntry[1] as any).score || 0;
+
+        const loserEntry = playersList.find(([pId, _]: [string, any]) => pId !== finalWinnerId);
+        if (loserEntry) {
+          loserId = loserEntry[0];
+          loserName = (loserEntry[1] as any).name || 'Oyuncu';
+          loserScore = (loserEntry[1] as any).score || 0;
+        }
+      } else if (matchObj.winnerId && matchObj.winnerId !== 'draw') {
+        finalWinnerId = matchObj.winnerId;
+        const winnerPlayer = matchObj.players[finalWinnerId];
+        if (winnerPlayer) {
+          winnerName = (winnerPlayer as any).name || 'Oyuncu';
+          winnerScore = (winnerPlayer as any).score || 0;
+        }
+
+        const loserEntry = playersList.find(([pId, _]: [string, any]) => pId !== finalWinnerId);
+        if (loserEntry) {
+          loserId = loserEntry[0];
+          loserName = (loserEntry[1] as any).name || 'Oyuncu';
+          loserScore = (loserEntry[1] as any).score || 0;
+        }
+      } else {
+        const sorted = [...playersList].sort((a: any, b: any) => (b[1].score || 0) - (a[1].score || 0));
+        if (sorted[0]) {
+          finalWinnerId = sorted[0][0];
+          winnerName = (sorted[0][1] as any).name || 'Oyuncu';
+          winnerScore = (sorted[0][1] as any).score || 0;
+        }
+        if (sorted[1]) {
+          loserId = sorted[1][0];
+          loserName = (sorted[1][1] as any).name || 'Oyuncu';
+          loserScore = (sorted[1][1] as any).score || 0;
+        }
+      }
+
+      if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+        try {
+          (window as any).AndroidBridge.loadAdBackground();
+          if ((window as any).AndroidBridge.redirectToResultActivity) {
+            console.log("Directing players to native ResultActivity synchronously from handleInstantMatchEnd...");
+            (window as any).AndroidBridge.redirectToResultActivity(
+              finalWinnerId,
+              winnerName,
+              winnerScore,
+              loserId,
+              loserName,
+              loserScore,
+              matchObj.targetWord || '',
+              finalWinnerId === profile.id // isWinner
+            );
+          }
+        } catch (e) {
+          console.error("Error calling native AndroidBridge:", e);
+        }
+      }
+    }
   }, [profile.id, targetWord, settings.soundEnabled]);
 
   const handleInstantMatchEndRef = useRef(handleInstantMatchEnd);
@@ -2225,6 +2310,7 @@ export default function App() {
 
   const handleLeaveMatchToMenu = useCallback(async () => {
     console.log('Centralized cleanup: returning to main menu');
+    hasRedirectedRef.current = false;
     if (matchUnsubscribeRef.current) {
       matchUnsubscribeRef.current();
       matchUnsubscribeRef.current = null;
@@ -3171,6 +3257,8 @@ export default function App() {
   const onDeleteRef = useRef(onDelete);
   const submitGuessRef = useRef(submitGuess);
   const isMatchEndedRef = useRef(false);
+  const activeMatchRef = useRef(activeMatch);
+  const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
     currentAttemptRef.current = currentAttempt;
@@ -3185,6 +3273,7 @@ export default function App() {
     onDeleteRef.current = onDelete;
     submitGuessRef.current = submitGuess;
     isMatchEndedRef.current = isMatchEnded;
+    activeMatchRef.current = activeMatch;
   });
 
   // Bind physical keyboard listeners exactly once on mount to prevent double keypresses and WebView input lag
@@ -3532,105 +3621,7 @@ export default function App() {
   const opponent = activeMatch ? Object.values(activeMatch.players).find(p => (p as any).name !== profile.name) as any : null;
   const isMatchEnded = !!(activeMatch && activeMatch.status === 'ended');
 
-  // Triggers when 1v1 match ends (isMatchEnded turns true) or when user exits a match, loading AdMob asynchronously in the background and freeing layout calculations
-  useEffect(() => {
-    if (isMatchEnded && activeMatch) {
-      console.log("1v1 Match ended. Executing layout freeze and scheduling background AdMob banner load.");
-      
-      // Force block game input states immediately
-      setGameStatus('idle');
 
-      // Stop all timer intervals
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      
-      // Force set isMatchEndedRef.current to true so keyboard listener ignores any events
-      isMatchEndedRef.current = true;
-
-      // Identify Winner & Loser
-      const playersList = Object.entries(activeMatch.players);
-      let winnerId = '';
-      let winnerName = 'Bilinmeyen Oyuncu';
-      let winnerScore = 0;
-      let loserId = '';
-      let loserName = 'Bilinmeyen Oyuncu';
-      let loserScore = 0;
-
-      const winnerEntry = playersList.find(([_, pState]: [string, any]) => pState.won);
-      const bothCompleted = playersList.length === 2 && playersList.every(([_, pState]: [string, any]) => pState.completed);
-      const neitherWon = playersList.every(([_, pState]: [string, any]) => !pState.won);
-
-      if (activeMatch.winnerId === 'draw' || (bothCompleted && neitherWon)) {
-        winnerId = 'draw';
-        winnerName = 'Berabere';
-        winnerScore = 0;
-        loserId = 'draw';
-        loserName = 'Berabere';
-        loserScore = 0;
-      } else if (winnerEntry) {
-        winnerId = winnerEntry[0];
-        winnerName = (winnerEntry[1] as any).name || 'Oyuncu';
-        winnerScore = (winnerEntry[1] as any).score || 0;
-
-        const loserEntry = playersList.find(([pId, _]: [string, any]) => pId !== winnerId);
-        if (loserEntry) {
-          loserId = loserEntry[0];
-          loserName = (loserEntry[1] as any).name || 'Oyuncu';
-          loserScore = (loserEntry[1] as any).score || 0;
-        }
-      } else if (activeMatch.winnerId && activeMatch.winnerId !== 'draw') {
-        winnerId = activeMatch.winnerId;
-        const winnerPlayer = activeMatch.players[winnerId];
-        if (winnerPlayer) {
-          winnerName = (winnerPlayer as any).name || 'Oyuncu';
-          winnerScore = (winnerPlayer as any).score || 0;
-        }
-
-        const loserEntry = playersList.find(([pId, _]: [string, any]) => pId !== winnerId);
-        if (loserEntry) {
-          loserId = loserEntry[0];
-          loserName = (loserEntry[1] as any).name || 'Oyuncu';
-          loserScore = (loserEntry[1] as any).score || 0;
-        }
-      } else {
-        // Fallback or Tie
-        const sorted = [...playersList].sort((a: any, b: any) => (b[1].score || 0) - (a[1].score || 0));
-        if (sorted[0]) {
-          winnerId = sorted[0][0];
-          winnerName = (sorted[0][1] as any).name || 'Oyuncu';
-          winnerScore = (sorted[0][1] as any).score || 0;
-        }
-        if (sorted[1]) {
-          loserId = sorted[1][0];
-          loserName = (sorted[1][1] as any).name || 'Oyuncu';
-          loserScore = (sorted[1][1] as any).score || 0;
-        }
-      }
-
-      if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
-        try {
-          (window as any).AndroidBridge.loadAdBackground();
-          if ((window as any).AndroidBridge.redirectToResultActivity) {
-            console.log("Directing both players to native ResultActivity...");
-            (window as any).AndroidBridge.redirectToResultActivity(
-              winnerId,
-              winnerName,
-              winnerScore,
-              loserId,
-              loserName,
-              loserScore,
-              activeMatch.targetWord || '',
-              winnerId === profile.id // isWinner
-            );
-          }
-        } catch (e) {
-          console.error("Error calling native AndroidBridge:", e);
-        }
-      }
-    }
-  }, [isMatchEnded, activeMatch]);
 
   const isAndroidApp = typeof window !== 'undefined' && !!(window as any).AndroidBridge;
 
