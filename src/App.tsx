@@ -23,7 +23,7 @@ import SettingsModal, { AppSettings } from './components/SettingsModal.js';
 import AuthScreen from './components/AuthScreen.js';
 import BadgeUnlockedModal from './components/BadgeUnlockedModal.js';
 import { auth, onAuthStateChanged, fetchUserProfile, saveUserProfileToFirestore, signOutUser, fetchUserProfileByDeviceId, deleteUserProfile, signInAsGuest, clearMatchmakingState, db } from './lib/firebase.js';
-import { doc, setDoc, updateDoc, onSnapshot, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, onSnapshot, runTransaction, getDoc } from 'firebase/firestore';
 import { UserProfile, GameAttempt, LobbyPlayer, Challenge, RealtimeMatch, DailyMission, Badge, NetworkLogEntry } from './types.js';
 import { Swords, RotateCcw, AlertCircle, HelpCircle, Trophy, UserCheck, Flame, Hourglass, HelpCircle as HelpIcon, Sparkles, Upload, Trash2, Image, X, ArrowLeft, Info, Play, Home } from 'lucide-react';
 import { getRandomWord, isWordInCuratedList, getDailyWordAndLength, COMMON_TURKISH_WORDS, CLEANED_TURKISH_WORDS } from './data/wordlist.js';
@@ -2621,6 +2621,25 @@ export default function App() {
         playErrorSound(settings.soundEnabled);
         setIsValidating(false);
         return;
+      }
+
+      // Check if match was already ended in Firestore during validation
+      if (activeMatch) {
+        const matchRef = doc(db, 'matches', activeMatch.id);
+        try {
+          const matchDoc = await getDoc(matchRef);
+          if (matchDoc.exists()) {
+            const matchData = matchDoc.data();
+            if (matchData.isGameOver || matchData.winner) {
+              console.log(`Pre-evaluation check: Match was already won by ${matchData.winner}. Halting guess.`);
+              setIsValidating(false);
+              handleInstantMatchEnd(matchData.winner);
+              return;
+            }
+          }
+        } catch (dbErr) {
+          console.warn('Defensive pre-evaluation Firestore check failed:', dbErr);
+        }
       }
 
       // Valid word! Submit and check results
