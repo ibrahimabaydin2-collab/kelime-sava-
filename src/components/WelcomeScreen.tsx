@@ -1144,9 +1144,11 @@ export default function WelcomeScreen({
                 <span className="block font-black text-[10px] leading-tight text-amber-900/80">
                   {isAdLoading ? "REKLAM HAZIRLANIYOR..." : isWatchingAd ? "REKLAM OYNATILIYOR..." : "REKLAM İZLE"}
                 </span>
-                <span className="block text-[8px] font-mono text-gray-500 leading-none mt-0.5">
-                  {isAdLoading ? "LÜTFEN BEKLEYİN" : "SINIRSIZ HAK"}
-                </span>
+                {isAdLoading && (
+                  <span className="block text-[8px] font-mono text-gray-500 leading-none mt-0.5">
+                    LÜTFEN BEKLEYİN
+                  </span>
+                )}
               </div>
             </div>
             <span className="font-mono text-xs font-black text-amber-600">+10🪙</span>
