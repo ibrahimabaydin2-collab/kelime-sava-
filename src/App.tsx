@@ -1025,6 +1025,22 @@ export default function App() {
   const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
   const [activeChallenges, setActiveChallenges] = useState<Challenge[]>([]);
   const [activeMatch, setActiveMatch] = useState<RealtimeMatch | null>(null);
+  const [seriesScore, setSeriesScore] = useState<{ player: number; opponent: number }>({ player: 0, opponent: 0 });
+
+  // Synchronize seriesScore state with activeMatch roundsWon
+  useEffect(() => {
+    if (activeMatch && activeMatch.roundsWon) {
+      const pId = profile.id;
+      const oId = Object.keys(activeMatch.players).find(id => id !== pId) || '';
+      setSeriesScore({
+        player: activeMatch.roundsWon[pId] || 0,
+        opponent: activeMatch.roundsWon[oId] || 0
+      });
+    } else {
+      setSeriesScore({ player: 0, opponent: 0 });
+    }
+  }, [activeMatch, profile?.id]);
+
   const [rematchRequested, setRematchRequested] = useState<boolean>(false);
   const [opponentRematchRequested, setOpponentRematchRequested] = useState<boolean>(false);
 
@@ -3656,16 +3672,23 @@ export default function App() {
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <h4 className="font-bold text-xs text-gray-800 dark:text-white">Kelime Savaşı Sürüyor!</h4>
                   {activeMatch.matchWordsCount && (
-                    <span className="text-[9px] font-black font-mono bg-emerald-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-                      {activeMatch.matchWordsCount === 3 ? `⚡ Tur ${activeMatch.currentRound || 1}/3` : `Tur ${activeMatch.currentRound}/${activeMatch.matchWordsCount}`}
-                    </span>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-[9px] font-black font-mono bg-emerald-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                        {activeMatch.matchWordsCount === 3 ? `⚡ Tur ${activeMatch.currentRound || 1}/3` : `Tur ${activeMatch.currentRound}/${activeMatch.matchWordsCount}`}
+                      </span>
+                      {activeMatch.matchWordsCount === 3 && seriesScore.player === 1 && seriesScore.opponent === 1 && (
+                        <span className="text-[9px] font-black font-mono bg-gradient-to-r from-red-500 to-amber-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse shadow-xs">
+                          🔥 FİNAL TURU
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
                 {activeMatch.roundsWon && (
                   <div className="flex gap-2.5 mt-0.5 text-[10px] font-bold font-mono">
-                    <span className="text-emerald-600 dark:text-emerald-400">SEN: {activeMatch.roundsWon[profile.id] || 0}</span>
+                    <span className="text-emerald-600 dark:text-emerald-400">SEN: {seriesScore.player}</span>
                     <span className="text-gray-400">|</span>
-                    <span className="text-amber-500">RAKİP: {activeMatch.roundsWon[opponent?.id || ''] || 0}</span>
+                    <span className="text-amber-500">RAKİP: {seriesScore.opponent}</span>
                   </div>
                 )}
               </div>
@@ -3711,9 +3734,37 @@ export default function App() {
 
           {isMatchEnded && (
             <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
-              <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <h2 className="text-xl font-black text-white tracking-wide mb-2 uppercase">DÜELLO TAMAMLANDI!</h2>
-              <p className="text-xs text-slate-400">Sonuç ekranına güvenli bir şekilde yönlendiriliyorsunuz...</p>
+              {!isAndroidApp ? (
+                <div className="space-y-4 max-w-sm w-full animate-scale-up">
+                  <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/20 mx-auto">
+                    <Trophy size={32} className="text-amber-400" />
+                  </div>
+                  <h2 className="text-xl font-black text-white tracking-wide uppercase">DÜELLO TAMAMLANDI!</h2>
+                  <div className="bg-black/45 border border-white/10 p-4 rounded-2xl space-y-3">
+                    <p className="text-[10px] text-gray-400 font-black uppercase font-mono tracking-widest">SERİ SKORU</p>
+                    <div className="flex justify-center items-center gap-4 text-lg font-black text-white">
+                      <span className="text-emerald-400">SEN: {seriesScore.player}</span>
+                      <span className="text-gray-500 font-mono">VS</span>
+                      <span className="text-amber-400">RAKİP: {seriesScore.opponent}</span>
+                    </div>
+                    <div className="text-xs font-bold text-emerald-400 mt-2 font-mono uppercase bg-emerald-500/10 border border-emerald-500/20 py-1 rounded-lg">
+                      {seriesScore.player > seriesScore.opponent ? '🏆 ZAFER! SERİYİ KAZANDINIZ' : seriesScore.player < seriesScore.opponent ? '💥 RAKİBİNİZ KAZANDI' : 'Berabere bitti!'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleLeaveMatchToMenu}
+                    className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] text-[#2E3748] border border-[#EBE6D5] font-black py-3 px-5 rounded-xl text-xs uppercase tracking-wider active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+                  >
+                    <span>Lobiye Dön</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4" />
+                  <h2 className="text-xl font-black text-white tracking-wide mb-2 uppercase">DÜELLO TAMAMLANDI!</h2>
+                  <p className="text-xs text-slate-400">Sonuç ekranına güvenli bir şekilde yönlendiriliyorsunuz...</p>
+                </>
+              )}
             </div>
           )}
 
