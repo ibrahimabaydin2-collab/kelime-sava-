@@ -1872,7 +1872,7 @@ export default function App() {
               }
 
               if (winnerId === profile.id) {
-                showToast('TEBRİKLER! Savaşı Kazandın!', 'success');
+                showToast('TEBRİKLER! Savaşı Kazandın! 🏆', 'success');
                 // Award Gladiator Badge
                 unlockBadge('gladiator');
                 updateDailyScore(200);
@@ -1881,8 +1881,10 @@ export default function App() {
                 showToast('Maç berabere bitti!', 'info');
                 updateDailyScore(50);
               } else {
-                showToast('Maçı rakibin kazandı. Daha hızlı olmalısın!', 'error');
+                showToast('KAYBETTİNİZ! Rakibiniz kelimeyi sizden önce doğru bildi. ⚔️', 'error');
                 playDefeatSound(settings.soundEnabled);
+                // Sever session and kick them out immediately to prevent background play
+                handleLeaveMatchToMenu();
               }
 
               // Clear matchmaking state in Firestore immediately
@@ -2163,8 +2165,10 @@ export default function App() {
       updateDailyScore(200);
       triggerVictoryCelebration(settings.soundEnabled);
     } else {
-      showToast('Maçı rakibin kazandı. Daha hızlı olmalısın! ⚔️', 'error');
+      showToast('KAYBETTİNİZ! Rakibiniz kelimeyi sizden önce doğru bildi. ⚔️', 'error');
       playDefeatSound(settings.soundEnabled);
+      // Sever session and kick them out immediately to prevent background play
+      handleLeaveMatchToMenuRef.current();
     }
 
     // Clean up matchmaking state in Firestore in the background
@@ -3259,6 +3263,7 @@ export default function App() {
   const isMatchEndedRef = useRef(false);
   const activeMatchRef = useRef(activeMatch);
   const hasRedirectedRef = useRef(false);
+  const handleLeaveMatchToMenuRef = useRef(handleLeaveMatchToMenu);
 
   useEffect(() => {
     currentAttemptRef.current = currentAttempt;
@@ -3274,6 +3279,7 @@ export default function App() {
     submitGuessRef.current = submitGuess;
     isMatchEndedRef.current = isMatchEnded;
     activeMatchRef.current = activeMatch;
+    handleLeaveMatchToMenuRef.current = handleLeaveMatchToMenu;
   });
 
   // Bind physical keyboard listeners exactly once on mount to prevent double keypresses and WebView input lag
