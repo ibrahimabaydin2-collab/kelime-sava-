@@ -1008,6 +1008,16 @@ export default function App() {
   const [avatarInput, setAvatarInput] = useState<string | undefined>(profile.avatarUrl);
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
+  // Sync nameInput and avatarInput when profile changes
+  useEffect(() => {
+    if (profile?.name) {
+      setNameInput(profile.name);
+    }
+    if (profile?.avatarUrl) {
+      setAvatarInput(profile.avatarUrl);
+    }
+  }, [profile?.name, profile?.avatarUrl]);
+
   // Real-time Multiplayer State
   const [networkLogs, setNetworkLogs] = useState<NetworkLogEntry[]>([]);
 
@@ -1169,9 +1179,11 @@ export default function App() {
                 let finalName = dbProfile.name || '';
                 let finalAvatar = dbProfile.avatarUrl || '🧠';
 
-                if (!finalName && savedUsername) {
+                const isGeneric = (n: string) => !n || n === 'Oyuncu' || n === 'Kelime Oyuncusu' || n.startsWith('Savaşçı_');
+
+                if (savedUsername && (isGeneric(finalName) || !finalName)) {
                   finalName = savedUsername;
-                } else if (!finalName && savedProfileStr) {
+                } else if ((isGeneric(finalName) || !finalName) && savedProfileStr) {
                   try {
                     const parsed = JSON.parse(savedProfileStr);
                     if (parsed && parsed.name) {
@@ -3308,16 +3320,24 @@ export default function App() {
               if (fUser && fUser.uid) {
                 justLoggedInUidRef.current = fUser.uid;
               }
-              // Ensure deviceId is stored on the registered/logged-in profile!
-              if (!updatedProfile.deviceId || updatedProfile.deviceId !== deviceId) {
-                updatedProfile.deviceId = deviceId;
-                saveUserProfileToFirestore(updatedProfile).catch((err) => {
-                  console.warn('Non-blocking profile save during onAuthComplete failed:', err);
-                });
-              }
+              // Always ensure deviceId and nameSet are saved
+              updatedProfile.deviceId = deviceId;
+              updatedProfile.nameSet = true;
+
               setProfile(updatedProfile);
+              setNameInput(updatedProfile.name || '');
+              setAvatarInput(updatedProfile.avatarUrl || '🧠');
               setFirebaseUser(fUser);
+
               safeLocalStorage.setItem('kelimesavasi_profile', JSON.stringify(updatedProfile));
+              if (updatedProfile.name) {
+                safeLocalStorage.setItem('saved_username', updatedProfile.name);
+              }
+
+              // Always persist the newly authenticated profile to Firestore
+              saveUserProfileToFirestore(updatedProfile).catch((err) => {
+                console.warn('Non-blocking profile save during onAuthComplete failed:', err);
+              });
               
               // Inform websocket if connection is alive
               if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -3366,7 +3386,6 @@ export default function App() {
             onClaimDailyReward={handleClaimDailyReward}
             onWatchRewardedAdReward={handleWatchRewardedAdReward}
             onStartMatchmaking={async (wordsCount) => {
-              setHasEnteredGame(true);
               await handleStartMatchmaking(wordsCount);
             }}
             matchmakingStatus={matchmakingStatus}

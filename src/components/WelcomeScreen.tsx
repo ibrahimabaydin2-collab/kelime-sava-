@@ -1024,7 +1024,7 @@ export default function WelcomeScreen({
 
                 <div className="flex flex-col">
                   {/* Name: "Art" */}
-                  <span className="text-2xl sm:text-3xl font-serif tracking-wide text-[#2E3748] font-bold leading-tight">{profile.name}</span>
+                  <span className="text-2xl sm:text-3xl font-serif tracking-wide text-[#2E3748] font-bold leading-tight">{profile.name || 'Oyuncu'}</span>
                   {/* Level: "1. SEVİYE" */}
                   <span className="text-[11px] sm:text-xs font-black text-[#C59B27] font-mono tracking-wider uppercase mt-1">
                     {progress.level}. SEVİYE
@@ -1766,6 +1766,35 @@ export default function WelcomeScreen({
               className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 py-3 rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition cursor-pointer"
             >
               Altınları Al!
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ⚔️ SEARCHING OPPONENT FULLSCREEN OVERLAY */}
+      {matchmakingStatus === 'queued' && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in pointer-events-auto">
+          <div className="w-full max-w-sm bg-slate-900 border-2 border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(245,158,11,0.25)] relative overflow-hidden animate-scale-up">
+            <div className="relative mb-6">
+              <div className="w-20 h-20 rounded-full border-4 border-amber-500/20 border-t-amber-400 animate-spin flex items-center justify-center mx-auto">
+                <Swords size={32} className="text-amber-400 animate-pulse" />
+              </div>
+            </div>
+
+            <span className="text-xs font-black text-amber-400 font-mono tracking-widest uppercase block mb-1">CANLI 1v1 DÜELLO</span>
+            <h3 className="text-xl font-black text-[#FAF6E9] tracking-wide uppercase mb-2">
+              RAKİP ARANIYOR...
+            </h3>
+            <p className="text-xs text-gray-300 leading-relaxed mb-6">
+              {wordLength} harfli canlı düello için rakip bekleniyor. Rakip eşleştiği anda oyun iki oyuncu için de aynı anda başlayacaktır.
+            </p>
+
+            <button
+              onClick={() => onStartMatchmaking && onStartMatchmaking(wordLength)}
+              className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer active:scale-95 shadow-md"
+              id="cancel-matchmaking-overlay-btn"
+            >
+              Aramayı İptal Et
             </button>
           </div>
         </div>
