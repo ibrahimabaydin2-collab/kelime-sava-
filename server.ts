@@ -935,21 +935,24 @@ async function startServer() {
       try {
         const data = JSON.parse(message.toString());
         if (data.type === 'join' || data.type === 'identify') {
+          const existing = connectedClients.get(ws);
           const clientInfo = {
-            id: data.id || data.userId || 'guest_' + Math.random().toString(36).substring(2, 7),
-            name: data.name || 'Oyuncu',
-            avatarUrl: data.avatarUrl || ''
+            id: data.id || data.userId || existing?.id || 'guest_' + Math.random().toString(36).substring(2, 7),
+            name: data.name || existing?.name || 'Oyuncu',
+            avatarUrl: data.avatarUrl || existing?.avatarUrl || ''
           };
           connectedClients.set(ws, clientInfo);
           sendWs(ws, { type: 'lobby', players: Array.from(connectedClients.values()) });
         } else if (data.type === 'ping') {
           sendWs(ws, { type: 'pong' });
         } else if (data.type === 'join_matchmaking') {
-          const player = connectedClients.get(ws) || {
-            id: data.id || 'p_' + Date.now(),
-            name: data.name || 'Oyuncu',
-            avatarUrl: data.avatarUrl || ''
+          const existing = connectedClients.get(ws);
+          const player = {
+            id: data.id || existing?.id || 'p_' + Date.now(),
+            name: data.name || existing?.name || 'Oyuncu',
+            avatarUrl: data.avatarUrl || existing?.avatarUrl || ''
           };
+          connectedClients.set(ws, player);
           const length = Number(data.wordLength) || 5;
 
           // Remove old queue entries for this ws if any
@@ -1002,6 +1005,7 @@ async function startServer() {
               matchId,
               gameState: 'WAITING',
               wordLength: length,
+              correctWord,
               player1: { id: matchObj.player1.id, name: matchObj.player1.name, avatarUrl: matchObj.player1.avatarUrl },
               player2: { id: matchObj.player2.id, name: matchObj.player2.name, avatarUrl: matchObj.player2.avatarUrl }
             };
@@ -1015,6 +1019,7 @@ async function startServer() {
               matchId,
               gameState: 'READY',
               wordLength: length,
+              correctWord,
               player1: { id: matchObj.player1.id, name: matchObj.player1.name, avatarUrl: matchObj.player1.avatarUrl },
               player2: { id: matchObj.player2.id, name: matchObj.player2.name, avatarUrl: matchObj.player2.avatarUrl }
             };
@@ -1031,6 +1036,7 @@ async function startServer() {
                   matchId,
                   gameState: 'PLAYING',
                   wordLength: length,
+                  correctWord,
                   player1: { id: matchObj.player1.id, name: matchObj.player1.name, avatarUrl: matchObj.player1.avatarUrl },
                   player2: { id: matchObj.player2.id, name: matchObj.player2.name, avatarUrl: matchObj.player2.avatarUrl }
                 };

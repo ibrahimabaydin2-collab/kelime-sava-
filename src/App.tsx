@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import {
   playClickSound,
@@ -1490,30 +1490,38 @@ export default function App() {
             } else if (data.type === 'match_joined') {
               setMatchmakingStatus('idle');
               setIsMatchmakingLocked(false);
+              const p1 = data.player1 || {};
+              const p2 = data.player2 || {};
+              const playersMap: Record<string, any> = {};
+              if (p1.id) playersMap[p1.id] = p1;
+              if (p2.id) playersMap[p2.id] = p2;
               setActiveMatch({
                 id: data.matchId,
                 matchId: data.matchId,
                 gameState: 'WAITING',
-                player1: data.player1,
-                player2: data.player2,
-                players: {
-                  [data.player1.id]: data.player1,
-                  [data.player2.id]: data.player2
-                },
+                player1: p1,
+                player2: p2,
+                players: playersMap,
                 wordLength: data.wordLength
               });
               setWordLength(data.wordLength);
             } else if (data.type === 'match_ready') {
+              const p1 = data.player1 || {};
+              const p2 = data.player2 || {};
               setActiveMatch((prev: any) => ({
                 ...prev,
                 gameState: 'READY',
-                player1: data.player1,
-                player2: data.player2
+                player1: p1,
+                player2: p2
               }));
               showToast('Rakip bağlandı! Oyun hazırlanıyor... ⚔️', 'info');
             } else if (data.type === 'match_start') {
               console.log('[WebSocket Manager] Match START:', data);
               const matchLen = data.wordLength || 5;
+              const target = data.correctWord || '';
+              if (target) {
+                setTargetWord(target);
+              }
               setWordLength(matchLen);
               setAttempts([]);
               setCurrentAttempt('');
@@ -1523,27 +1531,33 @@ export default function App() {
               setMatchmakingStatus('idle');
               setIsMatchmakingLocked(false);
               setOpponentLeftDuringMatch(false);
+              setShowCongratsModal(false);
+
+              const p1 = data.player1 || {};
+              const p2 = data.player2 || {};
+              const playersMap: Record<string, any> = {};
+              if (p1.id) playersMap[p1.id] = p1;
+              if (p2.id) playersMap[p2.id] = p2;
 
               setActiveMatch({
                 id: data.matchId,
                 matchId: data.matchId,
                 gameState: 'PLAYING',
                 status: 'playing',
-                player1: data.player1,
-                player2: data.player2,
-                players: {
-                  [data.player1.id]: data.player1,
-                  [data.player2.id]: data.player2
-                },
+                targetWord: target,
+                correctWord: target,
+                player1: p1,
+                player2: p2,
+                players: playersMap,
                 wordLength: matchLen
               });
 
               playEnterSound(settings.soundEnabled);
-              showToast('Düello başladı! İyi şanslar! ⚡', 'success');
+              showToast('Düello başladı! Aynı kelimeyi ilk bulan kazanır! ⚡', 'success');
             } else if (data.type === 'guess_result') {
               setIsValidating(false);
               const guessWord = data.word;
-              const feedback: Array<'green' | 'orange' | 'grey'> = data.feedback.map((f: string) => 
+              const feedback: Array<'green' | 'orange' | 'grey'> = (data.feedback || []).map((f: string) => 
                 f === 'correct' ? 'green' : f === 'present' ? 'orange' : 'grey'
               );
 
@@ -1563,25 +1577,29 @@ export default function App() {
 
               playEnterSound(settings.soundEnabled);
             } else if (data.type === 'opponent_attempt') {
-              showToast(`Rakip bir tahmin yaptı! (${data.attemptCount}. deneme)`, 'info');
+              showToast(`Rakip bir tahmin yaptı! (${data.attemptCount || 1}. deneme)`, 'info');
             } else if (data.type === 'guess_rejected') {
               setIsValidating(false);
               console.warn('[Duel Server] Guess rejected:', data.reason);
             } else if (data.type === 'match_end') {
               console.log('[WebSocket Manager] Match END:', data);
               setIsValidating(false);
-              const target = data.correctWord || '';
+              const target = data.correctWord || activeMatch?.targetWord || activeMatch?.correctWord || targetWord || '';
               if (target) {
                 setTargetWord(target);
                 fetchTargetWordDefinition(target);
               }
 
-              const isWinner = data.winner === profile.id;
+              const isWinner = data.winner && profile?.id && data.winner === profile.id;
               const isOpponentLeft = data.winReason === 'opponent_left';
 
               if (isOpponentLeft) {
                 setOpponentLeftDuringMatch(true);
               }
+
+              // Freeze gameStatus to idle so solo victory/loss UI is NOT triggered
+              setGameStatus('idle');
+              setShowCongratsModal(false);
 
               setActiveMatch((prev: any) => ({
                 ...prev,
@@ -1592,33 +1610,33 @@ export default function App() {
                 winnerName: data.winnerName,
                 winReason: data.winReason,
                 correctWord: target,
-                attempts: data.attempts
+                attempts: data.attempts || prev?.attempts
               }));
 
               if (isWinner) {
-                setGameStatus('won');
                 playVictorySound(settings.soundEnabled);
                 triggerVictoryCelebration(settings.soundEnabled);
 
                 if (isOpponentLeft) {
                   showToast('Rakip oyundan ayrıldı. 🏆 Kazandınız!', 'success');
                 } else {
-                  showToast('🏆 Kazandınız! Tebrikler!', 'success');
+                  showToast('🏆 Tebrikler, Canlı Düelloyu Kazandınız!', 'success');
                 }
 
                 addGold(1);
-                handleGameWin(attempts.length || 1, 100);
               } else {
-                setGameStatus('lost');
                 playDefeatSound(settings.soundEnabled);
-                showToast('❌ Kaybettiniz!', 'error');
-                handleGameLoss();
+                if (data.winner === 'draw') {
+                  showToast('Berabere! İki oyuncu da kelimeyi bulamadı.', 'info');
+                } else {
+                  showToast('❌ Kaybettiniz! Rakip kelimeyi önce buldu.', 'error');
+                }
               }
             } else if (data.type === 'opponent_left') {
               setOpponentLeftDuringMatch(true);
               showToast('Rakip oyundan ayrıldı.', 'info');
             } else if (data.type === 'challenge_received') {
-              if (data.challenge) {
+              if (data.challenge && data.challenge.id) {
                 setActiveChallenges((prev) => {
                   if (prev.some((c) => c.id === data.challenge.id)) return prev;
                   return [...prev, data.challenge];
@@ -1683,6 +1701,10 @@ export default function App() {
   // Yumuşak Sıfırlama (Soft Reset) Fonksiyonu
   // WebView'da sıfırdan reload yapmadan, reklamları etkilemeden ve performansı bozmadan oyunu temizler.
   const softResetGame = (length: number = wordLength, isDaily: boolean = isDailyPuzzle) => {
+    if (activeMatch) {
+      console.log('softResetGame skipped because activeMatch is active');
+      return;
+    }
     // Optimize AdMob Banner layouts and pause/resume drawing engines on native Android solo game reset
     // This MUST be called at the absolute beginning before any state or DOM updates to lock the native layouts
     if (!activeMatch && typeof window !== 'undefined' && (window as any).AndroidBridge) {
@@ -1736,6 +1758,10 @@ export default function App() {
 
   // Start a new solo game
   const startNewGame = async (length: number = wordLength, isDaily: boolean = isDailyPuzzle) => {
+    if (activeMatch) {
+      console.log('startNewGame skipped because activeMatch is active');
+      return;
+    }
     if (!isDaily) {
       const hasGold = await deductGold(1);
       if (!hasGold) {
@@ -3182,7 +3208,29 @@ export default function App() {
     }
   };
 
-  const opponent = activeMatch ? Object.values(activeMatch.players).find(p => (p as any).name !== profile.name) as any : null;
+  const selfPlayer = useMemo(() => {
+    if (!activeMatch || !activeMatch.players) return null;
+    return activeMatch.players[profile.id] || 
+           Object.values(activeMatch.players).find((p: any) => p && p.id === profile.id) ||
+           Object.values(activeMatch.players).find((p: any) => p && p.name === profile.name) ||
+           null;
+  }, [activeMatch, profile.id, profile.name]);
+
+  const opponent = useMemo(() => {
+    if (!activeMatch || !activeMatch.players) return null;
+    const oppById = Object.values(activeMatch.players).find((p: any) => p && p.id && p.id !== profile.id);
+    if (oppById) return oppById;
+    const oppByName = Object.values(activeMatch.players).find((p: any) => p && p.name && p.name !== profile.name);
+    if (oppByName) return oppByName;
+    if (activeMatch.player1 && activeMatch.player1.id !== profile.id && activeMatch.player1.name !== profile.name) {
+      return activeMatch.player1;
+    }
+    if (activeMatch.player2 && activeMatch.player2.id !== profile.id && activeMatch.player2.name !== profile.name) {
+      return activeMatch.player2;
+    }
+    return null;
+  }, [activeMatch, profile.id, profile.name]);
+
   const isMatchEnded = !!(activeMatch && activeMatch.status === 'ended');
 
   // Triggers when 1v1 match ends (isMatchEnded turns true) or when user exits a match, loading AdMob asynchronously in the background and freeing layout calculations
@@ -3527,9 +3575,13 @@ export default function App() {
                 </div>
                 {activeMatch.roundsWon && (
                   <div className="flex gap-2.5 mt-0.5 text-[10px] font-bold font-mono">
-                    <span className="text-emerald-600 dark:text-emerald-400">SEN: {activeMatch.roundsWon[profile.id] || 0}</span>
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      {profile.name?.toUpperCase() || selfPlayer?.name?.toUpperCase() || 'SEN'} (Sen): {activeMatch.roundsWon[profile.id] || 0}
+                    </span>
                     <span className="text-gray-400">|</span>
-                    <span className="text-amber-500">RAKİP: {activeMatch.roundsWon[opponent?.id || ''] || 0}</span>
+                    <span className="text-amber-500">
+                      {opponent?.name?.toUpperCase() || 'RAKİP'}: {activeMatch.roundsWon[opponent?.id || ''] || 0}
+                    </span>
                   </div>
                 )}
               </div>
@@ -3539,7 +3591,9 @@ export default function App() {
             <div className="flex gap-2 items-center">
               <div className="flex items-center gap-1.5 bg-white dark:bg-gray-900 px-2 py-1 rounded-lg shadow-xs border border-gray-100 dark:border-gray-800">
                 <div className="text-left">
-                  <span className="text-[9px] text-gray-400 font-bold block leading-none">SEN</span>
+                  <span className="text-[9px] text-gray-400 font-bold block truncate max-w-[80px] leading-none">
+                    {profile.name?.toUpperCase() || selfPlayer?.name?.toUpperCase() || 'SEN'} (Sen)
+                  </span>
                   <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{attempts.length} Dn</span>
                 </div>
               </div>
@@ -3548,7 +3602,9 @@ export default function App() {
 
               <div className="flex items-center gap-1.5 bg-white dark:bg-gray-900 px-2 py-1 rounded-lg shadow-xs border border-gray-100 dark:border-gray-800">
                 <div className="text-left">
-                  <span className="text-[9px] text-gray-400 font-bold block truncate max-w-[50px] leading-none">{opponent?.name?.toUpperCase() || 'RAKİP'}</span>
+                  <span className="text-[9px] text-gray-400 font-bold block truncate max-w-[80px] leading-none">
+                    {opponent?.name?.toUpperCase() || 'RAKİP'}
+                  </span>
                   <span className="text-[11px] font-bold text-amber-500">
                     {opponent?.attempts?.length || 0} Dn
                   </span>
@@ -3704,7 +3760,7 @@ export default function App() {
           )}
 
           {/* 🤫 HINT, SUGGESTION & AD REWARD CONTROLS ROW */}
-          {!isMatchEnded && gameStatus === 'playing' && (
+          {!isMatchEnded && gameStatus === 'playing' && !activeMatch && (
             <div className="w-full max-w-sm mx-auto flex gap-1.5 justify-center py-1.5 px-1 shrink-0">
               {/* HINT BUTTON */}
               <button
@@ -4007,19 +4063,22 @@ export default function App() {
               <div className="bg-black/25 rounded-2xl border border-white/5 p-3 mb-2 space-y-1.5 shrink-0">
                 <h4 className="text-[9px] font-black text-amber-300/80 tracking-widest uppercase font-mono text-left font-bold">OYUNCU DETAYLARI</h4>
                 {Object.entries(activeMatch.players).map(([pId, playerState]: [string, any]) => {
-                  const isSelf = pId === profile.id;
+                  const isSelf = pId === profile.id || playerState?.name === profile.name;
+                  const isWon = pId === activeMatch.winnerId || (activeMatch.winnerId === profile.id && isSelf);
+                  const pAttempts = activeMatch.attempts?.[pId] || playerState?.attempts || [];
+                  const displayName = playerState?.name || (isSelf ? profile.name : (opponent?.name || 'Rakip'));
                   return (
                     <div key={pId} className="flex justify-between items-center text-[11px]">
                       <div className="flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${playerState.won ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                        <span className={`w-1.5 h-1.5 rounded-full ${isWon ? 'bg-emerald-400' : 'bg-rose-400'}`} />
                         <span className={`font-black uppercase tracking-wider ${isSelf ? 'text-amber-400' : 'text-gray-300'}`}>
-                          {playerState.name} {isSelf ? '(Sen)' : ''}
+                          {displayName} {isSelf ? '(Sen)' : ''}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 font-mono font-bold">
                         <span className="text-gray-400">Deneme:</span>
-                        <span className={playerState.won ? 'text-emerald-400' : 'text-rose-400'}>
-                          {playerState.won ? `${playerState.attempts.length} / 6` : 'BİLEMEDİ'}
+                        <span className={isWon ? 'text-emerald-400' : 'text-rose-400'}>
+                          {isWon ? `${pAttempts.length || 1} / 6 (KAZANDI)` : pAttempts.length > 0 ? `${pAttempts.length} / 6` : 'BİLEMEDİ'}
                         </span>
                       </div>
                     </div>
@@ -4027,41 +4086,8 @@ export default function App() {
                 })}
               </div>
 
-              {/* Buttons Block - No Scroll & Balanced */}
+              {/* Buttons Block */}
               <div className="space-y-2 mt-auto shrink-0 pt-1">
-                {/* Rematch Button */}
-                <button
-                  disabled={rematchRequested}
-                  onClick={() => {
-                    playClickSound(settings.soundEnabled);
-                    setRematchRequested(true);
-                    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-                      socketRef.current.send(JSON.stringify({
-                        type: 'request_rematch',
-                        matchId: activeMatch.id
-                      }));
-                    }
-                    showToast('Yarışmayı tekrarlama isteği gönderildi!', 'success');
-                  }}
-                  className={`w-full font-black text-xs py-2 px-3 rounded-xl shadow-md transition-all uppercase tracking-widest cursor-pointer flex items-center justify-center gap-1.5 ${
-                    rematchRequested
-                      ? 'bg-slate-800 text-gray-500 border border-white/5 cursor-not-allowed'
-                      : opponentRematchRequested
-                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white animate-pulse'
-                      : 'bg-amber-500 hover:bg-amber-600 text-[#1E293B]'
-                  }`}
-                  id="rematch-btn"
-                >
-                  <RotateCcw size={14} className={`stroke-[2.5] ${rematchRequested ? '' : 'animate-spin'}`} />
-                  <span>
-                    {rematchRequested
-                      ? 'İstek Gönderildi...'
-                      : opponentRematchRequested
-                      ? 'Yarışmayı Tekrarla (Rakip İstiyor!)'
-                      : 'Yarışmayı Tekrarla'}
-                  </span>
-                </button>
-
                 {/* Main Home Button */}
                 <button
                   onClick={() => {
@@ -4357,7 +4383,7 @@ export default function App() {
       )}
 
       {/* Congrats / Victory Modal */}
-      {showCongratsModal && (
+      {showCongratsModal && !activeMatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn" id="congrats-modal-container">
           {/* Backdrop */}
           <div 
