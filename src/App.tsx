@@ -1463,6 +1463,139 @@ export default function App() {
             const data = JSON.parse(event.data);
             if (data.type === 'lobby' || data.type === 'online_players') {
               setLobbyPlayers(data.players || []);
+            } else if (data.type === 'queued') {
+              setMatchmakingStatus('queued');
+              showToast('Eşleşme sırasına alındınız. Rakip aranıyor...', 'info');
+            } else if (data.type === 'match_joined') {
+              setMatchmakingStatus('idle');
+              setIsMatchmakingLocked(false);
+              setActiveMatch({
+                id: data.matchId,
+                matchId: data.matchId,
+                gameState: 'WAITING',
+                player1: data.player1,
+                player2: data.player2,
+                players: {
+                  [data.player1.id]: data.player1,
+                  [data.player2.id]: data.player2
+                },
+                wordLength: data.wordLength
+              });
+              setWordLength(data.wordLength);
+            } else if (data.type === 'match_ready') {
+              setActiveMatch((prev: any) => ({
+                ...prev,
+                gameState: 'READY',
+                player1: data.player1,
+                player2: data.player2
+              }));
+              showToast('Rakip bağlandı! Oyun hazırlanıyor... ⚔️', 'info');
+            } else if (data.type === 'match_start') {
+              console.log('[WebSocket Manager] Match START:', data);
+              const matchLen = data.wordLength || 5;
+              setWordLength(matchLen);
+              setAttempts([]);
+              setCurrentAttempt('');
+              setLetterStatuses({});
+              setGameStatus('playing');
+              setHasEnteredGame(true);
+              setMatchmakingStatus('idle');
+              setIsMatchmakingLocked(false);
+              setOpponentLeftDuringMatch(false);
+
+              setActiveMatch({
+                id: data.matchId,
+                matchId: data.matchId,
+                gameState: 'PLAYING',
+                status: 'playing',
+                player1: data.player1,
+                player2: data.player2,
+                players: {
+                  [data.player1.id]: data.player1,
+                  [data.player2.id]: data.player2
+                },
+                wordLength: matchLen
+              });
+
+              playEnterSound(settings.soundEnabled);
+              showToast('Düello başladı! İyi şanslar! ⚡', 'success');
+            } else if (data.type === 'guess_result') {
+              setIsValidating(false);
+              const guessWord = data.word;
+              const feedback: Array<'green' | 'orange' | 'grey'> = data.feedback.map((f: string) => 
+                f === 'correct' ? 'green' : f === 'present' ? 'orange' : 'grey'
+              );
+
+              setAttempts(prev => [...prev, { word: guessWord, feedback }]);
+              setLetterStatuses(prev => {
+                const next = { ...prev };
+                guessWord.split('').forEach((letter: string, i: number) => {
+                  const status = feedback[i];
+                  const current = next[letter];
+                  if (status === 'green') next[letter] = 'green';
+                  else if (status === 'orange' && current !== 'green') next[letter] = 'orange';
+                  else if (status === 'grey' && !current) next[letter] = 'grey';
+                });
+                return next;
+              });
+              setCurrentAttempt('');
+
+              playEnterSound(settings.soundEnabled);
+            } else if (data.type === 'opponent_attempt') {
+              showToast(`Rakip bir tahmin yaptı! (${data.attemptCount}. deneme)`, 'info');
+            } else if (data.type === 'guess_rejected') {
+              setIsValidating(false);
+              console.warn('[Duel Server] Guess rejected:', data.reason);
+            } else if (data.type === 'match_end') {
+              console.log('[WebSocket Manager] Match END:', data);
+              setIsValidating(false);
+              const target = data.correctWord || '';
+              if (target) {
+                setTargetWord(target);
+                fetchTargetWordDefinition(target);
+              }
+
+              const isWinner = data.winner === profile.id;
+              const isOpponentLeft = data.winReason === 'opponent_left';
+
+              if (isOpponentLeft) {
+                setOpponentLeftDuringMatch(true);
+              }
+
+              setActiveMatch((prev: any) => ({
+                ...prev,
+                gameState: 'FINISHED',
+                status: 'ended',
+                winnerId: data.winner,
+                loserId: data.loser,
+                winnerName: data.winnerName,
+                winReason: data.winReason,
+                correctWord: target,
+                attempts: data.attempts
+              }));
+
+              if (isWinner) {
+                setGameStatus('won');
+                playVictorySound(settings.soundEnabled);
+                triggerVictoryCelebration(settings.soundEnabled);
+
+                if (isOpponentLeft) {
+                  showToast('Rakip oyundan ayrıldı. 🏆 Kazandınız!', 'success');
+                } else {
+                  showToast('🏆 Kazandınız! Tebrikler!', 'success');
+                }
+
+                addGold(1);
+                handleGameWin(attempts.length || 1, 100);
+              } else {
+                setGameStatus('lost');
+                playDefeatSound(settings.soundEnabled);
+                showToast('❌ Kaybettiniz!', 'error');
+                handleGameLoss();
+              }
+            } else if (data.type === 'opponent_left') {
+              setOpponentLeftDuringMatch(true);
+              showToast('Rakip oyundan ayrıldı.', 'info');
             } else if (data.type === 'challenge_received') {
               if (data.challenge) {
                 setActiveChallenges((prev) => {
@@ -1471,25 +1604,6 @@ export default function App() {
                 });
                 showToast(`${data.challenge.challengerName || 'Bir oyuncu'} sana meydan okudu!`, 'info');
               }
-            } else if (data.type === 'match_start' || data.type === 'match_created' || data.type === 'match_joined') {
-              console.log('[WebSocket Manager] Match started:', data.match);
-              const matchData = data.match || data;
-              setActiveMatch(matchData);
-              setMatchmakingStatus('idle');
-              setHasEnteredGame(true);
-              setIsMatchmakingLocked(false);
-              showToast('Eşleşme sağlandı! Düello başladı. ⚔️', 'success');
-            } else if (data.type === 'match_update') {
-              if (data.match) {
-                setActiveMatch(data.match);
-              }
-            } else if (data.type === 'match_end') {
-              if (data.match) {
-                setActiveMatch(data.match);
-              }
-            } else if (data.type === 'opponent_left') {
-              setOpponentLeftDuringMatch(true);
-              showToast('Rakip oyundan ayrıldı.', 'info');
             } else if (data.type === 'rematch_requested') {
               setOpponentRematchRequested(true);
               showToast('Rakip tekrar yarışmak istiyor!', 'info');
@@ -2152,30 +2266,26 @@ export default function App() {
         return;
       }
 
-      // Check if match was already ended in Firestore during validation
+      // Server Authoritative Duel Guess Submission
       if (activeMatch) {
-        const matchRef = doc(db, 'matches', activeMatch.id);
-        try {
-          const matchDoc = await getDoc(matchRef);
-          if (matchDoc.exists()) {
-            const matchData = matchDoc.data();
-            const isFinished = matchData.isGameOver === true || 
-                               matchData.status === 'finished' || 
-                               matchData.gameState === 'finished';
-            const winnerId = matchData.winner || matchData.winnerId || matchData.finishedBy;
-            if (isFinished && winnerId) {
-              console.log(`Pre-evaluation check: Match was already won by ${winnerId}. Halting guess.`);
-              setIsValidating(false);
-              handleInstantMatchEnd(winnerId);
-              return;
-            }
-          }
-        } catch (dbErr) {
-          console.warn('Defensive pre-evaluation Firestore check failed:', dbErr);
+        if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+          showToast('Sunucu bağlantısı aktif değil!', 'error');
+          setIsValidating(false);
+          return;
         }
+
+        socketRef.current.send(JSON.stringify({
+          type: 'submit_guess',
+          matchId: activeMatch.matchId || activeMatch.id,
+          word: guess,
+          playerId: profile.id
+        }));
+
+        setIsValidating(false);
+        return;
       }
 
-      // Valid word! Submit and check results
+      // Valid word! Submit and check results (Solo / Offline Mode)
       const feedback = evaluateGuess(guess, targetWord);
       const newAttempt: GameAttempt = { word: guess, feedback };
       const updatedAttempts = [...attempts, newAttempt];
@@ -2900,7 +3010,9 @@ export default function App() {
       socketRef.current.send(JSON.stringify({
         type: 'join_matchmaking',
         wordLength,
-        matchWordsCount: matchWordsCount || 1
+        id: profile.id,
+        name: profile.name || 'Oyuncu',
+        avatarUrl: profile.avatarUrl || ''
       }));
       setMatchmakingStatus('queued');
     }
