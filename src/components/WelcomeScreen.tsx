@@ -84,6 +84,7 @@ export default function WelcomeScreen({
   
   // Game setup states
   const [showGameSetup, setShowGameSetup] = useState<boolean>(false);
+  const [selectedGameModeTab, setSelectedGameModeTab] = useState<'solo' | 'duel'>('solo');
 
   // Real-time bidirectional friends and requests from Firestore
   const [confirmedFriends, setConfirmedFriends] = useState<{ id: string; name: string; avatarUrl?: string }[]>([]);
@@ -502,7 +503,7 @@ export default function WelcomeScreen({
 
   if (showGameSetup) {
     return (
-      <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2rem] border border-[#3E485A]/30 p-4 sm:p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between gap-y-2.5 h-full max-h-full transition-all duration-200 text-white animate-scale-up" id="welcome-setup-page">
+      <div className="w-full max-w-md md:max-w-[90%] lg:max-w-[85%] xl:max-w-[1000px] mx-auto card-theme rounded-[2rem] border border-[#3E485A]/30 p-4 sm:p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between gap-y-3 h-full max-h-full transition-all duration-200 text-white animate-scale-up" id="welcome-setup-page">
         {/* Decorative ambient glowing background rings */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-52 h-52 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -528,18 +529,56 @@ export default function WelcomeScreen({
               </h1>
             </div>
             <div className="h-0.5 w-12 bg-gradient-to-r from-transparent via-amber-400/40 to-transparent mt-1" />
-            <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-amber-200/50 uppercase mt-0.5">OYUN KURMA PANELİ</span>
+            <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-amber-200/50 uppercase mt-0.5">OYUN MODU VE AYARLARI</span>
           </div>
 
           <div className="hidden md:block md:col-span-1" />
         </div>
 
-        {/* Setup Content */}
+        {/* MODE TABS HEADER INSIDE GAME SETUP SCREEN */}
+        <div className="w-full bg-[#1A212D]/95 border-2 border-[#3E485A]/70 p-1.5 rounded-2xl shadow-xl flex items-center gap-1.5 relative z-10" id="setup-game-mode-tab-bar">
+          <button
+            onClick={() => setSelectedGameModeTab('solo')}
+            className={`flex-1 py-3 px-3 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${
+              selectedGameModeTab === 'solo'
+                ? 'bg-[#FAF6E9] text-[#2E3748] shadow-[0_3px_0_#D9D4C3] scale-[1.01]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+            id="tab-btn-solo-mode"
+          >
+            <Puzzle size={18} className={selectedGameModeTab === 'solo' ? 'text-emerald-700 stroke-[2.5]' : 'text-gray-400'} />
+            <div className="text-left leading-none">
+              <span className="block font-black text-xs sm:text-sm">Solo Oyun</span>
+              <span className="block text-[8px] opacity-75 font-sans mt-0.5 font-bold">Tek Oyunculu Mod</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setSelectedGameModeTab('duel')}
+            className={`flex-1 py-3 px-3 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${
+              selectedGameModeTab === 'duel'
+                ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 shadow-[0_3px_0_#D97706] scale-[1.01]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+            id="tab-btn-duel-mode"
+          >
+            <Swords size={18} className={selectedGameModeTab === 'duel' ? 'text-slate-950 stroke-[2.5]' : 'text-gray-400'} />
+            <div className="text-left leading-none">
+              <div className="flex items-center gap-1">
+                <span className="font-black text-xs sm:text-sm">Canlı Oyna</span>
+                <span className="text-[7.5px] bg-slate-950 text-amber-300 font-mono font-black px-1.5 py-0.2 rounded-full uppercase">1v1</span>
+              </div>
+              <span className="block text-[8px] opacity-80 font-sans mt-0.5 font-bold">Online Düello</span>
+            </div>
+          </button>
+        </div>
+
+        {/* Setup Content Based on Active Tab */}
         <div className="space-y-3 relative z-10 flex-1 flex flex-col justify-between min-h-0" id="action-settings-card">
-          <div className="space-y-3 flex-1 flex flex-col justify-between min-h-0" id="game-setup-wizard">
-            
-            {/* Parameter Controls with enlarged fonts and cream highlights */}
-            <div className="space-y-3 bg-[#3D4756]/30 p-4 sm:p-4.5 rounded-[1.5rem] border border-white/5">
+          {selectedGameModeTab === 'solo' ? (
+            /* SOLO OYUN TAB CONTENT */
+            <div className="space-y-3 flex-1 flex flex-col justify-between min-h-0 animate-fade-in" id="solo-setup-panel">
+              <div className="space-y-3 bg-[#3D4756]/30 p-4 sm:p-4.5 rounded-[1.5rem] border border-white/5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Word Length Selector */}
                   <div className="space-y-1.5 text-left">
@@ -549,7 +588,7 @@ export default function WelcomeScreen({
                         <button
                           key={len}
                           onClick={() => onChangeWordLength(len)}
-                          className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 active:scale-90 ${
+                          className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 active:scale-90 cursor-pointer ${
                             wordLength === len
                               ? 'bg-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
                               : 'text-[#FAF6E9]/75 hover:bg-white/5 hover:text-white'
@@ -567,7 +606,7 @@ export default function WelcomeScreen({
                     <div className="grid grid-cols-2 gap-1 bg-black/35 p-0.5 rounded-xl border border-white/5">
                       <button
                         onClick={() => onChangeDictionaryMode('tdk_online')}
-                        className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-95 ${
+                        className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${
                           dictionaryMode === 'tdk_online'
                             ? 'bg-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
                             : 'text-[#FAF6E9]/75 hover:bg-white/5 hover:text-white'
@@ -578,7 +617,7 @@ export default function WelcomeScreen({
                       </button>
                       <button
                         onClick={() => onChangeDictionaryMode('no_validation')}
-                        className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-95 ${
+                        className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${
                           dictionaryMode === 'no_validation'
                             ? 'bg-[#FAF6E9] text-[#2E3748] shadow-sm ring-2 ring-amber-400/20'
                             : 'text-[#FAF6E9]/75 hover:bg-white/5 hover:text-white'
@@ -591,7 +630,7 @@ export default function WelcomeScreen({
                   </div>
                 </div>
 
-                {/* Secondary settings */}
+                {/* Time Rule */}
                 <div className="space-y-1.5 text-left border-t border-white/5 pt-2">
                   <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase flex items-center gap-1">
                     <Zap size={10} className="text-amber-400 animate-pulse fill-amber-400/20" /> SÜRE VE ZAMAN KURALI
@@ -619,55 +658,137 @@ export default function WelcomeScreen({
                     </button>
                   </div>
                 </div>
-
-            </div>
-
-            {/* Sleek Dark Info Panel */}
-            <div className="bg-black/35 border border-white/5 rounded-2xl p-3 text-left space-y-0.5 relative overflow-hidden" id="mode-info-panel">
-              <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
-                <Zap size={30} />
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                <span className="text-[9px] font-black text-amber-300 uppercase tracking-widest font-mono">
-                  SOLO PRATİK MODU AÇIKLAMASI
-                </span>
+
+              {/* Info Panel */}
+              <div className="bg-black/35 border border-white/5 rounded-2xl p-3 text-left space-y-0.5 relative overflow-hidden" id="solo-info-panel">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[9px] font-black text-emerald-300 uppercase tracking-widest font-mono">
+                    SOLO PRATİK MODU
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-300 leading-snug font-sans">
+                  Kendi başınıza pratik yapıp kendinizi test edin! Süreli veya süresiz oynayarak kelime haznenizi genişletin.
+                </p>
               </div>
-              <p className="text-[11px] text-gray-300 leading-snug font-sans">
-                Kendi başınıza pratik yapıp kendinizi test edin! Süreli veya süresiz oynayarak kelime haznenizi genişletin ve yeni rekorlara koşun.
-              </p>
-            </div>
 
-            {/* Dual Action Launch Buttons: Canlı Düello & Solo Oyun */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
-              {onStartMatchmaking && (
-                <button
-                  onClick={() => {
-                    setShowGameSetup(false);
-                    onStartMatchmaking();
-                  }}
-                  className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] text-slate-900 font-black text-xs py-2.5 px-3 rounded-xl shadow-[0_3px_0_#D97706,0_5px_10px_rgba(245,158,11,0.25)] transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-amber-200/40"
-                  id="start-duel-setup-btn"
-                >
-                  <Swords size={14} className="text-slate-900 mr-1.5 stroke-[2.5]" />
-                  <span>Canlı Düello (1 Altın)</span>
-                </button>
-              )}
-
+              {/* Solo Launch Button */}
               <button
                 onClick={() => {
                   onStartSoloGame();
                   setShowGameSetup(false);
                 }}
-                className={`w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] text-[#2E3748] font-black text-xs py-2.5 px-3 rounded-xl shadow-[0_3px_0_#D9D4C3,0_5px_10px_rgba(0,0,0,0.15)] transition-all flex items-center justify-center uppercase tracking-wider cursor-pointer border border-[#EBE6D5] ${!onStartMatchmaking ? 'sm:col-span-2' : ''}`}
+                className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] text-[#2E3748] font-black text-sm py-3.5 px-4 rounded-2xl shadow-[0_4px_0_#D9D4C3,0_5px_10px_rgba(0,0,0,0.15)] transition-all flex items-center justify-between uppercase tracking-wider cursor-pointer border border-[#EBE6D5]"
                 id="start-solo-btn"
               >
-                <Puzzle size={14} className="text-emerald-600 mr-1.5 stroke-[2.5] fill-emerald-600/15" />
-                <span>Solo Oyunu Başlat</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                    <Puzzle size={20} className="text-emerald-700 stroke-[2.5]" />
+                  </div>
+                  <div className="text-left leading-tight">
+                    <span className="font-black text-[#2E3748] text-sm tracking-wide block">SOLO OYUNA BAŞLA</span>
+                    <span className="block text-[9.5px] font-bold text-gray-500 font-sans normal-case mt-0.5">Tek oyunculu kelime oyunu</span>
+                  </div>
+                </div>
+                <div className="px-3 py-1.5 bg-[#2E3748] text-[#FAF6E9] text-[10px] font-black rounded-xl uppercase tracking-widest flex items-center gap-1">
+                  <span>BAŞLAT</span>
+                  <Play size={10} className="fill-current" />
+                </div>
               </button>
             </div>
+          ) : (
+            /* CANLI OYNA / DÜELLO TAB CONTENT */
+            <div className="space-y-3 flex-1 flex flex-col justify-between min-h-0 animate-fade-in" id="duel-setup-panel">
+              <div className="space-y-3 bg-[#3D4756]/30 p-4 sm:p-4.5 rounded-[1.5rem] border border-white/5 text-left">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <span className="text-[9px] font-black text-amber-300 font-mono tracking-wider uppercase block">CANLI DÜELLO AYARLARI</span>
+                  <div className="flex items-center gap-1.5 text-[9px] font-mono font-black text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>{isOnline ? 'ONLINE CANLI' : 'BAĞLANIYOR'}</span>
+                  </div>
+                </div>
 
-          </div>
+                {/* Word Length Selector for Duels */}
+                <div className="space-y-1.5 text-left">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase block">DÜELLO HARF SAYISI</span>
+                    <span className="text-[10px] font-mono text-amber-400 font-bold">{wordLength} Harf</span>
+                  </div>
+                  <div className="grid grid-cols-6 gap-1 p-0.5 bg-black/35 rounded-xl border border-white/5">
+                    {[3, 4, 5, 6, 7, 8].map((len) => (
+                      <button
+                        key={len}
+                        onClick={() => onChangeWordLength(len)}
+                        className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 active:scale-90 cursor-pointer ${
+                          wordLength === len
+                            ? 'bg-amber-400 text-slate-950 shadow-sm font-black'
+                            : 'text-[#FAF6E9]/75 hover:bg-white/5 hover:text-white'
+                        }`}
+                      >
+                        {len}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Duel Mode Info Box */}
+              <div className="bg-black/35 border border-white/5 rounded-2xl p-3 text-left space-y-0.5 relative overflow-hidden" id="duel-info-panel">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="text-[9px] font-black text-amber-300 uppercase tracking-widest font-mono">
+                    CANLI 1v1 DÜELLO KURALLARI
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-300 leading-snug font-sans">
+                  Gerçek zamanlı bir rakiple aynı gizli kelimeyi en az denemede ve en hızlı şekilde tahmin etmek için yarışın. Kazanan +100 Savaş Puanı kazanır!
+                </p>
+              </div>
+
+              {/* Queued or Start Matchmaking Button */}
+              {matchmakingStatus === 'queued' ? (
+                <div className="w-full bg-amber-950/60 border border-amber-500/50 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-lg">
+                  <div className="flex items-center gap-2 text-amber-300 font-black text-xs sm:text-sm uppercase tracking-wider">
+                    <Swords size={20} className="animate-spin text-amber-400" />
+                    <span>RAKİP ARANIYOR ({wordLength} HARF)...</span>
+                  </div>
+                  <p className="text-[10px] text-amber-200/80 font-bold">Lütfen bekleyin, uygun bir rakip eşleştiriliyor.</p>
+                  <button
+                    onClick={() => onStartMatchmaking && onStartMatchmaking(wordLength)}
+                    className="mt-1 text-xs font-black text-rose-300 bg-rose-950/80 hover:bg-rose-900 border border-rose-500/50 px-4 py-2 rounded-xl uppercase tracking-wider transition cursor-pointer active:scale-95 shadow-sm"
+                    id="cancel-matchmaking-setup-btn"
+                  >
+                    Aramayı İptal Et
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (onStartMatchmaking) {
+                      onStartMatchmaking(wordLength);
+                    }
+                  }}
+                  className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] text-slate-950 py-3.5 px-4 rounded-2xl shadow-[0_4px_0_#D97706,0_8px_20px_rgba(245,158,11,0.35)] transition-all flex items-center justify-between uppercase tracking-wider cursor-pointer border border-amber-200/40"
+                  id="start-duel-setup-btn"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-slate-950/15 flex items-center justify-center shrink-0 border border-slate-900/10">
+                      <Swords size={20} className="text-slate-950 stroke-[2.5]" />
+                    </div>
+                    <div className="text-left leading-tight">
+                      <span className="font-black text-slate-950 text-sm tracking-wide block">CANLI DÜELLO ARA</span>
+                      <span className="block text-[9.5px] font-bold text-slate-900/80 font-sans normal-case mt-0.5">Online 1v1 Rakip Bul</span>
+                    </div>
+                  </div>
+                  <div className="px-3 py-1.5 bg-slate-950 text-amber-300 text-[10px] font-black rounded-xl uppercase tracking-widest flex items-center gap-1 shadow-sm">
+                    <span>1 Altın 🪙</span>
+                    <Play size={10} className="fill-current" />
+                  </div>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1014,30 +1135,28 @@ export default function WelcomeScreen({
         </div>
       </div>
 
-      {/* CARD 1: Main Play Action Button - Triggers game setup modal */}
-      <div className="w-full flex flex-col gap-1.5 relative z-10" id="main-play-section">
+      {/* CARD 1: Single Main Action Button - OYUN OYNA */}
+      <div className="w-full flex flex-col gap-2 relative z-10" id="main-play-section">
         <button
-          onClick={() => {
-            setShowGameSetup(true);
-          }}
-          className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] text-slate-900 py-3.5 px-4 sm:px-5 rounded-2xl shadow-[0_4px_0_#D97706,0_8px_20px_rgba(245,158,11,0.35)] transition-all flex items-center justify-between uppercase tracking-wider cursor-pointer relative overflow-hidden border border-amber-200/40"
+          onClick={() => setShowGameSetup(true)}
+          className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] text-slate-950 py-4 px-5 rounded-3xl shadow-[0_5px_0_#D97706,0_8px_20px_rgba(245,158,11,0.35)] transition-all flex items-center justify-between uppercase tracking-wider cursor-pointer relative overflow-hidden border border-amber-200/50"
           id="main-start-game-btn"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-950/15 flex items-center justify-center shrink-0 border border-slate-900/10">
-              <Swords size={22} className="text-slate-950 stroke-[2.5]" />
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-slate-950/15 flex items-center justify-center shrink-0 border border-slate-900/10">
+              <Swords size={24} className="text-slate-950 stroke-[2.5]" />
             </div>
             <div className="text-left leading-tight">
-              <div className="flex items-center gap-1.5">
-                <span className="font-black text-slate-950 text-sm sm:text-base tracking-wide">OYUNA BAŞLA</span>
-                <span className="text-[8px] font-black bg-slate-950 text-amber-300 px-1.5 py-0.5 rounded-full uppercase tracking-widest font-mono">1v1 & SOLO ⚡</span>
+              <div className="flex items-center gap-2">
+                <span className="font-black text-slate-950 text-base sm:text-lg tracking-wide">OYUN OYNA</span>
+                <span className="text-[8px] font-black bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full uppercase tracking-widest font-mono">1v1 & SOLO ⚡</span>
               </div>
-              <span className="block text-[9.5px] font-bold text-slate-900/80 font-sans normal-case mt-0.5">Canlı 1v1 Düello veya Solo Pratik Seçin</span>
+              <span className="block text-[10px] font-bold text-slate-900/80 font-sans normal-case mt-0.5">Solo Pratik veya Canlı 1v1 Düello Başlat</span>
             </div>
           </div>
-          <div className="px-3 py-1.5 bg-slate-950 text-amber-300 text-[10px] font-black rounded-xl uppercase tracking-widest shadow-sm flex items-center gap-1">
-            <span>Başla</span>
-            <Play size={10} className="fill-current" />
+          <div className="px-3.5 py-2 bg-slate-950 text-amber-300 text-[11px] font-black rounded-2xl uppercase tracking-widest shadow-sm flex items-center gap-1.5 shrink-0">
+            <span>GİRİŞ</span>
+            <Play size={12} className="fill-current" />
           </div>
         </button>
       </div>
