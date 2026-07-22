@@ -816,6 +816,15 @@ export default function App() {
     safeLocalStorage.setItem('kelimesavasi_game_mode', gameMode);
   }, [gameMode]);
 
+  const [duelWordLength, setDuelWordLength] = useState<number>(() => {
+    const saved = safeLocalStorage.getItem('kelimesavasi_duel_word_length');
+    return saved ? parseInt(saved, 10) : 5;
+  });
+
+  useEffect(() => {
+    safeLocalStorage.setItem('kelimesavasi_duel_word_length', duelWordLength.toString());
+  }, [duelWordLength]);
+
   const [matchmakingStatus, setMatchmakingStatus] = useState<'idle' | 'queued'>('idle');
 
   // Settings state moved up to avoid block scope issues with notification effects
@@ -1795,8 +1804,10 @@ export default function App() {
       };
     });
 
-    if (targetWord) {
-      fetchTargetWordDefinition(targetWord);
+    const wordToUse = targetWord || activeMatch?.targetWord || activeMatch?.correctWord || '';
+    if (wordToUse) {
+      setTargetWord(wordToUse);
+      fetchTargetWordDefinition(wordToUse);
     }
 
     if (winnerId === profile.id) {
@@ -2946,16 +2957,7 @@ export default function App() {
         matchId: activeMatch.id
       }));
     }
-    setActiveMatch(null);
-    setHasEnteredGame(false);
-    startNewGame(wordLength);
-
-    // Clean up matchmaking and room states in Firestore in the background
-    if (profile && profile.id) {
-      clearMatchmakingState(profile.id).catch((err) => {
-        console.warn('Database cleanup failed in handleLeaveMatch:', err);
-      });
-    }
+    await handleLeaveMatchToMenu();
   };
 
 
@@ -3018,10 +3020,11 @@ export default function App() {
         });
       }
 
+      const targetLen = matchWordsCount || duelWordLength || 5;
       // No redundant leave messages or timeout! Connect immediately to prevent race conditions.
       socketRef.current.send(JSON.stringify({
         type: 'join_matchmaking',
-        wordLength,
+        wordLength: targetLen,
         id: profile.id,
         name: profile.name || 'Oyuncu',
         avatarUrl: profile.avatarUrl || ''
@@ -3369,6 +3372,8 @@ export default function App() {
             onChangeGameMode={setGameMode}
             wordLength={wordLength}
             onChangeWordLength={setWordLength}
+            duelWordLength={duelWordLength}
+            onChangeDuelWordLength={setDuelWordLength}
             onStartSoloGame={() => {
               setHasEnteredGame(true);
             }}
@@ -3418,7 +3423,7 @@ export default function App() {
                     <span>Giriş Ekranı</span>
                   </button>
 
-                  {!isDailyPuzzle && (
+                  {!isDailyPuzzle && !activeMatch && (
                     <div className="flex items-center gap-1.5">
                       {gameStatus === 'playing' && (
                         <button
@@ -3464,7 +3469,7 @@ export default function App() {
                 </div>
 
                 {/* Row 2: Harf Sayısı Selector & Mode tag */}
-                {!isDailyPuzzle && (
+                {!isDailyPuzzle && !activeMatch && (
                   <div className="flex justify-between items-center w-full bg-[#3D4756]/85 backdrop-blur-md border border-[#3E485A] rounded-xl px-2.5 py-1.5 shadow-sm text-white">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider font-mono">Harf:</span>
@@ -3588,12 +3593,12 @@ export default function App() {
                 <span className="text-[10px] font-black text-amber-400 font-mono tracking-widest uppercase mt-3">CANLI 1v1 DÜELLO</span>
                 <h3 className="text-lg font-black text-[#FAF6E9] tracking-wide uppercase mt-0.5">RAKİP ARANIYOR...</h3>
                 <p className="text-xs text-gray-300 mt-1 leading-normal">
-                  {wordLength} harfli canlı düello için rakip bekleniyor. Odaya girildiği an yarış başlayacak!
+                  {duelWordLength} harfli canlı düello için rakip bekleniyor. Odaya girildiği an yarış başlayacak!
                 </p>
               </div>
 
               <button
-                onClick={() => handleStartMatchmaking()}
+                onClick={() => handleStartMatchmaking(duelWordLength)}
                 className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer active:scale-95"
               >
                 Aramayı İptal Et
@@ -4057,32 +4062,18 @@ export default function App() {
                   </span>
                 </button>
 
-                {/* Back and Home Row */}
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => {
-                      playClickSound(settings.soundEnabled);
-                      handleLeaveMatchToMenu();
-                    }}
-                    className="bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-[#FAF6E9] font-black text-xs py-2 px-3 rounded-xl shadow-md transition-all uppercase tracking-widest cursor-pointer flex items-center justify-center gap-1.5 border border-white/5"
-                    id="match-back-btn"
-                  >
-                    <ArrowLeft size={14} className="stroke-[2.5]" />
-                    <span>Geri</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      playClickSound(settings.soundEnabled);
-                      handleLeaveMatchToMenu();
-                    }}
-                    className="bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] text-[#2E3748] font-black text-xs py-2 px-3 rounded-xl shadow-md transition-all uppercase tracking-widest cursor-pointer flex items-center justify-center gap-1.5"
-                    id="match-home-btn"
-                  >
-                    <Home size={14} className="stroke-[2.5]" />
-                    <span>Ana Sayfa</span>
-                  </button>
-                </div>
+                {/* Main Home Button */}
+                <button
+                  onClick={() => {
+                    playClickSound(settings.soundEnabled);
+                    handleLeaveMatchToMenu();
+                  }}
+                  className="w-full bg-[#FAF6E9] hover:bg-[#F3EFE0] active:scale-[0.98] text-[#2E3748] font-black text-xs py-3 px-4 rounded-xl shadow-lg transition-all uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2 border border-white/10"
+                  id="match-home-btn"
+                >
+                  <Home size={16} className="stroke-[2.5]" />
+                  <span>ANA SAYFAYA DÖN</span>
+                </button>
               </div>
             </div>
           )}

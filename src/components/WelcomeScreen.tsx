@@ -23,6 +23,8 @@ interface WelcomeScreenProps {
   onChangeGameMode: (mode: 'timed' | 'untimed') => void;
   wordLength: number;
   onChangeWordLength: (length: number) => void;
+  duelWordLength?: number;
+  onChangeDuelWordLength?: (length: number) => void;
   onStartSoloGame: () => void;
   onOpenSettings: () => void;
   onOpenMissions?: () => void;
@@ -55,6 +57,8 @@ export default function WelcomeScreen({
   onChangeGameMode,
   wordLength,
   onChangeWordLength,
+  duelWordLength,
+  onChangeDuelWordLength,
   onStartSoloGame,
   onOpenSettings,
   onOpenMissions,
@@ -85,6 +89,29 @@ export default function WelcomeScreen({
   // Game setup states
   const [showGameSetup, setShowGameSetup] = useState<boolean>(false);
   const [selectedGameModeTab, setSelectedGameModeTab] = useState<'solo' | 'duel'>('solo');
+
+  // Independent Duel Word Length State
+  const [localDuelWordLength, setLocalDuelWordLength] = useState<number>(() => {
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('kelimesavasi_duel_word_length') : null;
+      return saved ? parseInt(saved, 10) : 5;
+    } catch (e) {
+      return 5;
+    }
+  });
+
+  const currentDuelWordLength = duelWordLength !== undefined ? duelWordLength : localDuelWordLength;
+
+  const handleDuelWordLengthChange = (len: number) => {
+    if (onChangeDuelWordLength) {
+      onChangeDuelWordLength(len);
+    } else {
+      setLocalDuelWordLength(len);
+      try {
+        localStorage.setItem('kelimesavasi_duel_word_length', len.toString());
+      } catch (e) {}
+    }
+  };
 
   // Real-time bidirectional friends and requests from Firestore
   const [confirmedFriends, setConfirmedFriends] = useState<{ id: string; name: string; avatarUrl?: string }[]>([]);
@@ -713,15 +740,15 @@ export default function WelcomeScreen({
                 <div className="space-y-1.5 text-left">
                   <div className="flex justify-between items-center">
                     <span className="text-[9px] font-black text-amber-300/80 font-mono tracking-wider uppercase block">DÜELLO HARF SAYISI</span>
-                    <span className="text-[10px] font-mono text-amber-400 font-bold">{wordLength} Harf</span>
+                    <span className="text-[10px] font-mono text-amber-400 font-bold">{currentDuelWordLength} Harf</span>
                   </div>
                   <div className="grid grid-cols-6 gap-1 p-0.5 bg-black/35 rounded-xl border border-white/5">
                     {[3, 4, 5, 6, 7, 8].map((len) => (
                       <button
                         key={len}
-                        onClick={() => onChangeWordLength(len)}
+                        onClick={() => handleDuelWordLengthChange(len)}
                         className={`py-1.5 rounded-lg text-xs font-black transition-all duration-200 active:scale-90 cursor-pointer ${
-                          wordLength === len
+                          currentDuelWordLength === len
                             ? 'bg-amber-400 text-slate-950 shadow-sm font-black'
                             : 'text-[#FAF6E9]/75 hover:bg-white/5 hover:text-white'
                         }`}
@@ -751,11 +778,11 @@ export default function WelcomeScreen({
                 <div className="w-full bg-amber-950/60 border border-amber-500/50 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-lg">
                   <div className="flex items-center gap-2 text-amber-300 font-black text-xs sm:text-sm uppercase tracking-wider">
                     <Swords size={20} className="animate-spin text-amber-400" />
-                    <span>RAKİP ARANIYOR ({wordLength} HARF)...</span>
+                    <span>RAKİP ARANIYOR ({currentDuelWordLength} HARF)...</span>
                   </div>
                   <p className="text-[10px] text-amber-200/80 font-bold">Lütfen bekleyin, uygun bir rakip eşleştiriliyor.</p>
                   <button
-                    onClick={() => onStartMatchmaking && onStartMatchmaking(wordLength)}
+                    onClick={() => onStartMatchmaking && onStartMatchmaking(currentDuelWordLength)}
                     className="mt-1 text-xs font-black text-rose-300 bg-rose-950/80 hover:bg-rose-900 border border-rose-500/50 px-4 py-2 rounded-xl uppercase tracking-wider transition cursor-pointer active:scale-95 shadow-sm"
                     id="cancel-matchmaking-setup-btn"
                   >
@@ -766,7 +793,7 @@ export default function WelcomeScreen({
                 <button
                   onClick={() => {
                     if (onStartMatchmaking) {
-                      onStartMatchmaking(wordLength);
+                      onStartMatchmaking(currentDuelWordLength);
                     }
                   }}
                   className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] text-slate-950 py-3.5 px-4 rounded-2xl shadow-[0_4px_0_#D97706,0_8px_20px_rgba(245,158,11,0.35)] transition-all flex items-center justify-between uppercase tracking-wider cursor-pointer border border-amber-200/40"

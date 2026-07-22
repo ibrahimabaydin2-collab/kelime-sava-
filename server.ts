@@ -860,7 +860,7 @@ async function startServer() {
     player2: MatchPlayer;
     winner: string | null;
     loser: string | null;
-    winReason: 'correct_word' | 'opponent_left' | null;
+    winReason: 'correct_word' | 'opponent_left' | 'max_attempts' | null;
     createdAt: number;
     startedAt?: number;
     finishedAt?: number;
@@ -1136,6 +1136,33 @@ async function startServer() {
               opponentId: sender.id,
               attemptCount: sender.attempts.length
             });
+
+            if (sender.attempts.length >= 6 && opponent.attempts.length >= 6) {
+              match.gameState = 'FINISHED';
+              match.winner = 'draw';
+              match.winReason = 'max_attempts';
+              match.finishedAt = Date.now();
+
+              const endPayload = {
+                type: 'match_end',
+                matchId: match.matchId,
+                gameState: 'FINISHED',
+                winner: 'draw',
+                winReason: 'max_attempts',
+                correctWord: match.correctWord,
+                attempts: {
+                  [match.player1.id]: match.player1.attempts,
+                  [match.player2.id]: match.player2.attempts
+                }
+              };
+
+              sendWs(match.player1.ws, endPayload);
+              sendWs(match.player2.ws, endPayload);
+
+              socketToMatchIdMap.delete(match.player1.ws);
+              socketToMatchIdMap.delete(match.player2.ws);
+              setTimeout(() => activeDuelMatches.delete(matchId), 15000);
+            }
           }
         } else if (data.type === 'leave_match') {
           handlePlayerDisconnect(ws);
